@@ -1,5 +1,8 @@
 #![no_std]
+pub mod error;
+
 use soroban_sdk::{contract, contractimpl, vec, Env, String, Vec};
+use crate::error::Error;
 
 #[contract]
 pub struct Contract;
@@ -19,5 +22,6 @@ impl Contract {
         vec![&env, String::from_str(&env, "Hello"), to]
     }
 }
+
 
 mod test;
