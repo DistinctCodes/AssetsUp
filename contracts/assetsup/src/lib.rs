@@ -58,6 +58,42 @@ impl AssetUpContract {
             None => Err(errors::ContractError::AssetNotFound),
         }
     }
+
+    /// Tokenize an existing asset by setting its Stellar token ID.
+    ///
+    /// Access: Only the contract admin (set during `initialize`) can call this.
+    ///
+    /// - Updates `stellar_token_id` field on the `Asset`.
+    /// - Returns `AssetNotFound` if the asset ID does not exist.
+    /// - Returns `Unauthorized` if caller is not the admin.
+    pub fn tokenize_asset(
+        env: Env,
+        caller: Address,
+        asset_id: BytesN<32>,
+        token_id: BytesN<32>,
+    ) -> Result<(), errors::ContractError> {
+        // Admin-only: caller must equal stored admin and must authorize
+        let admin = Self::get_admin(env.clone());
+        if caller != admin {
+            return Err(errors::ContractError::Unauthorized);
+        }
+        caller.require_auth();
+
+        let key = asset::DataKey::Asset(asset_id.clone());
+        let store = env.storage().persistent();
+
+        // Load asset or return not found
+        let mut a = match store.get::<_, asset::Asset>(&key) {
+            Some(a) => a,
+            None => return Err(errors::ContractError::AssetNotFound),
+        };
+
+        // Update token id and persist
+        a.stellar_token_id = token_id;
+        store.set(&key, &a);
+        Ok(())
+    }
 }
 
 mod tests;
+
