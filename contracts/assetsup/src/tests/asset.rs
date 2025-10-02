@@ -34,7 +34,7 @@ fn test_register_and_get_asset_success() {
     let asset = Asset {
         id: id.clone(),
         name: name.clone(),
-        asset_type: AssetType::IT,
+        asset_type: AssetType::Digital,
         category: category.clone(),
         branch_id: 10,
         department_id: 20,
@@ -54,7 +54,7 @@ fn test_register_and_get_asset_success() {
 
     assert_eq!(got.id, id);
     assert_eq!(got.name, name);
-    assert_eq!(got.asset_type, AssetType::IT);
+    assert_eq!(got.asset_type, AssetType::Digital);
     assert_eq!(got.category, category);
     assert_eq!(got.branch_id, 10);
     assert_eq!(got.department_id, 20);
@@ -82,7 +82,7 @@ fn test_register_asset_duplicate() {
     let asset = Asset {
         id: id.clone(),
         name: name.clone(),
-        asset_type: AssetType::Furniture,
+        asset_type: AssetType::Physical,
         category: category.clone(),
         branch_id: 1,
         department_id: 2,

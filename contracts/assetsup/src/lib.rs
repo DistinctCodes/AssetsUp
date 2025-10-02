@@ -5,6 +5,8 @@ pub(crate) mod asset;
 pub(crate) mod errors;
 pub(crate) mod types;
 
+pub use types::*;
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
