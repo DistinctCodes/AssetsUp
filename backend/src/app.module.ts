@@ -14,6 +14,11 @@ import { SearchModule } from './search/search.module';
 import { AuthModule } from './auth/auth.module';
 import { RiskModule } from './risk/risk.module';
 import { ReportingModule } from './reporting/reporting.module';
+import { AssetTransfersModule } from './asset-transfers/asset-transfers.module';
+import { FileUpload } from './file-uploads/entities/file-upload.entity';
+import { Asset } from './assets/entities/assest.entity';
+import { Supplier } from './suppliers/entities/supplier.entity';
+import { QrBarcodeModule } from './qr-barcode/qr-barcode.module';
 
 @Module({
   imports: [
@@ -50,8 +55,9 @@ import { ReportingModule } from './reporting/reporting.module';
     AuthModule,
     RiskModule,
     ReportingModule,
+    QrBarcodeModule,
   ],
-  controllers: [AppController, NotificationsController],
-  providers: [AppService, NotificationsService],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

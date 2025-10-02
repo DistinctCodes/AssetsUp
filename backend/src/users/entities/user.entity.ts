@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  UpdateDateColumn,
+  CreateDateColumn,
+} from 'typeorm';
 
 @Entity('users')
 export class User {
@@ -17,20 +24,20 @@ export class User {
   @Column()
   passwordHash: string;
 
-    @Column({ type: 'enum', enum: ['admin', 'user', 'manager'], default: 'user' })
-    role: 'admin' | 'user' | 'manager';
-    // Department relation temporarily commented out due to import error
-    // @ManyToOne(() => Department, { nullable: true })
-    // department?: Department;
-    @Column({ nullable: true })
-    companyId?: number;
-    @Column({ nullable: true })
-    branchId?: number;
+  @Column({ type: 'enum', enum: ['admin', 'user', 'manager'], default: 'user' })
+  role: 'admin' | 'user' | 'manager';
+  // Department relation temporarily commented out due to import error
+  // @ManyToOne(() => Department, { nullable: true })
+  // department?: Department;
+  @Column({ nullable: true })
+  companyId?: number;
+  @Column({ nullable: true })
+  branchId?: number;
 
-    @CreateDateColumn()
-    createdAt: Date;
-    @UpdateDateColumn()
-    updatedAt: Date;
+  @CreateDateColumn()
+  createdAt: Date;
+  @UpdateDateColumn()
+  updatedAt: Date;
 
   // Relations to company, department, branch (to be defined)
   // @ManyToOne(() => Company, company => company.users)

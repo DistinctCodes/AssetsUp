@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Asset } from './entities/asset.entity';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { Supplier } from '../suppliers/entities/supplier.entity';
-import { Department } from '../departments/entities/department.entity';
-import { Category } from '../categories/entities/category.entity';
+import { Asset } from './entities/assest.entity';
+import { Department } from 'src/departments/department.entity';
+import { AssetCategory } from 'src/asset-categories/asset-category.entity';
 
 @Injectable()
 export class AssetsService {
@@ -17,8 +17,8 @@ export class AssetsService {
     private supplierRepo: Repository<Supplier>,
     @InjectRepository(Department)
     private departmentRepo: Repository<Department>,
-    @InjectRepository(Category)
-    private categoryRepo: Repository<Category>,
+    @InjectRepository(AssetCategory)
+    private categoryRepo: Repository<AssetCategory>,
   ) {}
 
   async create(dto: CreateAssetDto): Promise<Asset> {
@@ -30,7 +30,9 @@ export class AssetsService {
 
     let department: Department = null;
     if (dto.assignedDepartmentId) {
-      department = await this.departmentRepo.findOneBy({ id: dto.assignedDepartmentId });
+      department = await this.departmentRepo.findOneBy({
+        id: dto.assignedDepartmentId,
+      });
       if (!department) throw new NotFoundException('Department not found');
     }
 
@@ -65,13 +67,19 @@ export class AssetsService {
     const asset = await this.findOne(id);
 
     if (dto.supplierId) {
-      asset.supplier = await this.supplierRepo.findOneBy({ id: dto.supplierId });
+      asset.supplier = await this.supplierRepo.findOneBy({
+        id: dto.supplierId,
+      });
     }
     if (dto.categoryId) {
-      asset.category = await this.categoryRepo.findOneBy({ id: dto.categoryId });
+      asset.category = await this.categoryRepo.findOneBy({
+        id: dto.categoryId,
+      });
     }
     if (dto.assignedDepartmentId) {
-      asset.assignedDepartment = await this.departmentRepo.findOneBy({ id: dto.assignedDepartmentId });
+      asset.assignedDepartment = await this.departmentRepo.findOneBy({
+        id: dto.assignedDepartmentId,
+      });
     }
 
     Object.assign(asset, dto);

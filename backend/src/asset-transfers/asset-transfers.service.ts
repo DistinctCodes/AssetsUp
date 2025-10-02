@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AssetTransfer } from './entities/asset-transfer.entity';
 import { InitiateTransferDto } from './dto/initiate-transfer.dto';
-import { InventoryItem } from '../../inventory-items/entities/inventory-item.entity';
+import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
 
 @Injectable()
 export class AssetTransfersService {
@@ -15,7 +15,9 @@ export class AssetTransfersService {
   ) {}
 
   async initiateTransfer(dto: InitiateTransferDto): Promise<AssetTransfer> {
-    const asset = await this.inventoryRepository.findOne({ where: { id: dto.assetId } });
+    const asset = await this.inventoryRepository.findOne({
+      where: { id: dto.assetId },
+    });
     if (!asset) {
       throw new NotFoundException(`Asset ${dto.assetId} not found`);
     }
@@ -38,5 +40,3 @@ export class AssetTransfersService {
     return await this.transferRepository.save(transfer);
   }
 }
-
-

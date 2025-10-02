@@ -4,8 +4,8 @@ import { Repository, SelectQueryBuilder } from 'typeorm';
 import { SearchQueryDto, SearchEntity } from './dto/search-query.dto';
 import { SearchResponseDto, SearchMetadata } from './dto/search-response.dto';
 import { SearchResultDto } from './dto/search-result.dto';
-import { Asset } from 'src/assets/entity/asset.entity';
-import { InventoryItem } from 'src/inventory/entities/inventory-item.entity'; 
+import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
+import { Asset } from 'src/assets/entities/assest.entity';
 
 @Injectable()
 export class SearchService {
@@ -44,7 +44,10 @@ export class SearchService {
       total += assetResults.total;
     }
 
-    if (entityType === SearchEntity.ALL || entityType === SearchEntity.INVENTORY) {
+    if (
+      entityType === SearchEntity.ALL ||
+      entityType === SearchEntity.INVENTORY
+    ) {
       const inventoryResults = await this.searchInventory(searchQuery);
       results.push(...inventoryResults.data);
       total += inventoryResults.total;
@@ -106,7 +109,8 @@ export class SearchService {
   private async searchInventory(
     searchQuery: SearchQueryDto,
   ): Promise<{ data: SearchResultDto[]; total: number }> {
-    const queryBuilder = this.inventoryRepository.createQueryBuilder('inventory');
+    const queryBuilder =
+      this.inventoryRepository.createQueryBuilder('inventory');
 
     // Apply filters
     this.applyFilters(queryBuilder, searchQuery, 'inventory');
@@ -141,9 +145,12 @@ export class SearchService {
 
     // Category filter
     if (category) {
-      queryBuilder.andWhere(`LOWER(${entityAlias}.category) = LOWER(:category)`, {
-        category,
-      });
+      queryBuilder.andWhere(
+        `LOWER(${entityAlias}.category) = LOWER(:category)`,
+        {
+          category,
+        },
+      );
     }
 
     // Department filter
@@ -156,16 +163,22 @@ export class SearchService {
 
     // Supplier filter
     if (supplier) {
-      queryBuilder.andWhere(`LOWER(${entityAlias}.supplier) = LOWER(:supplier)`, {
-        supplier,
-      });
+      queryBuilder.andWhere(
+        `LOWER(${entityAlias}.supplier) = LOWER(:supplier)`,
+        {
+          supplier,
+        },
+      );
     }
 
     // Location filter
     if (location) {
-      queryBuilder.andWhere(`LOWER(${entityAlias}.location) = LOWER(:location)`, {
-        location,
-      });
+      queryBuilder.andWhere(
+        `LOWER(${entityAlias}.location) = LOWER(:location)`,
+        {
+          location,
+        },
+      );
     }
   }
 
@@ -245,7 +258,7 @@ export class SearchService {
     ];
 
     // Repeat for other fields...
-    
+
     return {
       categories,
       departments: [], // Implement similar logic

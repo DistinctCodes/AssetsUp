@@ -61,4 +61,17 @@ export class Asset {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // New columns for QR/Barcode
+  @Column({ type: 'text', nullable: true })
+  qrCodeBase64?: string | null; // data:image/png;base64,...
+
+  @Column({ type: 'text', nullable: true })
+  barcodeBase64?: string | null; // data:image/png;base64,...
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  qrCodeFilename?: string | null; // optional file path if you save to disk
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  barcodeFilename?: string | null; // optional file path if you save to disk
 }
