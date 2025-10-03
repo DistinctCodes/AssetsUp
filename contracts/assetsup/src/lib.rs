@@ -98,4 +98,3 @@ impl AssetUpContract {
 }
 
 mod tests;
-

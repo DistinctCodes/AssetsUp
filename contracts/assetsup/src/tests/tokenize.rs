@@ -6,8 +6,8 @@ use soroban_sdk::{Address, BytesN, String, testutils::Address as _};
 
 use crate::{
     asset::Asset,
-    types::{AssetStatus, AssetType},
     errors::ContractError,
+    types::{AssetStatus, AssetType},
 };
 
 use super::initialize::setup_test_environment;
@@ -46,7 +46,7 @@ fn test_tokenize_asset_success_by_admin() {
         current_value: 4_000,
         warranty_expiry: 1_760_000_000,
         stellar_token_id: initial_token,
-        owner: owner,
+        owner,
     };
 
     client.register_asset(&asset);
@@ -85,7 +85,7 @@ fn test_tokenize_asset_unauthorized() {
         current_value: 250,
         warranty_expiry: 1_750_000_000,
         stellar_token_id: initial_token,
-        owner: owner,
+        owner,
     };
 
     client.register_asset(&asset);
