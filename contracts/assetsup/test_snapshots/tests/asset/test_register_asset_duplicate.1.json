@@ -23,7 +23,7 @@
                       "val": {
                         "vec": [
                           {
-                            "symbol": "Furniture"
+                            "symbol": "Physical"
                           }
                         ]
                       }
@@ -199,7 +199,7 @@
                       "val": {
                         "vec": [
                           {
-                            "symbol": "Furniture"
+                            "symbol": "Physical"
                           }
                         ]
                       }

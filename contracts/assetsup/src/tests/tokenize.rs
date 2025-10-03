@@ -36,7 +36,7 @@ fn test_tokenize_asset_success_by_admin() {
     let asset = Asset {
         id: asset_id.clone(),
         name: String::from_str(&env, "Printer X"),
-        asset_type: AssetType::IT,
+        asset_type: AssetType::Physical,
         category: String::from_str(&env, "Electronics"),
         branch_id: 1,
         department_id: 1,
@@ -75,7 +75,7 @@ fn test_tokenize_asset_unauthorized() {
     let asset = Asset {
         id: asset_id.clone(),
         name: String::from_str(&env, "Desk Y"),
-        asset_type: AssetType::Furniture,
+        asset_type: AssetType::Physical,
         category: String::from_str(&env, "Furniture"),
         branch_id: 2,
         department_id: 3,

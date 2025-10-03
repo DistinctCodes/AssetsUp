@@ -42,7 +42,7 @@
                       "val": {
                         "vec": [
                           {
-                            "symbol": "IT"
+                            "symbol": "Physical"
                           }
                         ]
                       }
@@ -282,7 +282,7 @@
                       "val": {
                         "vec": [
                           {
-                            "symbol": "IT"
+                            "symbol": "Physical"
                           }
                         ]
                       }
