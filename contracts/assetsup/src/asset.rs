@@ -15,7 +15,7 @@ pub struct Asset {
     pub name: String,
     pub asset_type: AssetType,
     pub category: String,
-    pub branch_id: u64,
+    pub branch_id: BytesN<32>,
     pub department_id: u64,
     pub status: AssetStatus,
     pub purchase_date: u64,
