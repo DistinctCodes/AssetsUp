@@ -9,6 +9,7 @@ pub(crate) mod error;
 pub(crate) mod errors;
 pub(crate) mod types;
 
+pub(crate) mod audit;
 pub use types::*;
 
 #[contracttype]
@@ -203,6 +204,71 @@ impl AssetUpContract {
         a.stellar_token_id = token_id;
         store.set(&key, &a);
         Ok(())
+    }
+
+    pub fn transfer_asset(
+    env: Env,
+    actor: Address,
+    asset_id: BytesN<32>,
+    new_branch_id: BytesN<32>,
+) -> Result<(), Error> {
+    actor.require_auth();
+
+    let store = env.storage().persistent();
+    let asset_key = asset::DataKey::Asset(asset_id.clone());
+
+    let mut asset: asset::Asset = match store.get(&asset_key) {
+        Some(a) => a,
+        None => return Err(Error::AssetNotFound),
+    };
+
+    let contract_admin = Self::get_admin(env.clone())?;
+    if actor != contract_admin && actor != asset.owner {
+        return Err(Error::Unauthorized);
+    }
+
+    let old_branch_id = asset.branch_id.clone();
+
+    if old_branch_id == new_branch_id {
+        return Ok(()); // No-op
+    }
+
+    // Verify new branch exists
+    let new_branch_key = branch::DataKey::Branch(new_branch_id.clone());
+    if !store.has(&new_branch_key) {
+        return Err(Error::BranchNotFound);
+    }
+
+    // Remove from old branch asset list
+    let old_asset_list_key = branch::DataKey::AssetList(old_branch_id);
+    let mut old_asset_list: Vec<BytesN<32>> = store.get(&old_asset_list_key).unwrap();
+    if let Some(index) = old_asset_list.iter().position(|x| x == asset_id) {
+        old_asset_list.remove(index as u32);
+    }
+    store.set(&old_asset_list_key, &old_asset_list);
+
+    // Add to new branch asset list
+    let new_asset_list_key = branch::DataKey::AssetList(new_branch_id.clone());
+    let mut new_asset_list: Vec<BytesN<32>> = store.get(&new_asset_list_key).unwrap_or_else(|| Vec::new(&env));
+    new_asset_list.push_back(asset_id.clone());
+    store.set(&new_asset_list_key, &new_asset_list);
+
+    // Update asset's branch
+    asset.branch_id = new_branch_id;
+    store.set(&asset_key, &asset);
+
+    // Log the transfer
+    let note = String::from_str(&env, "Asset transferred");
+    audit::log_action(&env, &asset_id, actor, ActionType::Transferred, note);
+
+    Ok(())
+    }
+
+    pub fn get_asset_log(
+        env: Env,
+        asset_id: BytesN<32>,
+    ) -> Result<Vec<audit::AuditEntry>, Error> {
+        Ok(audit::get_asset_log(&env, &asset_id))
     }
 }
 
