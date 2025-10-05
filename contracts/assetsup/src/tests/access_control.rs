@@ -141,7 +141,6 @@ fn test_global_admin_can_log_audit_action() {
     client.register_asset(&asset);
 
     // Global admin should be able to log audit action
-    let action = String::from_str(&env, "PROCURED");
     let details = String::from_str(&env, "Asset registered");
 
     // Verify audit log was created
