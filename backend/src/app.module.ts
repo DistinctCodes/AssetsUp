@@ -33,6 +33,7 @@ import { AssetCategoriesModule } from './asset-categories/asset-categories.modul
 import { DepartmentsModule } from './departments/departments.module';
 import { AssetTransfersModule } from './asset-transfers/asset-transfers.module';
 import { SearchModule } from './search/search.module';
+import { ApiKeyModule } from './api-key/api-key.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { SearchModule } from './search/search.module';
     // VendorDirectoryModule,
     WebhooksModule,
     AuditLogsModule,
+    ApiKeyModule,
   ],
   controllers: [AppController],
   providers: [

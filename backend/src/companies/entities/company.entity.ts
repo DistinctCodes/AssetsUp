@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('companies')
@@ -19,6 +20,7 @@ export class Company {
 
   @UpdateDateColumn()
   updatedAt: Date;
+    apiKeys: any;
 }
 
 
