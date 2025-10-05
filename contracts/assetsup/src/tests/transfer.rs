@@ -83,7 +83,7 @@ fn test_transfer_asset_by_owner() {
         asset_id
     );
 
-    let log = client.get_asset_log(&asset_id);
+    let log = client.get_asset_audit_logs(&asset_id);
     assert_eq!(log.len(), 1);
     let entry = log.get(0).unwrap();
     assert_eq!(entry.actor, owner);
@@ -231,7 +231,7 @@ fn test_transfer_to_same_branch() {
     assert_eq!(client.get_branch_assets(&initial_branch_id).len(), 1);
 
     // No log should be created
-    let log = client.get_asset_log(&asset_id);
+    let log = client.get_asset_audit_logs(&asset_id);
     assert_eq!(log.len(), 0);
 }
 
