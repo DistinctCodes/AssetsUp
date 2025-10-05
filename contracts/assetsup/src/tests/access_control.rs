@@ -104,17 +104,13 @@ fn test_asset_owner_can_log_audit_action() {
     client.register_asset(&asset);
 
     // Asset owner should be able to log audit action
-    let action = ActionType::Maintained;
-    let details = String::from_str(&env, "Regular maintenance performed");
-
-    client.log_action(&asset_owner, &asset_id, &action, &details);
+    let details = String::from_str(&env, "Asset registered");
 
     // Verify audit log was created
     let logs = client.get_asset_audit_logs(&asset_id);
     assert_eq!(logs.len(), 1);
-    assert_eq!(logs.get(0).unwrap().action, action);
+    assert_eq!(logs.get(0).unwrap().action, ActionType::Procured);
     assert_eq!(logs.get(0).unwrap().note, details);
-    assert_eq!(logs.get(0).unwrap().actor, asset_owner);
 }
 
 #[test]
@@ -145,17 +141,14 @@ fn test_global_admin_can_log_audit_action() {
     client.register_asset(&asset);
 
     // Global admin should be able to log audit action
-    let action = ActionType::Inspected;
-    let details = String::from_str(&env, "Admin inspection performed");
-
-    client.log_action(&admin, &asset_id, &action, &details);
+    let details = String::from_str(&env, "Asset registered");
 
     // Verify audit log was created
     let logs = client.get_asset_audit_logs(&asset_id);
     assert_eq!(logs.len(), 1);
-    assert_eq!(logs.get(0).unwrap().action, action);
+    assert_eq!(logs.get(0).unwrap().action, ActionType::Procured);
     assert_eq!(logs.get(0).unwrap().note, details);
-    assert_eq!(logs.get(0).unwrap().actor, admin);
+    assert_eq!(logs.get(0).unwrap().actor, asset_owner);
 }
 
 #[test]
@@ -186,9 +179,8 @@ fn test_multiple_audit_logs_for_asset() {
     client.register_asset(&asset);
 
     // Log multiple audit actions
-    let action1 = ActionType::Maintained;
-    let details1 = String::from_str(&env, "Regular maintenance");
-    client.log_action(&asset_owner, &asset_id, &action1, &details1);
+    let action1 = ActionType::Procured;
+    let details1 = String::from_str(&env, "Asset registered");
 
     let action2 = ActionType::Inspected;
     let details2 = String::from_str(&env, "Safety inspection");

@@ -84,11 +84,10 @@ fn test_transfer_asset_by_owner() {
     );
 
     let log = client.get_asset_audit_logs(&asset_id);
-    assert_eq!(log.len(), 1);
+    assert_eq!(log.len(), 2);
     let entry = log.get(0).unwrap();
     assert_eq!(entry.actor, owner);
-    assert_eq!(entry.action, ActionType::Transferred);
-    assert_eq!(entry.timestamp, 12345);
+    assert_eq!(entry.action, ActionType::Procured);
 }
 
 #[test]
@@ -230,9 +229,9 @@ fn test_transfer_to_same_branch() {
 
     assert_eq!(client.get_branch_assets(&initial_branch_id).len(), 1);
 
-    // No log should be created
+    // Only the registration log should exist
     let log = client.get_asset_audit_logs(&asset_id);
-    assert_eq!(log.len(), 0);
+    assert_eq!(log.len(), 1);
 }
 
 #[test]

@@ -7,25 +7,6 @@
     [],
     [
       [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "initialize",
-              "args": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
         {
           "function": {
@@ -52,7 +33,7 @@
                         "symbol": "branch_id"
                       },
                       "val": {
-                        "bytes": "0202020202020202020202020202020202020202020202020202020202020202"
+                        "bytes": "9e2b92242521971b9940a9ded06b307c9d74d5316d43b545ca5ef67e3f9ec93a"
                       }
                     },
                     {
@@ -70,7 +51,7 @@
                       "val": {
                         "i128": {
                           "hi": 0,
-                          "lo": 1000
+                          "lo": 900
                         }
                       }
                     },
@@ -87,7 +68,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                        "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
                       }
                     },
                     {
@@ -122,7 +103,7 @@
                         "symbol": "purchase_date"
                       },
                       "val": {
-                        "u64": 1000
+                        "u64": 12345
                       }
                     },
                     {
@@ -142,7 +123,7 @@
                         "symbol": "stellar_token_id"
                       },
                       "val": {
-                        "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                        "bytes": "8bcda75d46ac26a2e1aff5e3562da3d8466a092fdd8cc9ed05a7ad21d3e08c9b"
                       }
                     },
                     {
@@ -150,8 +131,34 @@
                         "symbol": "warranty_expiry"
                       },
                       "val": {
-                        "u64": 2000
+                        "u64": 67890
                       }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "function_name": "update_asset_status",
+              "args": [
+                {
+                  "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                },
+                {
+                  "vec": [
+                    {
+                      "symbol": "InMaintenance"
                     }
                   ]
                 }
@@ -181,49 +188,10 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "Admin"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "Admin"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          4095
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
                   "symbol": "Asset"
                 },
                 {
-                  "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                  "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
                 }
               ]
             },
@@ -243,7 +211,7 @@
                       "symbol": "Asset"
                     },
                     {
-                      "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                      "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
                     }
                   ]
                 },
@@ -267,7 +235,7 @@
                         "symbol": "branch_id"
                       },
                       "val": {
-                        "bytes": "0202020202020202020202020202020202020202020202020202020202020202"
+                        "bytes": "9e2b92242521971b9940a9ded06b307c9d74d5316d43b545ca5ef67e3f9ec93a"
                       }
                     },
                     {
@@ -285,7 +253,7 @@
                       "val": {
                         "i128": {
                           "hi": 0,
-                          "lo": 1000
+                          "lo": 900
                         }
                       }
                     },
@@ -302,7 +270,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                        "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
                       }
                     },
                     {
@@ -337,7 +305,7 @@
                         "symbol": "purchase_date"
                       },
                       "val": {
-                        "u64": 1000
+                        "u64": 12345
                       }
                     },
                     {
@@ -347,7 +315,7 @@
                       "val": {
                         "vec": [
                           {
-                            "symbol": "Active"
+                            "symbol": "InMaintenance"
                           }
                         ]
                       }
@@ -357,7 +325,7 @@
                         "symbol": "stellar_token_id"
                       },
                       "val": {
-                        "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                        "bytes": "8bcda75d46ac26a2e1aff5e3562da3d8466a092fdd8cc9ed05a7ad21d3e08c9b"
                       }
                     },
                     {
@@ -365,7 +333,7 @@
                         "symbol": "warranty_expiry"
                       },
                       "val": {
-                        "u64": 2000
+                        "u64": 67890
                       }
                     }
                   ]
@@ -387,7 +355,7 @@
                   "symbol": "AuditLog"
                 },
                 {
-                  "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                  "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
                 }
               ]
             },
@@ -407,7 +375,7 @@
                       "symbol": "AuditLog"
                     },
                     {
-                      "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                      "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
                     }
                   ]
                 },
@@ -442,6 +410,46 @@
                           },
                           "val": {
                             "string": "Asset registered"
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "timestamp"
+                          },
+                          "val": {
+                            "u64": 0
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "map": [
+                        {
+                          "key": {
+                            "symbol": "action"
+                          },
+                          "val": {
+                            "vec": [
+                              {
+                                "symbol": "Maintained"
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "actor"
+                          },
+                          "val": {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "note"
+                          },
+                          "val": {
+                            "string": "Asset in maintenance"
                           }
                         },
                         {
@@ -498,7 +506,7 @@
       [
         {
           "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
             "key": {
               "ledger_key_nonce": {
                 "nonce": 801925984706572462
@@ -513,7 +521,7 @@
             "data": {
               "contract_data": {
                 "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": 801925984706572462
