@@ -58,6 +58,52 @@ impl AssetUpContract {
             return Err(Error::AssetAlreadyExists);
         }
         store.set(&key, &asset);
+
+        // Log the procurement action
+        Self::log_audit_action_as_owner(
+            env.clone(),
+            asset.id,
+            String::from_str(&env, "PROCURED"),
+            String::from_str(&env, "Asset registered"),
+        )?;
+        Ok(())
+    }
+
+    pub fn update_asset_status(
+        env: Env,
+        asset_id: BytesN<32>,
+        new_status: AssetStatus,
+    ) -> Result<(), Error> {
+        let key = asset::DataKey::Asset(asset_id.clone());
+        let store = env.storage().persistent();
+
+        let mut asset = match store.get::<_, asset::Asset>(&key) {
+            Some(a) => a,
+            None => return Err(Error::AssetNotFound),
+        };
+
+        // Only asset owner can update status
+        asset.owner.require_auth();
+
+        // Update status
+        asset.status = new_status.clone();
+        store.set(&key, &asset);
+
+        // Log appropriate audit action based on status
+        let (action, details) = match new_status {
+            AssetStatus::InMaintenance => (
+                String::from_str(&env, "IN_MAINTAINANCE"),
+                String::from_str(&env, "Asset in maintenance"),
+            ),
+            AssetStatus::Disposed => (
+                String::from_str(&env, "DISPOSED"),
+                String::from_str(&env, "Asset disposed"),
+            ),
+            _ => return Ok(()), // Don't log other status changes
+        };
+
+        Self::log_audit_action_as_owner(env, asset_id, action, details)?;
+
         Ok(())
     }
 

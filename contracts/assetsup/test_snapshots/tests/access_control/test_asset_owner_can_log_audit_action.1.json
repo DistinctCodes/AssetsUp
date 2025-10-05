@@ -160,25 +160,136 @@
           },
           "sub_invocations": []
         }
-      ]
-    ],
-    [
+      ],
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
         {
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "log_audit_action_as_owner",
+              "function_name": "register_asset",
               "args": [
                 {
-                  "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
-                },
-                {
-                  "string": "Asset Maintenance"
-                },
-                {
-                  "string": "Regular maintenance performed"
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "asset_type"
+                      },
+                      "val": {
+                        "vec": [
+                          {
+                            "symbol": "Physical"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "branch_id"
+                      },
+                      "val": {
+                        "u64": 1
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "category"
+                      },
+                      "val": {
+                        "string": "Test Category"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "current_value"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 1000
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "department_id"
+                      },
+                      "val": {
+                        "u64": 1
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "id"
+                      },
+                      "val": {
+                        "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "name"
+                      },
+                      "val": {
+                        "string": "Test Asset"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "owner"
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "purchase_cost"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 1000
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "purchase_date"
+                      },
+                      "val": {
+                        "u64": 1000
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "status"
+                      },
+                      "val": {
+                        "vec": [
+                          {
+                            "symbol": "Active"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "stellar_token_id"
+                      },
+                      "val": {
+                        "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "warranty_expiry"
+                      },
+                      "val": {
+                        "u64": 2000
+                      }
+                    }
+                  ]
                 }
               ]
             }
@@ -412,7 +523,7 @@
                   "symbol": "AuditLog"
                 },
                 {
-                  "bytes": "26d361c8eb42adac971ecf532ab697580c7086f223f1cd65a5d8a12426395d50"
+                  "bytes": "dfd3becaf3150b98fbcf87ba84cf5019d7edc50c4ec6f398e443753132d5c49e"
                 }
               ]
             },
@@ -432,7 +543,7 @@
                       "symbol": "AuditLog"
                     },
                     {
-                      "bytes": "26d361c8eb42adac971ecf532ab697580c7086f223f1cd65a5d8a12426395d50"
+                      "bytes": "dfd3becaf3150b98fbcf87ba84cf5019d7edc50c4ec6f398e443753132d5c49e"
                     }
                   ]
                 },
@@ -444,7 +555,7 @@
                         "symbol": "action"
                       },
                       "val": {
-                        "string": "Asset Maintenance"
+                        "string": "PROCURED"
                       }
                     },
                     {
@@ -468,7 +579,7 @@
                         "symbol": "details"
                       },
                       "val": {
-                        "string": "Regular maintenance performed"
+                        "string": "Asset registered"
                       }
                     },
                     {
@@ -476,7 +587,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "bytes": "26d361c8eb42adac971ecf532ab697580c7086f223f1cd65a5d8a12426395d50"
+                        "bytes": "dfd3becaf3150b98fbcf87ba84cf5019d7edc50c4ec6f398e443753132d5c49e"
                       }
                     },
                     {
@@ -534,7 +645,7 @@
                 "val": {
                   "vec": [
                     {
-                      "bytes": "26d361c8eb42adac971ecf532ab697580c7086f223f1cd65a5d8a12426395d50"
+                      "bytes": "dfd3becaf3150b98fbcf87ba84cf5019d7edc50c4ec6f398e443753132d5c49e"
                     }
                   ]
                 }
