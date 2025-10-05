@@ -31,6 +31,7 @@ pub enum ActionType {
     Disposed,
     CheckedIn,
     CheckedOut,
+    Inspected,
 }
 
 /// Represents different subscription plan tiers
