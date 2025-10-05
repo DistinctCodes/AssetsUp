@@ -110,6 +110,7 @@ fn test_types_can_be_used_in_functions() {
             ActionType::Disposed => false,
             ActionType::CheckedIn => true,
             ActionType::CheckedOut => true,
+            ActionType::Inspected => true,
         }
     }
 

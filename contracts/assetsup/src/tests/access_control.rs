@@ -1,6 +1,6 @@
 #![cfg(test)]
 use crate::asset::Asset;
-use crate::types::{AssetStatus, AssetType};
+use crate::types::{ActionType, AssetStatus, AssetType};
 use crate::{AssetUpContract, AssetUpContractClient};
 use soroban_sdk::{Address, BytesN, Env, String, testutils::Address as _};
 
@@ -48,12 +48,13 @@ fn test_global_admin_can_tokenize_asset() {
     // Register an asset
     let asset_id = BytesN::from_array(&env, &[1u8; 32]);
     let asset_owner = Address::generate(&env);
+    let branch_id = BytesN::from_array(&env, &[2u8; 32]);
     let asset = Asset {
         id: asset_id.clone(),
         name: String::from_str(&env, "Test Asset"),
         asset_type: AssetType::Physical,
         category: String::from_str(&env, "Test Category"),
-        branch_id: 1,
+        branch_id,
         department_id: 1,
         status: AssetStatus::Active,
         purchase_date: 1000,
@@ -83,12 +84,13 @@ fn test_asset_owner_can_log_audit_action() {
     // Register an asset
     let asset_id = BytesN::from_array(&env, &[1u8; 32]);
     let asset_owner = Address::generate(&env);
+    let branch_id = BytesN::from_array(&env, &[2u8; 32]);
     let asset = Asset {
         id: asset_id.clone(),
         name: String::from_str(&env, "Test Asset"),
         asset_type: AssetType::Physical,
         category: String::from_str(&env, "Test Category"),
-        branch_id: 1,
+        branch_id,
         department_id: 1,
         status: AssetStatus::Active,
         purchase_date: 1000,
@@ -102,17 +104,17 @@ fn test_asset_owner_can_log_audit_action() {
     client.register_asset(&asset);
 
     // Asset owner should be able to log audit action
-    let action = String::from_str(&env, "Asset Maintenance");
+    let action = ActionType::Maintained;
     let details = String::from_str(&env, "Regular maintenance performed");
 
-    client.log_audit_action_as_owner(&asset_id, &action, &details);
+    client.log_action(&asset_owner, &asset_id, &action, &details);
 
     // Verify audit log was created
     let logs = client.get_asset_audit_logs(&asset_id);
     assert_eq!(logs.len(), 1);
     assert_eq!(logs.get(0).unwrap().action, action);
-    assert_eq!(logs.get(0).unwrap().details, details);
-    assert_eq!(logs.get(0).unwrap().asset_id, asset_id);
+    assert_eq!(logs.get(0).unwrap().note, details);
+    assert_eq!(logs.get(0).unwrap().actor, asset_owner);
 }
 
 #[test]
@@ -123,12 +125,13 @@ fn test_global_admin_can_log_audit_action() {
     // Register an asset
     let asset_id = BytesN::from_array(&env, &[1u8; 32]);
     let asset_owner = Address::generate(&env);
+    let branch_id = BytesN::from_array(&env, &[2u8; 32]);
     let asset = Asset {
         id: asset_id.clone(),
         name: String::from_str(&env, "Test Asset"),
         asset_type: AssetType::Physical,
         category: String::from_str(&env, "Test Category"),
-        branch_id: 1,
+        branch_id,
         department_id: 1,
         status: AssetStatus::Active,
         purchase_date: 1000,
@@ -142,17 +145,17 @@ fn test_global_admin_can_log_audit_action() {
     client.register_asset(&asset);
 
     // Global admin should be able to log audit action
-    let action = String::from_str(&env, "Asset Inspection");
+    let action = ActionType::Inspected;
     let details = String::from_str(&env, "Admin inspection performed");
 
-    client.log_audit_action_as_admin(&asset_id, &action, &details);
+    client.log_action(&admin, &asset_id, &action, &details);
 
     // Verify audit log was created
     let logs = client.get_asset_audit_logs(&asset_id);
     assert_eq!(logs.len(), 1);
     assert_eq!(logs.get(0).unwrap().action, action);
-    assert_eq!(logs.get(0).unwrap().details, details);
-    assert_eq!(logs.get(0).unwrap().asset_id, asset_id);
+    assert_eq!(logs.get(0).unwrap().note, details);
+    assert_eq!(logs.get(0).unwrap().actor, admin);
 }
 
 #[test]
@@ -163,12 +166,13 @@ fn test_multiple_audit_logs_for_asset() {
     // Register an asset
     let asset_id = BytesN::from_array(&env, &[1u8; 32]);
     let asset_owner = Address::generate(&env);
+    let branch_id = BytesN::from_array(&env, &[2u8; 32]);
     let asset = Asset {
         id: asset_id.clone(),
         name: String::from_str(&env, "Test Asset"),
         asset_type: AssetType::Physical,
         category: String::from_str(&env, "Test Category"),
-        branch_id: 1,
+        branch_id,
         department_id: 1,
         status: AssetStatus::Active,
         purchase_date: 1000,
@@ -181,34 +185,25 @@ fn test_multiple_audit_logs_for_asset() {
 
     client.register_asset(&asset);
 
-    // Log multiple audit actions (both as owner)
-    let action1 = String::from_str(&env, "Maintenance");
+    // Log multiple audit actions
+    let action1 = ActionType::Maintained;
     let details1 = String::from_str(&env, "Regular maintenance");
-    client.log_audit_action_as_owner(&asset_id, &action1, &details1);
+    client.log_action(&asset_owner, &asset_id, &action1, &details1);
 
-    let action2 = String::from_str(&env, "Inspection");
+    let action2 = ActionType::Inspected;
     let details2 = String::from_str(&env, "Safety inspection");
-    client.log_audit_action_as_owner(&asset_id, &action2, &details2);
+    client.log_action(&admin, &asset_id, &action2, &details2);
 
     // Verify both audit logs were created
     let logs = client.get_asset_audit_logs(&asset_id);
     assert_eq!(logs.len(), 2);
 
     // Check that both actions are present
-    let mut found_maintenance = false;
-    let mut found_inspection = false;
+    let log1 = logs.get(0).unwrap();
+    assert_eq!(log1.action, action1);
+    assert_eq!(log1.note, details1);
 
-    for i in 0..logs.len() {
-        let log = logs.get(i).unwrap();
-        if log.action == action1 {
-            found_maintenance = true;
-            assert_eq!(log.details, details1);
-        } else if log.action == action2 {
-            found_inspection = true;
-            assert_eq!(log.details, details2);
-        }
-    }
-
-    assert!(found_maintenance);
-    assert!(found_inspection);
+    let log2 = logs.get(1).unwrap();
+    assert_eq!(log2.action, action2);
+    assert_eq!(log2.note, details2);
 }

@@ -27,6 +27,7 @@ fn test_register_and_get_asset_success() {
 
     let id = make_bytes32(&env, 1);
     let token = make_bytes32(&env, 2);
+    let branch_id = make_bytes32(&env, 10);
 
     let name = String::from_str(&env, "Laptop A");
     let category = String::from_str(&env, "Electronics");
@@ -36,7 +37,7 @@ fn test_register_and_get_asset_success() {
         name: name.clone(),
         asset_type: AssetType::Digital,
         category: category.clone(),
-        branch_id: 10,
+        branch_id: branch_id.clone(),
         department_id: 20,
         status: AssetStatus::Active,
         purchase_date: 1_725_000_000,
@@ -56,7 +57,7 @@ fn test_register_and_get_asset_success() {
     assert_eq!(got.name, name);
     assert_eq!(got.asset_type, AssetType::Digital);
     assert_eq!(got.category, category);
-    assert_eq!(got.branch_id, 10);
+    assert_eq!(got.branch_id, branch_id);
     assert_eq!(got.department_id, 20);
     assert_eq!(got.status, AssetStatus::Active);
     assert_eq!(got.purchase_date, 1_725_000_000);
@@ -75,6 +76,7 @@ fn test_register_asset_duplicate() {
 
     let id = make_bytes32(&env, 3);
     let token = make_bytes32(&env, 4);
+    let branch_id = make_bytes32(&env, 1);
 
     let name = String::from_str(&env, "Office Chair");
     let category = String::from_str(&env, "Furniture");
@@ -84,7 +86,7 @@ fn test_register_asset_duplicate() {
         name: name.clone(),
         asset_type: AssetType::Physical,
         category: category.clone(),
-        branch_id: 1,
+        branch_id: branch_id.clone(),
         department_id: 2,
         status: AssetStatus::Active,
         purchase_date: 1_700_000_000,

@@ -29,13 +29,14 @@ fn test_tokenize_asset_success() {
     let owner = Address::generate(&env);
     let id = make_bytes32(&env, 11);
     let initial_token = make_bytes32(&env, 12);
+    let branch_id = make_bytes32(&env, 99);
 
     let asset = Asset {
         id: id.clone(),
         name: String::from_str(&env, "Server X"),
         asset_type: AssetType::Digital,
         category: String::from_str(&env, "Compute"),
-        branch_id: 99,
+        branch_id: branch_id.clone(),
         department_id: 7,
         status: AssetStatus::Active,
         purchase_date: 1_725_000_100,
@@ -69,13 +70,14 @@ fn test_tokenize_asset_without_admin_initialized() {
     let owner = Address::generate(&env);
     let id = make_bytes32(&env, 21);
     let token = make_bytes32(&env, 22);
+    let branch_id = make_bytes32(&env, 1);
 
     let asset = Asset {
         id: id.clone(),
         name: String::from_str(&env, "Router Y"),
         asset_type: AssetType::Physical,
         category: String::from_str(&env, "Network"),
-        branch_id: 1,
+        branch_id: branch_id.clone(),
         department_id: 2,
         status: AssetStatus::Active,
         purchase_date: 1_700_000_001,
