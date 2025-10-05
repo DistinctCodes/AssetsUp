@@ -92,7 +92,7 @@ impl AssetUpContract {
         // Log appropriate audit action based on status
         let (action, details) = match new_status {
             AssetStatus::InMaintenance => (
-                String::from_str(&env, "IN_MAINTAINANCE"),
+                String::from_str(&env, "IN_MAINTENANCE"),
                 String::from_str(&env, "Asset in maintenance"),
             ),
             AssetStatus::Disposed => (

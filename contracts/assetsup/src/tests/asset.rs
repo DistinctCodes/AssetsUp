@@ -2,7 +2,9 @@
 
 extern crate std;
 
-use soroban_sdk::{Address, BytesN, Env, String, testutils::Address as _};
+use soroban_sdk::testutils::{Address as _, BytesN as _};
+
+use soroban_sdk::{Address, BytesN, Env, String};
 
 use crate::{
     asset::Asset,
@@ -100,4 +102,41 @@ fn test_register_asset_duplicate() {
 
     // Second registration with same ID should panic (Err propagated)
     client.register_asset(&asset);
+}
+
+#[test]
+fn test_update_status_creates_audit_log() {
+    let (env, client, _admin) = setup_test_environment();
+    let owner = Address::generate(&env);
+
+    // Create and register asset first
+    let asset = Asset {
+        id: BytesN::random(&env),
+        name: String::from_str(&env, "Test Asset"),
+        asset_type: AssetType::Physical,
+        category: String::from_str(&env, "Test Category"),
+        branch_id: 1,
+        department_id: 1,
+        status: AssetStatus::Active,
+        purchase_date: 12345,
+        purchase_cost: 1000,
+        current_value: 900,
+        warranty_expiry: 67890,
+        stellar_token_id: BytesN::random(&env),
+        owner: owner.clone(),
+    };
+
+    client.register_asset(&asset);
+
+    // Update to Maintained status
+    client.update_asset_status(&asset.id, &AssetStatus::InMaintenance);
+
+    // Verify audit logs
+    let logs = client.get_asset_audit_logs(&asset.id);
+    assert_eq!(logs.len(), 2); // Procurement + Maintenance
+    assert_eq!(
+        logs.get(1).unwrap().action,
+        String::from_str(&env, "IN_MAINTENANCE")
+    );
+    assert_eq!(logs.get(1).unwrap().actor, owner);
 }
