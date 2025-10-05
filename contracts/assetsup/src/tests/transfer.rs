@@ -2,11 +2,14 @@
 
 extern crate std;
 
-use soroban_sdk::{Address, BytesN, String, testutils::{Address as _, Ledger as _}, Env};
+use soroban_sdk::{
+    Address, BytesN, Env, String,
+    testutils::{Address as _, Ledger as _},
+};
 
 use crate::{
     asset::Asset,
-    types::{AssetStatus, AssetType, ActionType},
+    types::{ActionType, AssetStatus, AssetType},
 };
 
 use super::initialize::setup_test_environment;
@@ -30,8 +33,18 @@ fn test_transfer_asset_by_owner() {
     let new_branch_id = make_bytes32(&env, 20);
 
     // Create branches
-    client.create_branch(&initial_branch_id, &String::from_str(&env, "Initial Branch"), &String::from_str(&env, "Location A"), &Address::generate(&env));
-    client.create_branch(&new_branch_id, &String::from_str(&env, "New Branch"), &String::from_str(&env, "Location B"), &Address::generate(&env));
+    client.create_branch(
+        &initial_branch_id,
+        &String::from_str(&env, "Initial Branch"),
+        &String::from_str(&env, "Location A"),
+        &Address::generate(&env),
+    );
+    client.create_branch(
+        &new_branch_id,
+        &String::from_str(&env, "New Branch"),
+        &String::from_str(&env, "Location B"),
+        &Address::generate(&env),
+    );
 
     let asset = Asset {
         id: asset_id.clone(),
@@ -65,7 +78,10 @@ fn test_transfer_asset_by_owner() {
 
     assert_eq!(client.get_branch_assets(&initial_branch_id).len(), 0);
     assert_eq!(client.get_branch_assets(&new_branch_id).len(), 1);
-    assert_eq!(client.get_branch_assets(&new_branch_id).get(0).unwrap(), asset_id);
+    assert_eq!(
+        client.get_branch_assets(&new_branch_id).get(0).unwrap(),
+        asset_id
+    );
 
     let log = client.get_asset_log(&asset_id);
     assert_eq!(log.len(), 1);
@@ -86,8 +102,18 @@ fn test_transfer_asset_by_admin() {
     let new_branch_id = make_bytes32(&env, 40);
 
     // Create branches
-    client.create_branch(&initial_branch_id, &String::from_str(&env, "Initial Branch"), &String::from_str(&env, "Location A"), &Address::generate(&env));
-    client.create_branch(&new_branch_id, &String::from_str(&env, "New Branch"), &String::from_str(&env, "Location B"), &Address::generate(&env));
+    client.create_branch(
+        &initial_branch_id,
+        &String::from_str(&env, "Initial Branch"),
+        &String::from_str(&env, "Location A"),
+        &Address::generate(&env),
+    );
+    client.create_branch(
+        &new_branch_id,
+        &String::from_str(&env, "New Branch"),
+        &String::from_str(&env, "Location B"),
+        &Address::generate(&env),
+    );
 
     let asset = Asset {
         id: asset_id.clone(),
@@ -128,8 +154,18 @@ fn test_transfer_asset_unauthorized() {
     let branch_id = make_bytes32(&env, 1);
     let new_branch_id = make_bytes32(&env, 2);
 
-    client.create_branch(&branch_id, &String::from_str(&env, "Branch 1"), &String::from_str(&env, "Location"), &Address::generate(&env));
-    client.create_branch(&new_branch_id, &String::from_str(&env, "Branch 2"), &String::from_str(&env, "Location"), &Address::generate(&env));
+    client.create_branch(
+        &branch_id,
+        &String::from_str(&env, "Branch 1"),
+        &String::from_str(&env, "Location"),
+        &Address::generate(&env),
+    );
+    client.create_branch(
+        &new_branch_id,
+        &String::from_str(&env, "Branch 2"),
+        &String::from_str(&env, "Location"),
+        &Address::generate(&env),
+    );
 
     let asset = Asset {
         id: asset_id.clone(),
@@ -161,7 +197,12 @@ fn test_transfer_to_same_branch() {
     let asset_id = make_bytes32(&env, 7);
     let initial_branch_id = make_bytes32(&env, 50);
 
-    client.create_branch(&initial_branch_id, &String::from_str(&env, "Branch"), &String::from_str(&env, "Location"), &Address::generate(&env));
+    client.create_branch(
+        &initial_branch_id,
+        &String::from_str(&env, "Branch"),
+        &String::from_str(&env, "Location"),
+        &Address::generate(&env),
+    );
 
     let asset = Asset {
         id: asset_id.clone(),
@@ -202,7 +243,12 @@ fn test_transfer_nonexistent_asset() {
 
     let non_existent_asset_id = make_bytes32(&env, 99);
     let branch_id = make_bytes32(&env, 100);
-    client.create_branch(&branch_id, &String::from_str(&env, "Branch"), &String::from_str(&env, "Location"), &Address::generate(&env));
+    client.create_branch(
+        &branch_id,
+        &String::from_str(&env, "Branch"),
+        &String::from_str(&env, "Location"),
+        &Address::generate(&env),
+    );
 
     client.transfer_asset(&admin, &non_existent_asset_id, &branch_id);
 }
@@ -218,7 +264,12 @@ fn test_transfer_to_nonexistent_branch() {
     let initial_branch_id = make_bytes32(&env, 10);
     let non_existent_branch_id = make_bytes32(&env, 99);
 
-    client.create_branch(&initial_branch_id, &String::from_str(&env, "Initial"), &String::from_str(&env, "Location"), &Address::generate(&env));
+    client.create_branch(
+        &initial_branch_id,
+        &String::from_str(&env, "Initial"),
+        &String::from_str(&env, "Location"),
+        &Address::generate(&env),
+    );
 
     let asset = Asset {
         id: asset_id.clone(),
