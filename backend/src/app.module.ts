@@ -34,6 +34,8 @@ import { DepartmentsModule } from './departments/departments.module';
 import { AssetTransfersModule } from './asset-transfers/asset-transfers.module';
 import { SearchModule } from './search/search.module';
 import { ApiKeyModule } from './api-key/api-key.module';
+import { NestModule } from './scheduled-jobs/nest/nest.module';
+import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
 
 @Module({
   imports: [
@@ -84,6 +86,8 @@ import { ApiKeyModule } from './api-key/api-key.module';
     WebhooksModule,
     AuditLogsModule,
     ApiKeyModule,
+    NestModule,
+    ScheduledJobsModule,
   ],
   controllers: [AppController],
   providers: [
