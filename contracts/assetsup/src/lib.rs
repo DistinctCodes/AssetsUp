@@ -2,11 +2,13 @@
 
 use crate::error::{Error, handle_error};
 use soroban_sdk::{Address, BytesN, Env, String, Vec, contract, contractimpl, contracttype};
+use crate:: subscription::{SubscriptionContract, SubscriptionService};
 
 pub(crate) mod asset;
 pub(crate) mod audit;
 pub(crate) mod branch;
 pub(crate) mod error;
+pub(crate) mod subscription;
 pub(crate) mod types;
 
 pub use types::*;
@@ -318,6 +320,25 @@ impl AssetUpContract {
         asset_id: BytesN<32>,
     ) -> Result<Vec<audit::AuditEntry>, Error> {
         Ok(audit::get_asset_log(&env, &asset_id))
+    }
+    //creates a new subscription
+    pub fn create_subscription(
+        env: Env,
+        id: BytesN<32>,
+        user: Address,
+        plan: crate::types::PlanType,
+        payment_token: Address,
+        duration_days: u32,
+    ) ->Result<Subscription,Error> {
+        SubscriptionService::create_subscription(env, id, user, plan, payment_token, duration_days)
+    } 
+    /// Cancels an active subscription.
+    pub fn cancel_subscription(env: Env, id:soroban_sdk::BytesN<32>) -> Result<crate::types::Subscription, Error> {
+        SubscriptionService::cancel_subscription(env, id)
+    }
+    /// Retrieves subscription details.
+    pub fn get_subscription(env: Env, id:soroban_sdk::BytesN<32>) -> Result<crate::types::Subscription, Error> {
+        SubscriptionService::get_subscription(env, id)
     }
 }
 

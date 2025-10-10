@@ -33,7 +33,7 @@
                         "symbol": "branch_id"
                       },
                       "val": {
-                        "bytes": "9e2b92242521971b9940a9ded06b307c9d74d5316d43b545ca5ef67e3f9ec93a"
+                        "bytes": "bfcf48190fc3668a5354859766d7888a1f99f825bd63709a963ccf97e20ee886"
                       }
                     },
                     {
@@ -68,7 +68,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                        "bytes": "dfff0e3fda22d55011267e9801ab72ea6ecfdaaa61a3a88fe18c3b945a72d184"
                       }
                     },
                     {
@@ -123,7 +123,7 @@
                         "symbol": "stellar_token_id"
                       },
                       "val": {
-                        "bytes": "8bcda75d46ac26a2e1aff5e3562da3d8466a092fdd8cc9ed05a7ad21d3e08c9b"
+                        "bytes": "65346898ee4a0bfec0db29613ce9af9975e0e5e9f2d42951a276b4efb4863777"
                       }
                     },
                     {
@@ -153,7 +153,7 @@
               "function_name": "update_asset_status",
               "args": [
                 {
-                  "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                  "bytes": "dfff0e3fda22d55011267e9801ab72ea6ecfdaaa61a3a88fe18c3b945a72d184"
                 },
                 {
                   "vec": [
@@ -191,7 +191,7 @@
                   "symbol": "Asset"
                 },
                 {
-                  "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                  "bytes": "dfff0e3fda22d55011267e9801ab72ea6ecfdaaa61a3a88fe18c3b945a72d184"
                 }
               ]
             },
@@ -211,7 +211,7 @@
                       "symbol": "Asset"
                     },
                     {
-                      "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                      "bytes": "dfff0e3fda22d55011267e9801ab72ea6ecfdaaa61a3a88fe18c3b945a72d184"
                     }
                   ]
                 },
@@ -235,7 +235,7 @@
                         "symbol": "branch_id"
                       },
                       "val": {
-                        "bytes": "9e2b92242521971b9940a9ded06b307c9d74d5316d43b545ca5ef67e3f9ec93a"
+                        "bytes": "bfcf48190fc3668a5354859766d7888a1f99f825bd63709a963ccf97e20ee886"
                       }
                     },
                     {
@@ -270,7 +270,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                        "bytes": "dfff0e3fda22d55011267e9801ab72ea6ecfdaaa61a3a88fe18c3b945a72d184"
                       }
                     },
                     {
@@ -325,7 +325,7 @@
                         "symbol": "stellar_token_id"
                       },
                       "val": {
-                        "bytes": "8bcda75d46ac26a2e1aff5e3562da3d8466a092fdd8cc9ed05a7ad21d3e08c9b"
+                        "bytes": "65346898ee4a0bfec0db29613ce9af9975e0e5e9f2d42951a276b4efb4863777"
                       }
                     },
                     {
@@ -355,7 +355,7 @@
                   "symbol": "AuditLog"
                 },
                 {
-                  "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                  "bytes": "dfff0e3fda22d55011267e9801ab72ea6ecfdaaa61a3a88fe18c3b945a72d184"
                 }
               ]
             },
@@ -375,7 +375,7 @@
                       "symbol": "AuditLog"
                     },
                     {
-                      "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                      "bytes": "dfff0e3fda22d55011267e9801ab72ea6ecfdaaa61a3a88fe18c3b945a72d184"
                     }
                   ]
                 },

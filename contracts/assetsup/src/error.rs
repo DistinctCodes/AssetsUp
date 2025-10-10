@@ -20,6 +20,13 @@ pub enum Error {
     Unauthorized = 8,
     // Payment is not valid
     InvalidPayment = 9,
+    //Subscription errors
+    SubscriptionNotFound = 201,
+    SubscriptionNotActive = 202,
+    SubscriptionActive = 203,
+
+    //Payment errors
+    InsufficientPayment = 300,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
