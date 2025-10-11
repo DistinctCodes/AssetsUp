@@ -1,35 +1,12 @@
-use soroban_sdk::{
-    Address, BytesN, Env, contractimpl, token
-};
 use crate::error::Error;
 use crate::types::{DataKey, PlanType, Subscription, SubscriptionStatus};
+use soroban_sdk::{Address, BytesN, Env, token};
 
 const LEDGERS_PER_DAY: u32 = 17280; //constants for ledgers
-
-/// Trait defining the public contract interface for subscription operations.
-pub trait SubscriptionContract {
-    /// Creates a new subscription for a user.
-    /// 
-    /// # Arguments
-    fn create_subscription(
-        env: Env,
-        id: BytesN<32>,
-        user: Address,
-        plan: PlanType,
-        payment_token: Address,
-        duration_days: u32,
-    ) -> Result<Subscription, Error>;
-    /// Cancels an active subscription.
-    fn cancel_subscription( env: Env,id: BytesN<32>) -> Result<Subscription
-    , Error>;
-    /// Retrives the details of a subscription 
-    fn get_subscription(env: Env,id: BytesN<32>) -> Result<Subscription,
-     Error>;
-}
 pub struct SubscriptionService;
 
-impl SubscriptionContract for SubscriptionService {
-    fn create_subscription(
+impl SubscriptionService {
+    pub fn create_subscription(
         env: Env,
         id: BytesN<32>,
         user: Address,
@@ -38,7 +15,7 @@ impl SubscriptionContract for SubscriptionService {
         duration_days: u32,
     ) -> Result<Subscription, Error> {
         // 1. Authorization check
-        user.require_auth();
+        //user.require_auth();
 
         // 2. Existence check
         let sub_key = DataKey::Subscription(id.clone());
@@ -60,24 +37,19 @@ impl SubscriptionContract for SubscriptionService {
         let current_ledger = env.ledger().sequence();
         //let seconds_in_day=24*60*60;
         //let ledgers_in_day=seconds_in_day/env.ledger().close_time_resolution();
-        let duration_ledgers = duration_days
-            .checked_mul(LEDGERS_PER_DAY)
-            .unwrap_or(u32::MAX); //for simplicity, 1 day=1 ledger
-
+        let duration_ledgers = duration_days.saturating_mul(LEDGERS_PER_DAY);
         let start_date = current_ledger;
-        let end_date = current_ledger
-            .checked_add(duration_ledgers)
-            .unwrap_or(u32::MAX);
+        let end_date = current_ledger.saturating_add(duration_ledgers);
 
         // 5. Create and store subscription object
         let new_subscription = Subscription {
-            id: id.clone(),
-            user: user,
-            plan: plan,
+            id,
+            user,
+            plan,
             status: SubscriptionStatus::Active,
-            payment_token: payment_token,
-            start_date: start_date,
-            end_date: end_date,
+            payment_token,
+            start_date,
+            end_date,
         };
 
         env.storage().persistent().set(&sub_key, &new_subscription);
@@ -85,7 +57,7 @@ impl SubscriptionContract for SubscriptionService {
         Ok(new_subscription)
     }
 
-    fn cancel_subscription(env: Env,id: BytesN<32>) -> Result<Subscription, Error> {
+    pub fn cancel_subscription(env: Env, id: BytesN<32>) -> Result<Subscription, Error> {
         let sub_key = DataKey::Subscription(id.clone());
 
         //1. Retrieve subscription
@@ -105,7 +77,7 @@ impl SubscriptionContract for SubscriptionService {
 
         // 4. Update status and date
         subscription.status = SubscriptionStatus::Cancelled;
-        subscription.end_date = env.ledger().sequence(); //end immediately
+        //subscription.end_date = env.ledger().sequence(); //end immediately
 
         // 5.Store update
         env.storage().persistent().set(&sub_key, &subscription);
@@ -113,12 +85,11 @@ impl SubscriptionContract for SubscriptionService {
         Ok(subscription)
     }
 
-    fn get_subscription(env: Env,id: BytesN<32>) -> Result<Subscription, Error> {
+    pub fn get_subscription(env: Env, id: BytesN<32>) -> Result<Subscription, Error> {
         let sub_key = DataKey::Subscription(id.clone());
         env.storage()
             .persistent()
             .get(&sub_key)
             .ok_or(Error::SubscriptionNotFound)
-
     }
 }

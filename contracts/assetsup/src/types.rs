@@ -1,5 +1,5 @@
 #![allow(clippy::upper_case_acronyms)]
-use soroban_sdk::{ Address, BytesN, contracttype};
+use soroban_sdk::{Address, BytesN, contracttype};
 
 /// Represents the fundamental type of asset being managed
 /// Distinguishes between physical and digital assets for different handling requirements
@@ -50,11 +50,11 @@ pub enum PlanType {
 }
 impl PlanType {
     /// Returns the required monthly payment amount in 7-decimal precision tokens (e.g., USDC).
-    pub fn get_price_7_decimal(&self) -> i128{
-        match self{
-            PlanType::Basic => 10_0000000, 
+    pub fn get_price_7_decimal(&self) -> i128 {
+        match self {
+            PlanType::Basic => 10_0000000,
             PlanType::Pro => 20_000000,
-            PlanType::Enterprise => 50_0000000, 
+            PlanType::Enterprise => 50_0000000,
         }
     }
 }
