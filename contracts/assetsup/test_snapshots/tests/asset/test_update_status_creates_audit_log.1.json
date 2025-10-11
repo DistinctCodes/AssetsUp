@@ -33,7 +33,7 @@
                         "symbol": "branch_id"
                       },
                       "val": {
-                        "bytes": "9e2b92242521971b9940a9ded06b307c9d74d5316d43b545ca5ef67e3f9ec93a"
+                        "bytes": "707f2737376b596a94884c54b5ea9642a1b463daf4fdee579d2c0fa9f85ddb91"
                       }
                     },
                     {
@@ -68,7 +68,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                        "bytes": "9ce714d3c8b0c516d34190952dec010344eaeaa758bcb583fd331efcc82c5ebf"
                       }
                     },
                     {
@@ -123,7 +123,7 @@
                         "symbol": "stellar_token_id"
                       },
                       "val": {
-                        "bytes": "8bcda75d46ac26a2e1aff5e3562da3d8466a092fdd8cc9ed05a7ad21d3e08c9b"
+                        "bytes": "066c079db2927db08e15ce2de4a32024b4c2bd04a021c01cde7b0e302f4b7ad1"
                       }
                     },
                     {
@@ -153,7 +153,7 @@
               "function_name": "update_asset_status",
               "args": [
                 {
-                  "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                  "bytes": "9ce714d3c8b0c516d34190952dec010344eaeaa758bcb583fd331efcc82c5ebf"
                 },
                 {
                   "vec": [
@@ -191,7 +191,7 @@
                   "symbol": "Asset"
                 },
                 {
-                  "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                  "bytes": "9ce714d3c8b0c516d34190952dec010344eaeaa758bcb583fd331efcc82c5ebf"
                 }
               ]
             },
@@ -211,7 +211,7 @@
                       "symbol": "Asset"
                     },
                     {
-                      "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                      "bytes": "9ce714d3c8b0c516d34190952dec010344eaeaa758bcb583fd331efcc82c5ebf"
                     }
                   ]
                 },
@@ -235,7 +235,7 @@
                         "symbol": "branch_id"
                       },
                       "val": {
-                        "bytes": "9e2b92242521971b9940a9ded06b307c9d74d5316d43b545ca5ef67e3f9ec93a"
+                        "bytes": "707f2737376b596a94884c54b5ea9642a1b463daf4fdee579d2c0fa9f85ddb91"
                       }
                     },
                     {
@@ -270,7 +270,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                        "bytes": "9ce714d3c8b0c516d34190952dec010344eaeaa758bcb583fd331efcc82c5ebf"
                       }
                     },
                     {
@@ -325,7 +325,7 @@
                         "symbol": "stellar_token_id"
                       },
                       "val": {
-                        "bytes": "8bcda75d46ac26a2e1aff5e3562da3d8466a092fdd8cc9ed05a7ad21d3e08c9b"
+                        "bytes": "066c079db2927db08e15ce2de4a32024b4c2bd04a021c01cde7b0e302f4b7ad1"
                       }
                     },
                     {
@@ -355,7 +355,7 @@
                   "symbol": "AuditLog"
                 },
                 {
-                  "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                  "bytes": "9ce714d3c8b0c516d34190952dec010344eaeaa758bcb583fd331efcc82c5ebf"
                 }
               ]
             },
@@ -375,7 +375,7 @@
                       "symbol": "AuditLog"
                     },
                     {
-                      "bytes": "9eb73418d79f261e3ad00e39c9814bcf585538578b5bab8944cb2e5ee975b8e8"
+                      "bytes": "9ce714d3c8b0c516d34190952dec010344eaeaa758bcb583fd331efcc82c5ebf"
                     }
                   ]
                 },
