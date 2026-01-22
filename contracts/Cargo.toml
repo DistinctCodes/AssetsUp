@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "./hello-world",
+  "./asset-maintenance",
 ]
 
 [workspace.dependencies]
