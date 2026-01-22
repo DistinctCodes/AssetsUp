@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+import { User } from 'src/users/entities/user.entity';
 import { Asset } from '../../assets/entities/assest.entity';
 
 export enum TransferStatus {

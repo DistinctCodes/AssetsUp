@@ -5,8 +5,16 @@ import { ApproveTransferDto, RejectTransferDto } from './dto/approve-transfer.dt
 import { TransferFilterDto } from './dto/transfer-filter.dto';
 
 // Mock decorator since we don't have auth implemented yet
-const AuthGuard = () => (): any => {};
-const GetUser = () => (): any => {};
+const AuthGuard = () => {
+  return (target: any, key?: string | symbol, descriptor?: PropertyDescriptor) => {
+    // Mock implementation - in real auth, this would validate JWT
+  };
+};
+const GetUser = () => {
+  return (target: any, propertyKey: string, parameterIndex: number) => {
+    // Mock implementation - in real auth, this would extract user from request
+  };
+};
 
 @Controller('transfers')
 export class AssetTransfersController {
