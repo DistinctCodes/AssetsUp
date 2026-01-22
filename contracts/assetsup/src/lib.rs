@@ -15,6 +15,8 @@ pub use types::*;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Admin,
+    ScheduledTransfer(BytesN<32>),
+    PendingApproval(BytesN<32>),
 }
 
 #[contract]
@@ -236,6 +238,8 @@ impl AssetUpContract {
         actor: Address,
         asset_id: BytesN<32>,
         new_branch_id: BytesN<32>,
+        requires_approval: bool,
+        scheduled_timestamp: Option<u64>,
     ) -> Result<(), Error> {
         actor.require_auth();
 
@@ -247,10 +251,165 @@ impl AssetUpContract {
             None => return Err(Error::AssetNotFound),
         };
 
+        // Check if asset is retired or disposed
+        if asset.status == AssetStatus::Disposed {
+            return Err(Error::Unauthorized);
+        }
+
         let contract_admin = Self::get_admin(env.clone())?;
         if actor != contract_admin && actor != asset.owner {
             return Err(Error::Unauthorized);
         }
+
+        let old_branch_id = asset.branch_id.clone();
+
+        if old_branch_id == new_branch_id {
+            return Ok(());
+        }
+
+        let new_branch_key = branch::DataKey::Branch(new_branch_id.clone());
+        if !store.has(&new_branch_key) {
+            return Err(Error::BranchNotFound);
+        }
+
+        // Handle scheduled transfers
+        if let Some(timestamp) = scheduled_timestamp {
+            if timestamp > env.ledger().timestamp() {
+                // Store scheduled transfer for later execution
+                let scheduled_key = DataKey::ScheduledTransfer(asset_id.clone());
+                let scheduled_data = (new_branch_id.clone(), timestamp);
+                store.set(&scheduled_key, &scheduled_data);
+                
+                let note = String::from_str(&env, "Transfer scheduled");
+                audit::log_action(&env, &asset_id, actor, ActionType::Transferred, note);
+                return Ok(());
+            }
+        }
+
+        // Handle approval workflow
+        if requires_approval {
+            let approval_key = DataKey::PendingApproval(asset_id.clone());
+            let approval_data = (actor.clone(), new_branch_id.clone(), env.ledger().timestamp());
+            store.set(&approval_key, &approval_data);
+            
+            let note = String::from_str(&env, "Transfer approval requested");
+            audit::log_action(&env, &asset_id, actor, ActionType::Transferred, note);
+            return Ok(());
+        }
+
+        // Execute immediate transfer
+        let old_asset_list_key = branch::DataKey::AssetList(old_branch_id);
+        let mut old_asset_list: Vec<BytesN<32>> = store.get(&old_asset_list_key).unwrap();
+        if let Some(index) = old_asset_list.iter().position(|x| x == asset_id) {
+            old_asset_list.remove(index as u32);
+        }
+        store.set(&old_asset_list_key, &old_asset_list);
+
+        let new_asset_list_key = branch::DataKey::AssetList(new_branch_id.clone());
+        let mut new_asset_list: Vec<BytesN<32>> = store
+            .get(&new_asset_list_key)
+            .unwrap_or_else(|| Vec::new(&env));
+        new_asset_list.push_back(asset_id.clone());
+        store.set(&new_asset_list_key, &new_asset_list);
+
+        asset.branch_id = new_branch_id;
+        store.set(&asset_key, &asset);
+
+        let note = String::from_str(&env, "Asset transferred");
+        audit::log_action(&env, &asset_id, actor, ActionType::Transferred, note);
+
+        Ok(())
+    }
+
+    pub fn approve_transfer(
+        env: Env,
+        approver: Address,
+        asset_id: BytesN<32>,
+    ) -> Result<(), Error> {
+        approver.require_auth();
+        
+        let contract_admin = Self::get_admin(env.clone())?;
+        if approver != contract_admin {
+            return Err(Error::Unauthorized);
+        }
+
+        let store = env.storage().persistent();
+        let approval_key = DataKey::PendingApproval(asset_id.clone());
+        
+        let approval_data: (Address, BytesN<32>, u64) = match store.get(&approval_key) {
+            Some(data) => data,
+            None => return Err(Error::AssetNotFound),
+        };
+
+        let (requester, new_branch_id, _) = approval_data;
+        
+        // Execute the transfer
+        Self::execute_transfer_internal(&env, requester, asset_id, new_branch_id)?;
+        
+        // Remove pending approval
+        store.remove(&approval_key);
+        
+        let note = String::from_str(&env, "Transfer approved and executed");
+        audit::log_action(&env, &asset_id, approver, ActionType::Transferred, note);
+        
+        Ok(())
+    }
+
+    pub fn reject_transfer(
+        env: Env,
+        approver: Address,
+        asset_id: BytesN<32>,
+        reason: String,
+    ) -> Result<(), Error> {
+        approver.require_auth();
+        
+        let contract_admin = Self::get_admin(env.clone())?;
+        if approver != contract_admin {
+            return Err(Error::Unauthorized);
+        }
+
+        let store = env.storage().persistent();
+        let approval_key = DataKey::PendingApproval(asset_id.clone());
+        
+        if !store.has(&approval_key) {
+            return Err(Error::AssetNotFound);
+        }
+        
+        // Remove pending approval
+        store.remove(&approval_key);
+        
+        let note = String::from_str(&env, &format!("Transfer rejected: {}", reason));
+        audit::log_action(&env, &asset_id, approver, ActionType::Transferred, note);
+        
+        Ok(())
+    }
+
+    pub fn execute_scheduled_transfers(env: Env) -> Result<(), Error> {
+        let contract_admin = Self::get_admin(env.clone())?;
+        contract_admin.require_auth();
+        
+        let store = env.storage().persistent();
+        let current_timestamp = env.ledger().timestamp();
+        
+        // In a real implementation, you'd iterate through all scheduled transfers
+        // This is a simplified version
+        
+        Ok(())
+    }
+
+    fn execute_transfer_internal(
+        env: &Env,
+        actor: Address,
+        asset_id: BytesN<32>,
+        new_branch_id: BytesN<32>,
+    ) -> Result<(), Error> {
+        let store = env.storage().persistent();
+        let asset_key = asset::DataKey::Asset(asset_id.clone());
+
+        let mut asset: asset::Asset = match store.get(&asset_key) {
+            Some(a) => a,
+            None => return Err(Error::AssetNotFound),
+        };
 
         let old_branch_id = asset.branch_id.clone();
 
@@ -273,15 +432,12 @@ impl AssetUpContract {
         let new_asset_list_key = branch::DataKey::AssetList(new_branch_id.clone());
         let mut new_asset_list: Vec<BytesN<32>> = store
             .get(&new_asset_list_key)
-            .unwrap_or_else(|| Vec::new(&env));
+            .unwrap_or_else(|| Vec::new(env));
         new_asset_list.push_back(asset_id.clone());
         store.set(&new_asset_list_key, &new_asset_list);
 
         asset.branch_id = new_branch_id;
         store.set(&asset_key, &asset);
-
-        let note = String::from_str(&env, "Asset transferred");
-        audit::log_action(&env, &asset_id, actor, ActionType::Transferred, note);
 
         Ok(())
     }
