@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "assetsup"
+    "assetsup",
+    "multisig-wallet"
 ]
 
 [workspace.dependencies]
