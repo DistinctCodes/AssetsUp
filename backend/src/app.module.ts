@@ -36,6 +36,11 @@ import { SearchModule } from './search/search.module';
 import { ApiKeyModule } from './api-key/api-key.module';
 import { NestModule } from './scheduled-jobs/nest/nest.module';
 import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
+import { DocumentsModule } from './documents/documents.module';
+import { Document } from './documents/entities/document.entity';
+import { DocumentVersion } from './documents/entities/document-version.entity';
+import { DocumentAccessPermission } from './documents/entities/document-access-permission.entity';
+import { DocumentAuditLog } from './documents/entities/document-audit-log.entity';
 
 @Module({
   imports: [
@@ -58,6 +63,10 @@ import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
           FileUpload,
           Asset,
           Supplier,
+          Document,
+          DocumentVersion,
+          DocumentAccessPermission,
+          DocumentAuditLog,
         ],
         synchronize: configService.get('NODE_ENV') !== 'production', // Only for development
       }),
@@ -88,6 +97,7 @@ import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
     ApiKeyModule,
     NestModule,
     ScheduledJobsModule,
+    DocumentsModule,
   ],
   controllers: [AppController],
   providers: [
