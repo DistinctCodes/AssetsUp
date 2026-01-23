@@ -42,8 +42,8 @@ export class AssetQueryDto {
   departmentId?: string;
 
   @IsOptional()
-  @IsString()
-  location?: string;
+  @IsUUID()
+  locationId?: string;
 
   @IsOptional()
   @IsUUID()

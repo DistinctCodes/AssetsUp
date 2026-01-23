@@ -27,7 +27,7 @@ import { AssetCategory } from './asset-categories/asset-category.entity';
 import { Department } from './departments/department.entity';
 import { User } from './users/entities/user.entity';
 import { FileUpload } from './file-uploads/entities/file-upload.entity';
-import { Asset } from './assets/entities/assest.entity';
+import { Asset } from './assets/entities/asset.entity';
 import { Supplier } from './suppliers/entities/supplier.entity';
 import { AssetCategoriesModule } from './asset-categories/asset-categories.module';
 import { DepartmentsModule } from './departments/departments.module';

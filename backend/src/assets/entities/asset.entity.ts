@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { AssetCategory } from '../../asset-categories/asset-category.entity';
 import { Department } from '../../departments/department.entity';
+import { Location } from '../../locations/location.entity';
 import { User } from '../../users/entities/user.entity';
 
 export enum AssetStatus {
@@ -96,8 +97,9 @@ export class Asset {
   @JoinColumn({ name: 'department_id' })
   department: Department;
 
-  @Column({ name: 'location', length: 200, nullable: true })
-  location: string;
+  @ManyToOne(() => Location, { eager: true, nullable: true })
+  @JoinColumn({ name: 'location_id' })
+  location: Location;
 
   @ManyToOne(() => User, { nullable: true, eager: true })
   @JoinColumn({ name: 'assigned_to_id' })

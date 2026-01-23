@@ -10,6 +10,7 @@ import { Repository, DataSource } from 'typeorm';
 import { Asset, AssetStatus } from './entities/asset.entity';
 import { AssetCategory } from '../asset-categories/asset-category.entity';
 import { Department } from '../departments/department.entity';
+import { Location } from '../locations/location.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateAssetDto, BulkCreateAssetDto } from './dto/create-asset.dto';
 import {
@@ -38,6 +39,8 @@ export class AssetsService {
     private readonly categoryRepository: Repository<AssetCategory>,
     @InjectRepository(Department)
     private readonly departmentRepository: Repository<Department>,
+    @InjectRepository(Location)
+    private readonly locationRepository: Repository<Location>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly dataSource: DataSource,
@@ -65,6 +68,18 @@ export class AssetsService {
         throw new NotFoundException(
           `Department with ID ${createAssetDto.departmentId} not found`,
         );
+      }
+
+      let location = null;
+      if (createAssetDto.locationId) {
+        location = await this.locationRepository.findOne({
+          where: { id: createAssetDto.locationId },
+        });
+        if (!location) {
+          throw new NotFoundException(
+            `Location with ID ${createAssetDto.locationId} not found`,
+          );
+        }
       }
 
       let assignedUser = null;
@@ -123,7 +138,7 @@ export class AssetsService {
         assetId,
         category,
         department,
-        location: createAssetDto.location,
+        location,
         assignedTo: assignedUser,
         currentValue,
         createdBy: creatingUser,
@@ -154,7 +169,7 @@ export class AssetsService {
       sortOrder = 'DESC',
       categoryId,
       departmentId,
-      location,
+      locationId,
       assignedToId,
       status,
       condition,
@@ -169,6 +184,7 @@ export class AssetsService {
       .createQueryBuilder('asset')
       .leftJoinAndSelect('asset.category', 'category')
       .leftJoinAndSelect('asset.department', 'department')
+      .leftJoinAndSelect('asset.location', 'location')
       .leftJoinAndSelect('asset.assignedTo', 'assignedTo')
       .leftJoinAndSelect('asset.createdBy', 'createdBy')
       .leftJoinAndSelect('asset.updatedBy', 'updatedBy');
@@ -188,10 +204,8 @@ export class AssetsService {
       queryBuilder.andWhere('asset.departmentId = :departmentId', { departmentId });
     }
 
-    if (location) {
-      queryBuilder.andWhere('asset.location ILIKE :location', {
-        location: `%${location}%`,
-      });
+    if (locationId) {
+      queryBuilder.andWhere('asset.locationId = :locationId', { locationId });
     }
 
     if (assignedToId) {
@@ -298,6 +312,17 @@ export class AssetsService {
         if (!department) {
           throw new NotFoundException(
             `Department with ID ${updateAssetDto.departmentId} not found`,
+          );
+        }
+      }
+
+      if (updateAssetDto.locationId) {
+        const location = await this.locationRepository.findOne({
+          where: { id: updateAssetDto.locationId },
+        });
+        if (!location) {
+          throw new NotFoundException(
+            `Location with ID ${updateAssetDto.locationId} not found`,
           );
         }
       }
