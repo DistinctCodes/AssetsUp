@@ -36,6 +36,7 @@ import { SearchModule } from './search/search.module';
 import { ApiKeyModule } from './api-key/api-key.module';
 import { NestModule } from './scheduled-jobs/nest/nest.module';
 import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
+import { AssetsModule } from './assets/assets.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
     ApiKeyModule,
     NestModule,
     ScheduledJobsModule,
+    AssetsModule
   ],
   controllers: [AppController],
   providers: [
