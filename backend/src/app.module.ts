@@ -36,11 +36,7 @@ import { SearchModule } from './search/search.module';
 import { ApiKeyModule } from './api-key/api-key.module';
 import { NestModule } from './scheduled-jobs/nest/nest.module';
 import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
-import { DocumentsModule } from './documents/documents.module';
-import { Document } from './documents/entities/document.entity';
-import { DocumentVersion } from './documents/entities/document-version.entity';
-import { DocumentAccessPermission } from './documents/entities/document-access-permission.entity';
-import { DocumentAuditLog } from './documents/entities/document-audit-log.entity';
+import { AssetsModule } from './assets/assets.module';
 
 @Module({
   imports: [
@@ -97,7 +93,7 @@ import { DocumentAuditLog } from './documents/entities/document-audit-log.entity
     ApiKeyModule,
     NestModule,
     ScheduledJobsModule,
-    DocumentsModule,
+    AssetsModule
   ],
   controllers: [AppController],
   providers: [
