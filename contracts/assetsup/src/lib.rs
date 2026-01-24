@@ -15,32 +15,8 @@ pub use types::*;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Admin,
-    Paused,
-    ContractVersion,
-    ContractMetadata,
-    AuthorizedRegistrar(Address),
-    TotalAssetCount,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ContractMetadata {
-    pub version: String,
-    pub name: String,
-    pub description: String,
-    pub created_at: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Event {
-    AssetRegistered(Address, BytesN<32>, u64),
-    AssetTransferred(BytesN<32>, Address, Address, u64),
-    AssetUpdated(BytesN<32>, Address, u64),
-    AssetRetired(BytesN<32>, Address, u64),
-    AdminChanged(Address, Address, u64),
-    ContractPaused(Address, u64),
-    ContractUnpaused(Address, u64),
+    ScheduledTransfer(BytesN<32>),
+    PendingApproval(BytesN<32>),
 }
 
 #[contract]
