@@ -53,3 +53,47 @@ pub enum SubscriptionStatus {
     Expired,
     Cancelled,
 }
+
+// =====================
+// Tokenization / Fractional Ownership Types (V1)
+// =====================
+
+use soroban_sdk::Address;
+use soroban_sdk::BigInt;
+
+/// Represents a tokenized asset on-chain
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokenizedAsset {
+    /// Original asset ID (reference to registry)
+    pub asset_id: u64,
+    /// Total number of tokens issued
+    pub total_supply: BigInt,
+    /// Token symbol (unique per asset)
+    pub symbol: String,
+    /// Number of decimals for fractional ownership
+    pub decimals: u32,
+    /// Total tokens currently locked (non-transferable)
+    pub locked_tokens: BigInt,
+    /// Tokenizer / asset owner
+    pub tokenizer: Address,
+    /// Asset valuation (in stroops)
+    pub valuation: BigInt,
+}
+
+/// Metadata associated with a tokenized asset
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokenMetadata {
+    pub name: String,
+    pub description: String,
+    pub asset_type: super::AssetType,
+}
+
+/// Represents ownership record of a token holder
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OwnershipRecord {
+    pub owner: Address,
+    pub balance: BigInt,
+}

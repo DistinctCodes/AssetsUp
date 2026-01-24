@@ -1,95 +1,131 @@
-#![cfg(test)]
+#[test]
+fn test_mint_tokens_v1() {
+    let env = Env::default();
+    let tokenizer = Address::random(&env);
 
-extern crate std;
+    let asset_id = 200u64;
+    let symbol = "AST200".to_string();
+    let total_supply = BigInt::from_i128(&env, 500);
+    let decimals = 2u32;
+    let name = "Mint Test Asset".to_string();
+    let description = "Testing minting".to_string();
+    let asset_type = AssetType::Digital;
 
-use soroban_sdk::{Address, BytesN, Env, String, testutils::Address as _};
+    // Tokenize asset first
+    let tokenized_asset = TokenizeContract::tokenize(
+        env.clone(),
+        asset_id,
+        symbol,
+        total_supply.clone(),
+        decimals,
+        name,
+        description,
+        asset_type,
+        tokenizer.clone(),
+    );
 
-use crate::{
-    asset::Asset,
-    types::{AssetStatus, AssetType},
-};
+    // Mint additional tokens
+    let mint_amount = BigInt::from_i128(&env, 200);
+    let updated_asset = TokenizeContract::mint_tokens(env.clone(), asset_id, mint_amount.clone(), tokenizer.clone());
 
-use super::initialize::setup_test_environment;
+    // Verify total supply increased
+    assert_eq!(updated_asset.total_supply, &total_supply + &mint_amount);
 
-fn make_bytes32(env: &Env, seed: u32) -> BytesN<32> {
-    let mut arr = [0u8; 32];
-    for (i, item) in arr.iter_mut().enumerate() {
-        *item = ((seed as usize + i) % 256) as u8;
-    }
-    BytesN::from_array(env, &arr)
+    // Verify tokenizer's ownership updated
+    let ownership: OwnershipRecord = env.storage().get((b"ownership", asset_id, &tokenizer)).unwrap().unwrap();
+    assert_eq!(ownership.balance, &total_supply + &mint_amount);
 }
 
 #[test]
-fn test_tokenize_asset_success() {
-    let (env, client, admin) = setup_test_environment();
-    // initialize admin
-    client.initialize(&admin);
+fn test_burn_tokens_v1() {
+    let env = Env::default();
+    let tokenizer = Address::random(&env);
 
-    // prepare an asset and register
-    let owner = Address::generate(&env);
-    let id = make_bytes32(&env, 11);
-    let initial_token = make_bytes32(&env, 12);
-    let branch_id = make_bytes32(&env, 99);
+    let asset_id = 300u64;
+    let symbol = "AST300".to_string();
+    let total_supply = BigInt::from_i128(&env, 1000);
+    let decimals = 2u32;
+    let name = "Burn Test Asset".to_string();
+    let description = "Testing burning".to_string();
+    let asset_type = AssetType::Digital;
 
-    let asset = Asset {
-        id: id.clone(),
-        name: String::from_str(&env, "Server X"),
-        asset_type: AssetType::Digital,
-        category: String::from_str(&env, "Compute"),
-        branch_id: branch_id.clone(),
-        department_id: 7,
-        status: AssetStatus::Active,
-        purchase_date: 1_725_000_100,
-        purchase_cost: 1_000_000,
-        current_value: 900_000,
-        warranty_expiry: 1_826_000_000,
-        stellar_token_id: initial_token,
-        owner: owner.clone(),
-    };
+    // Tokenize asset first
+    let tokenized_asset = TokenizeContract::tokenize(
+        env.clone(),
+        asset_id,
+        symbol,
+        total_supply.clone(),
+        decimals,
+        name,
+        description,
+        asset_type,
+        tokenizer.clone(),
+    );
 
-    client.register_asset(&asset);
+    // Burn some tokens
+    let burn_amount = BigInt::from_i128(&env, 400);
+    let updated_asset = TokenizeContract::burn_tokens(env.clone(), asset_id, burn_amount.clone(), tokenizer.clone());
 
-    // new token id to set
-    let new_token = make_bytes32(&env, 13);
+    // Verify total supply decreased
+    assert_eq!(updated_asset.total_supply, &total_supply - &burn_amount);
 
-    // admin-only: with mocked auth, this will succeed
-    let res = client.try_tokenize_asset(&id, &new_token);
-    assert!(res.is_ok());
-
-    // verify updated
-    let got = client.get_asset(&id);
-    assert_eq!(got.stellar_token_id, new_token);
+    // Verify tokenizer's ownership updated
+    let ownership: OwnershipRecord = env.storage().get((b"ownership", asset_id, &tokenizer)).unwrap().unwrap();
+    assert_eq!(ownership.balance, &total_supply - &burn_amount);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")]
-fn test_tokenize_asset_without_admin_initialized() {
-    let (env, client, _admin) = setup_test_environment();
+#[should_panic(expected = "Unauthorized: only tokenizer can mint")]
+fn test_mint_unauthorized() {
+    let env = Env::default();
+    let tokenizer = Address::random(&env);
+    let attacker = Address::random(&env);
 
-    // prepare an asset and register
-    let owner = Address::generate(&env);
-    let id = make_bytes32(&env, 21);
-    let token = make_bytes32(&env, 22);
-    let branch_id = make_bytes32(&env, 1);
+    let asset_id = 400u64;
+    let total_supply = BigInt::from_i128(&env, 500);
 
-    let asset = Asset {
-        id: id.clone(),
-        name: String::from_str(&env, "Router Y"),
-        asset_type: AssetType::Physical,
-        category: String::from_str(&env, "Network"),
-        branch_id: branch_id.clone(),
-        department_id: 2,
-        status: AssetStatus::Active,
-        purchase_date: 1_700_000_001,
-        purchase_cost: 50_000,
-        current_value: 45_000,
-        warranty_expiry: 1_760_000_000,
-        stellar_token_id: make_bytes32(&env, 23),
-        owner,
-    };
+    // Tokenize asset first
+    TokenizeContract::tokenize(
+        env.clone(),
+        asset_id,
+        "AST400".to_string(),
+        total_supply.clone(),
+        2,
+        "Unauthorized Mint".to_string(),
+        "Test".to_string(),
+        AssetType::Digital,
+        tokenizer.clone(),
+    );
 
-    client.register_asset(&asset);
+    // Attempt to mint from unauthorized address
+    let mint_amount = BigInt::from_i128(&env, 100);
+    TokenizeContract::mint_tokens(env, asset_id, mint_amount, attacker);
+}
 
-    // calling tokenize without initialize should panic with AdminNotFound (Error #2)
-    client.tokenize_asset(&id, &token);
+#[test]
+#[should_panic(expected = "Unauthorized: only tokenizer can burn")]
+fn test_burn_unauthorized() {
+    let env = Env::default();
+    let tokenizer = Address::random(&env);
+    let attacker = Address::random(&env);
+
+    let asset_id = 500u64;
+    let total_supply = BigInt::from_i128(&env, 500);
+
+    // Tokenize asset first
+    TokenizeContract::tokenize(
+        env.clone(),
+        asset_id,
+        "AST500".to_string(),
+        total_supply.clone(),
+        2,
+        "Unauthorized Burn".to_string(),
+        "Test".to_string(),
+        AssetType::Digital,
+        tokenizer.clone(),
+    );
+
+    // Attempt to burn from unauthorized address
+    let burn_amount = BigInt::from_i128(&env, 100);
+    TokenizeContract::burn_tokens(env, asset_id, burn_amount, attacker);
 }
