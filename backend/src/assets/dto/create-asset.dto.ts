@@ -69,9 +69,8 @@ export class CreateAssetDto {
   departmentId: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  location?: string;
+  @IsUUID()
+  locationId?: string;
 
   @IsOptional()
   @IsUUID()

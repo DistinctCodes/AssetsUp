@@ -30,6 +30,7 @@ import { User } from './users/entities/user.entity';
 import { FileUpload } from './file-uploads/entities/file-upload.entity';
 import { Asset } from './assets/entities/asset.entity';
 // import { Supplier } from './suppliers/entities/supplier.entity';
+import { Supplier } from './suppliers/entities/supplier.entity';
 import { AssetCategoriesModule } from './asset-categories/asset-categories.module';
 // import { DepartmentsModule } from './departments/departments.module';
 // import { AssetTransfersModule } from './asset-transfers/asset-transfers.module';
@@ -66,6 +67,11 @@ import { AnalyticsModule } from './analytics/analytics.module';
           FileUpload,
           Asset,
           // Supplier,
+          Supplier,
+          Document,
+          DocumentVersion,
+          DocumentAccessPermission,
+          DocumentAuditLog,
         ],
         synchronize: configService.get('NODE_ENV') !== 'production', // Only for development
       }),

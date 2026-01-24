@@ -8,17 +8,26 @@ import {
   Index,
 } from 'typeorm';
 
-@Entity('asset_categories')
+@Entity('locations')
 @Index(['code'], { unique: true })
-export class AssetCategory {
+export class Location {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column({ length: 100, unique: true })
+  code: string;
+
+  @Column({ length: 200 })
   name: string;
 
-  @Column({ nullable: true })
-  description?: string;
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({ length: 100, nullable: true })
+  building: string;
+
+  @Column({ length: 100, nullable: true })
+  floor: string;
 
   @Column({ default: true })
   isActive: boolean;
