@@ -6,20 +6,19 @@ use soroban_sdk::{Env, contracterror, panic_with_error};
 pub enum Error {
     AlreadyInitialized = 1,
     AdminNotFound = 2,
-    // Asset exist
     AssetAlreadyExists = 3,
-    //Asset not found
     AssetNotFound = 4,
-    // Branch already exists
     BranchAlreadyExists = 5,
-    // Branch not found
     BranchNotFound = 6,
-    // Subscription already exist
     SubscriptionAlreadyExists = 7,
-    // User not authorized
     Unauthorized = 8,
-    // Payment is not valid
     InvalidPayment = 9,
+    ContractPaused = 10,
+    ContractNotInitialized = 11,
+    InvalidAssetName = 12,
+    InvalidPurchaseValue = 13,
+    InvalidMetadataUri = 14,
+    InvalidOwnerAddress = 15,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
