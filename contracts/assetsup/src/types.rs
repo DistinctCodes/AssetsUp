@@ -1,5 +1,5 @@
 #![allow(clippy::upper_case_acronyms)]
-use soroban_sdk::contracttype;
+use soroban_sdk::{String, contracttype};
 
 /// Represents the fundamental type of asset being managed
 /// Distinguishes between physical and digital assets for different handling requirements
@@ -16,8 +16,8 @@ pub enum AssetType {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AssetStatus {
     Active,
-    InMaintenance,
-    Disposed,
+    Transferred,
+    Retired,
 }
 
 /// Represents different types of actions that can be performed on assets
@@ -52,6 +52,15 @@ pub enum SubscriptionStatus {
     Active,
     Expired,
     Cancelled,
+}
+
+/// Represents custom attributes for assets (key-value pairs)
+/// Used for storing additional metadata about assets
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CustomAttribute {
+    pub key: String,
+    pub value: String,
 }
 
 // =====================
