@@ -59,6 +59,10 @@ import { AssetsModule } from './assets/assets.module';
           FileUpload,
           Asset,
           Supplier,
+          Document,
+          DocumentVersion,
+          DocumentAccessPermission,
+          DocumentAuditLog,
         ],
         synchronize: configService.get('NODE_ENV') !== 'production', // Only for development
       }),
