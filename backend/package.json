@@ -35,6 +35,7 @@
     "@types/multer": "^2.0.0",
     "@types/speakeasy": "^2.0.10",
     "@types/uuid": "^10.0.0",
+    "axios": "^1.6.0",
     "bcryptjs": "^3.0.3",
     "bwip-js": "^4.7.0",
     "class-transformer": "^0.5.1",

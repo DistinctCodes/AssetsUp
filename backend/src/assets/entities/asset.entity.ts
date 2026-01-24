@@ -10,7 +10,7 @@ import {
   Index,
 } from 'typeorm';
 import { AssetCategory } from '../../asset-categories/asset-category.entity';
-import { Department } from '../../departments/department.entity';
+import { Department } from '../../departments/entities/department.entity';
 import { User } from '../../users/entities/user.entity';
 
 export enum AssetStatus {

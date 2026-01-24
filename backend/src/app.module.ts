@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UsersModule } from './users/users.module';
+import { UserModule } from './users/user.module';
 import { AuthModule } from './auth/auth.module';
 // import { ApiKeysModule } from "./api-keys/api-keys.module";
 // import { OrganizationUnitsModule } from "./organization-units/organization-units.module";
@@ -24,25 +25,31 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AuditLoggingInterceptor } from './audit-logs/audit-logging.interceptor';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AssetCategory } from './asset-categories/asset-category.entity';
-import { Department } from './departments/department.entity';
+import { Department } from './departments/entities/department.entity';
 import { User } from './users/entities/user.entity';
 import { FileUpload } from './file-uploads/entities/file-upload.entity';
 import { Asset } from './assets/entities/asset.entity';
-import { Supplier } from './suppliers/entities/supplier.entity';
+// import { Supplier } from './suppliers/entities/supplier.entity';
 import { AssetCategoriesModule } from './asset-categories/asset-categories.module';
-import { DepartmentsModule } from './departments/departments.module';
-import { AssetTransfersModule } from './asset-transfers/asset-transfers.module';
-import { SearchModule } from './search/search.module';
-import { ApiKeyModule } from './api-key/api-key.module';
-import { NestModule } from './scheduled-jobs/nest/nest.module';
-import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
+// import { DepartmentsModule } from './departments/departments.module';
+// import { AssetTransfersModule } from './asset-transfers/asset-transfers.module';
+// import { SearchModule } from './search/search.module';
+// import { ApiKeyModule } from './api-key/api-key.module';
+// import { NestModule } from './scheduled-jobs/nest/nest.module';
+// import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
 import { AssetsModule } from './assets/assets.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 10,
+    }]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -58,7 +65,7 @@ import { AssetsModule } from './assets/assets.module';
           User,
           FileUpload,
           Asset,
-          Supplier,
+          // Supplier,
         ],
         synchronize: configService.get('NODE_ENV') !== 'production', // Only for development
       }),
@@ -66,10 +73,10 @@ import { AssetsModule } from './assets/assets.module';
     }),
 
     AssetCategoriesModule,
-    DepartmentsModule,
-    AssetTransfersModule,
-    UsersModule,
-    SearchModule,
+    // DepartmentsModule,
+    // AssetTransfersModule,
+    UserModule,
+    // SearchModule,
     AuthModule,
     // ApiKeysModule,
     // OrganizationUnitsModule,
@@ -86,10 +93,11 @@ import { AssetsModule } from './assets/assets.module';
     // VendorDirectoryModule,
     WebhooksModule,
     AuditLogsModule,
-    ApiKeyModule,
-    NestModule,
-    ScheduledJobsModule,
-    AssetsModule
+    // ApiKeyModule,
+    // NestModule,
+    // ScheduledJobsModule,
+    AssetsModule,
+    AnalyticsModule
   ],
   controllers: [AppController],
   providers: [

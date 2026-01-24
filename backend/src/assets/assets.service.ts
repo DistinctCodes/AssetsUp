@@ -9,7 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Asset, AssetStatus } from './entities/asset.entity';
 import { AssetCategory } from '../asset-categories/asset-category.entity';
-import { Department } from '../departments/department.entity';
+import { Department } from '../departments/entities/department.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateAssetDto, BulkCreateAssetDto } from './dto/create-asset.dto';
 import {
