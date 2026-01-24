@@ -5,23 +5,33 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
-  Index,
 } from 'typeorm';
 
-@Entity('asset_categories')
-@Index(['code'], { unique: true })
-export class AssetCategory {
+@Entity('file_uploads')
+export class FileUpload {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
-  name: string;
+  @Column()
+  filename: string;
+
+  @Column()
+  originalName: string;
+
+  @Column()
+  mimeType: string;
+
+  @Column()
+  size: number;
 
   @Column({ nullable: true })
-  description?: string;
+  url?: string;
 
-  @Column({ default: true })
-  isActive: boolean;
+  @Column({ nullable: true })
+  path?: string;
+
+  @Column({ nullable: true })
+  uploadedBy?: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

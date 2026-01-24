@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './users/user.module';
@@ -30,7 +29,6 @@ import { User } from './users/entities/user.entity';
 import { FileUpload } from './file-uploads/entities/file-upload.entity';
 import { Asset } from './assets/entities/asset.entity';
 // import { Supplier } from './suppliers/entities/supplier.entity';
-import { Supplier } from './suppliers/entities/supplier.entity';
 import { AssetCategoriesModule } from './asset-categories/asset-categories.module';
 // import { DepartmentsModule } from './departments/departments.module';
 // import { AssetTransfersModule } from './asset-transfers/asset-transfers.module';
@@ -39,18 +37,12 @@ import { AssetCategoriesModule } from './asset-categories/asset-categories.modul
 // import { NestModule } from './scheduled-jobs/nest/nest.module';
 // import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
 import { AssetsModule } from './assets/assets.module';
-import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 10,
-    }]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -67,11 +59,6 @@ import { AnalyticsModule } from './analytics/analytics.module';
           FileUpload,
           Asset,
           // Supplier,
-          Supplier,
-          Document,
-          DocumentVersion,
-          DocumentAccessPermission,
-          DocumentAuditLog,
         ],
         synchronize: configService.get('NODE_ENV') !== 'production', // Only for development
       }),
@@ -102,8 +89,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     // ApiKeyModule,
     // NestModule,
     // ScheduledJobsModule,
-    AssetsModule,
-    AnalyticsModule
+    AssetsModule
   ],
   controllers: [AppController],
   providers: [
