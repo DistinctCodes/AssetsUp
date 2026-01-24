@@ -5,7 +5,7 @@ import { Role, User } from '../../../backend/src/types/admin'
 interface UserFormProps {
     initialData?: Partial<User>;
     roles: Role[];
-    onSubmit: (data: any) => void;
+    onSubmit: (data: Partial<User>) => void;
     onCancel: () => void;
 }
 
