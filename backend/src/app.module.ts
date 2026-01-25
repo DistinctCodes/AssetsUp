@@ -1,3 +1,4 @@
+// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -7,19 +8,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './users/user.module';
 import { AuthModule } from './auth/auth.module';
-// import { ApiKeysModule } from "./api-keys/api-keys.module";
-// import { OrganizationUnitsModule } from "./organization-units/organization-units.module";
-// import { ChangeLogModule } from "./change-log/change-log.module";
-// import { BarcodeModule } from "./barcode/barcode.module";
-// import { ComplianceModule } from "./compliance/compliance.module";
-// import { MobileDevicesModule } from "./mobile-devices/mobile-devices.module";
-// import { PolicyDocumentsModule } from "./policy-documents/policy-documents.module";
-// import { DeviceHealthModule } from "./device-health/device-health.module";
-// import { QRCodeModule } from "./QR-Code/qrcode.module";
-// import { NotificationsModule } from "./notifications/notifications.module";
-// import { StatusHistoryModule } from "./status-history/status-history.module";
-// import { DisposalRegistryModule } from "./disposal-registry/disposal-registry.module";
-// import { VendorDirectoryModule } from "./vendor-directory/vendor-directory.module";
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AuditLoggingInterceptor } from './audit-logs/audit-logging.interceptor';
@@ -29,17 +17,23 @@ import { Department } from './departments/entities/department.entity';
 import { User } from './users/entities/user.entity';
 import { FileUpload } from './file-uploads/entities/file-upload.entity';
 import { Asset } from './assets/entities/asset.entity';
-// import { Supplier } from './suppliers/entities/supplier.entity';
 import { Supplier } from './suppliers/entities/supplier.entity';
 import { AssetCategoriesModule } from './asset-categories/asset-categories.module';
-// import { DepartmentsModule } from './departments/departments.module';
-// import { AssetTransfersModule } from './asset-transfers/asset-transfers.module';
-// import { SearchModule } from './search/search.module';
-// import { ApiKeyModule } from './api-key/api-key.module';
-// import { NestModule } from './scheduled-jobs/nest/nest.module';
-// import { ScheduledJobsModule } from './scheduled-jobs/scheduled-jobs.module';
 import { AssetsModule } from './assets/assets.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { ReportsModule } from './reports/reports.module';
+
+// Import Report entities
+import { Report } from './reports/entities/report.entity';
+import { ScheduledReport } from './reports/entities/scheduled-report.entity';
+import { ReportExecution } from './reports/entities/report-execution.entity';
+
+// Import Document entities (referenced in your original app.module)
+// Make sure these exist or remove if not needed
+// import { Document } from './documents/entities/document.entity';
+// import { DocumentVersion } from './documents/entities/document-version.entity';
+// import { DocumentAccessPermission } from './documents/entities/document-access-permission.entity';
+// import { DocumentAuditLog } from './documents/entities/document-audit-log.entity';
 
 @Module({
   imports: [
@@ -66,44 +60,28 @@ import { AnalyticsModule } from './analytics/analytics.module';
           User,
           FileUpload,
           Asset,
-          // Supplier,
           Supplier,
-          Document,
-          DocumentVersion,
-          DocumentAccessPermission,
-          DocumentAuditLog,
+          Report,
+          ScheduledReport,
+          ReportExecution,
+          // Document,
+          // DocumentVersion,
+          // DocumentAccessPermission,
+          // DocumentAuditLog,
         ],
-        synchronize: configService.get('NODE_ENV') !== 'production', // Only for development
+        synchronize: configService.get('NODE_ENV') !== 'production',
       }),
       inject: [ConfigService],
     }),
 
     AssetCategoriesModule,
-    // DepartmentsModule,
-    // AssetTransfersModule,
     UserModule,
-    // SearchModule,
     AuthModule,
-    // ApiKeysModule,
-    // OrganizationUnitsModule,
-    // ChangeLogModule,
-    // BarcodeModule,
-    // ComplianceModule,
-    // MobileDevicesModule,
-    // PolicyDocumentsModule,
-    // DeviceHealthModule,
-    // QRCodeModule,
-    // NotificationsModule,
-    // StatusHistoryModule,
-    // DisposalRegistryModule,
-    // VendorDirectoryModule,
     WebhooksModule,
     AuditLogsModule,
-    // ApiKeyModule,
-    // NestModule,
-    // ScheduledJobsModule,
     AssetsModule,
-    AnalyticsModule
+    AnalyticsModule,
+    ReportsModule, // Add the Reports Module
   ],
   controllers: [AppController],
   providers: [
