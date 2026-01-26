@@ -34,6 +34,7 @@ import { ReportExecution } from './reports/entities/report-execution.entity';
 // import { DocumentVersion } from './documents/entities/document-version.entity';
 // import { DocumentAccessPermission } from './documents/entities/document-access-permission.entity';
 // import { DocumentAuditLog } from './documents/entities/document-audit-log.entity';
+import { TransfersModule } from './transfers/transfers.module';
 
 @Module({
   imports: [
@@ -41,10 +42,12 @@ import { ReportExecution } from './reports/entities/report-execution.entity';
       isGlobal: true,
     }),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 10,
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 10,
+      },
+    ]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -81,7 +84,8 @@ import { ReportExecution } from './reports/entities/report-execution.entity';
     AuditLogsModule,
     AssetsModule,
     AnalyticsModule,
-    ReportsModule, // Add the Reports Module
+    ReportsModule,
+    TransfersModule, // Add the Reports Module
   ],
   controllers: [AppController],
   providers: [
