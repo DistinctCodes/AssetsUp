@@ -8,6 +8,8 @@ pub(crate) mod audit;
 pub(crate) mod branch;
 pub(crate) mod error;
 pub(crate) mod types;
+pub(crate) mod insurance;
+
 
 pub use types::*;
 
