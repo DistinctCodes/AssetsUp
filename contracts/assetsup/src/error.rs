@@ -13,12 +13,37 @@ pub enum Error {
     SubscriptionAlreadyExists = 7,
     Unauthorized = 8,
     InvalidPayment = 9,
-    ContractPaused = 10,
-    ContractNotInitialized = 11,
-    InvalidAssetName = 12,
-    InvalidPurchaseValue = 13,
-    InvalidMetadataUri = 14,
-    InvalidOwnerAddress = 15,
+    // Tokenization errors
+    AssetAlreadyTokenized = 10,
+    AssetNotTokenized = 11,
+    InvalidTokenSupply = 12,
+    InvalidTokenDecimals = 13,
+    InsufficientBalance = 14,
+    InsufficientLockedTokens = 15,
+    TokensAreLocked = 16,
+    TransferRestrictionFailed = 17,
+    NotWhitelisted = 18,
+    AccreditedInvestorRequired = 19,
+    GeographicRestriction = 20,
+    // Voting errors
+    InsufficientVotingPower = 21,
+    AlreadyVoted = 22,
+    ProposalNotFound = 23,
+    InvalidProposal = 24,
+    VotingPeriodEnded = 25,
+    // Dividend errors
+    NoDividendsToClaim = 26,
+    InvalidDividendAmount = 27,
+    // Detokenization errors
+    DetokenizationNotApproved = 28,
+    DetokenizationAlreadyProposed = 29,
+    // Valuation errors
+    InvalidValuation = 30,
+    // Holder enumeration errors
+    HolderNotFound = 31,
+    // Math errors
+    MathOverflow = 32,
+    MathUnderflow = 33,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
