@@ -1,7 +1,7 @@
 #![no_std]
 
 use crate::error::{Error, handle_error};
-use soroban_sdk::{Address, BytesN, Env, String, Vec, contract, contractimpl, contracttype, symbol_short};
+use soroban_sdk::{Address, BigInt, BytesN, Env, String, Vec, contract, contractimpl, contracttype, symbol_short};
 
 pub(crate) mod asset;
 pub(crate) mod audit;
@@ -420,6 +420,304 @@ impl AssetUpContract {
         Ok(())
     }
 
+    pub fn get_asset_audit_logs(
+        env: Env,
+        asset_id: BytesN<32>,
+    ) -> Result<Vec<audit::AuditEntry>, Error> {
+        Ok(audit::get_asset_log(&env, &asset_id))
+    }
+
+    // =====================
+    // Tokenization Functions
+    // =====================
+
+    /// Tokenize an asset with full supply to tokenizer
+    pub fn tokenize_asset(
+        env: Env,
+        asset_id: u64,
+        symbol: String,
+        total_supply: BigInt,
+        decimals: u32,
+        min_voting_threshold: BigInt,
+        tokenizer: Address,
+        name: String,
+        description: String,
+        asset_type: AssetType,
+    ) -> Result<TokenizedAsset, Error> {
+        tokenizer.require_auth();
+
+        let metadata = TokenMetadata {
+            name,
+            description,
+            asset_type,
+            ipfs_uri: None,
+            legal_docs_hash: None,
+            valuation_report_hash: None,
+            accredited_investor_required: false,
+            geographic_restrictions: Vec::new(&env),
+        };
+
+        tokenization::tokenize_asset(
+            &env,
+            asset_id,
+            symbol,
+            total_supply,
+            decimals,
+            min_voting_threshold,
+            tokenizer,
+            metadata,
+        )
+    }
+
+    /// Mint additional tokens (only tokenizer can call)
+    pub fn mint_tokens(
+        env: Env,
+        asset_id: u64,
+        amount: BigInt,
+        minter: Address,
+    ) -> Result<TokenizedAsset, Error> {
+        minter.require_auth();
+        tokenization::mint_tokens(&env, asset_id, amount, minter)
+    }
+
+    /// Burn tokens (only tokenizer can call)
+    pub fn burn_tokens(
+        env: Env,
+        asset_id: u64,
+        amount: BigInt,
+        burner: Address,
+    ) -> Result<TokenizedAsset, Error> {
+        burner.require_auth();
+        tokenization::burn_tokens(&env, asset_id, amount, burner)
+    }
+
+    /// Transfer tokens from one address to another
+    pub fn transfer_tokens(
+        env: Env,
+        asset_id: u64,
+        from: Address,
+        to: Address,
+        amount: BigInt,
+    ) -> Result<(), Error> {
+        from.require_auth();
+
+        // Validate transfer restrictions
+        transfer_restrictions::validate_transfer(&env, asset_id, from.clone(), to.clone())?;
+
+        tokenization::transfer_tokens(&env, asset_id, from, to, amount)
+    }
+
+    /// Get token balance for an address
+    pub fn get_token_balance(env: Env, asset_id: u64, holder: Address) -> Result<BigInt, Error> {
+        tokenization::get_token_balance(&env, asset_id, holder)
+    }
+
+    /// Get all token holders for an asset
+    pub fn get_token_holders(env: Env, asset_id: u64) -> Result<Vec<Address>, Error> {
+        tokenization::get_token_holders(&env, asset_id)
+    }
+
+    /// Lock tokens until timestamp
+    pub fn lock_tokens(
+        env: Env,
+        asset_id: u64,
+        holder: Address,
+        until_timestamp: u64,
+    ) -> Result<(), Error> {
+        tokenization::lock_tokens(&env, asset_id, holder, until_timestamp)
+    }
+
+    /// Unlock tokens
+    pub fn unlock_tokens(env: Env, asset_id: u64, holder: Address) -> Result<(), Error> {
+        tokenization::unlock_tokens(&env, asset_id, holder)
+    }
+
+    /// Get ownership percentage for a holder (in basis points)
+    pub fn get_ownership_percentage(
+        env: Env,
+        asset_id: u64,
+        holder: Address,
+    ) -> Result<BigInt, Error> {
+        tokenization::calculate_ownership_percentage(&env, asset_id, holder)
+    }
+
+    /// Get tokenized asset details
+    pub fn get_tokenized_asset(env: Env, asset_id: u64) -> Result<TokenizedAsset, Error> {
+        tokenization::get_tokenized_asset(&env, asset_id)
+    }
+
+    /// Update asset valuation
+    pub fn update_valuation(
+        env: Env,
+        asset_id: u64,
+        new_valuation: BigInt,
+    ) -> Result<(), Error> {
+        tokenization::update_valuation(&env, asset_id, new_valuation)
+    }
+
+    // =====================
+    // Dividend Functions
+    // =====================
+
+    /// Distribute dividends proportionally to all holders
+    pub fn distribute_dividends(
+        env: Env,
+        asset_id: u64,
+        total_amount: BigInt,
+    ) -> Result<(), Error> {
+        dividends::distribute_dividends(&env, asset_id, total_amount)
+    }
+
+    /// Claim unclaimed dividends
+    pub fn claim_dividends(env: Env, asset_id: u64, holder: Address) -> Result<BigInt, Error> {
+        holder.require_auth();
+        dividends::claim_dividends(&env, asset_id, holder)
+    }
+
+    /// Get unclaimed dividends for a holder
+    pub fn get_unclaimed_dividends(
+        env: Env,
+        asset_id: u64,
+        holder: Address,
+    ) -> Result<BigInt, Error> {
+        dividends::get_unclaimed_dividends(&env, asset_id, holder)
+    }
+
+    /// Enable revenue sharing for an asset
+    pub fn enable_revenue_sharing(env: Env, asset_id: u64) -> Result<(), Error> {
+        dividends::enable_revenue_sharing(&env, asset_id)
+    }
+
+    /// Disable revenue sharing for an asset
+    pub fn disable_revenue_sharing(env: Env, asset_id: u64) -> Result<(), Error> {
+        dividends::disable_revenue_sharing(&env, asset_id)
+    }
+
+    // =====================
+    // Voting Functions
+    // =====================
+
+    /// Cast a vote on a proposal
+    pub fn cast_vote(
+        env: Env,
+        asset_id: u64,
+        proposal_id: u64,
+        voter: Address,
+    ) -> Result<(), Error> {
+        voter.require_auth();
+        voting::cast_vote(&env, asset_id, proposal_id, voter)
+    }
+
+    /// Get vote tally for a proposal
+    pub fn get_vote_tally(
+        env: Env,
+        asset_id: u64,
+        proposal_id: u64,
+    ) -> Result<BigInt, Error> {
+        voting::get_vote_tally(&env, asset_id, proposal_id)
+    }
+
+    /// Check if an address has voted
+    pub fn has_voted(
+        env: Env,
+        asset_id: u64,
+        proposal_id: u64,
+        voter: Address,
+    ) -> Result<bool, Error> {
+        voting::has_voted(&env, asset_id, proposal_id, voter)
+    }
+
+    /// Check if proposal passed
+    pub fn proposal_passed(
+        env: Env,
+        asset_id: u64,
+        proposal_id: u64,
+    ) -> Result<bool, Error> {
+        voting::proposal_passed(&env, asset_id, proposal_id)
+    }
+
+    // =====================
+    // Transfer Restrictions
+    // =====================
+
+    /// Set transfer restrictions
+    pub fn set_transfer_restriction(
+        env: Env,
+        asset_id: u64,
+        require_accredited: bool,
+    ) -> Result<(), Error> {
+        transfer_restrictions::set_transfer_restriction(
+            &env,
+            asset_id,
+            TransferRestriction {
+                require_accredited,
+                geographic_allowed: Vec::new(&env),
+            },
+        )
+    }
+
+    /// Add address to whitelist
+    pub fn add_to_whitelist(env: Env, asset_id: u64, address: Address) -> Result<(), Error> {
+        transfer_restrictions::add_to_whitelist(&env, asset_id, address)
+    }
+
+    /// Remove address from whitelist
+    pub fn remove_from_whitelist(
+        env: Env,
+        asset_id: u64,
+        address: Address,
+    ) -> Result<(), Error> {
+        transfer_restrictions::remove_from_whitelist(&env, asset_id, address)
+    }
+
+    /// Check if address is whitelisted
+    pub fn is_whitelisted(env: Env, asset_id: u64, address: Address) -> Result<bool, Error> {
+        transfer_restrictions::is_whitelisted(&env, asset_id, address)
+    }
+
+    /// Get whitelist
+    pub fn get_whitelist(env: Env, asset_id: u64) -> Result<Vec<Address>, Error> {
+        transfer_restrictions::get_whitelist(&env, asset_id)
+    }
+
+    // =====================
+    // Detokenization
+    // =====================
+
+    /// Propose detokenization
+    pub fn propose_detokenization(
+        env: Env,
+        asset_id: u64,
+        proposer: Address,
+    ) -> Result<u64, Error> {
+        proposer.require_auth();
+        detokenization::propose_detokenization(&env, asset_id, proposer)
+    }
+
+    /// Execute detokenization (if vote passed)
+    pub fn execute_detokenization(
+        env: Env,
+        asset_id: u64,
+        proposal_id: u64,
+    ) -> Result<(), Error> {
+        detokenization::execute_detokenization(&env, asset_id, proposal_id)
+    }
+
+    /// Get detokenization proposal status
+    pub fn get_detokenization_proposal(
+        env: Env,
+        asset_id: u64,
+    ) -> Result<DetokenizationProposal, Error> {
+        detokenization::get_detokenization_proposal(&env, asset_id)
+    }
+
+    /// Check if detokenization is active
+    pub fn is_detokenization_active(env: Env, asset_id: u64) -> Result<bool, Error> {
+        detokenization::is_detokenization_active(&env, asset_id)
+    }
+}
+
+mod tests;
     pub fn unpause_contract(env: Env) -> Result<(), Error> {
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
