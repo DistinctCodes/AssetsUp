@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-const PROTECTED = ['/dashboard', '/assets', '/departments', '/users'];
+const PROTECTED = [ '/assets', '/departments', '/users'];
 const AUTH_PAGES = ['/signin', '/signup'];
 
 export const middleware = (req: NextRequest) => {
@@ -16,9 +16,9 @@ export const middleware = (req: NextRequest) => {
     return NextResponse.redirect(url);
   }
 
-  if (isAuthPage && token) {
-    return NextResponse.redirect(new URL('/dashboard', req.url));
-  }
+  // if (isAuthPage && token) {
+  //   return NextResponse.redirect(new URL('/dashboard', req.url));
+  // }
 
   return NextResponse.next();
 };
