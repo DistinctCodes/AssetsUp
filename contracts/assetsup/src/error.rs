@@ -44,6 +44,14 @@ pub enum Error {
     // Math errors
     MathOverflow = 32,
     MathUnderflow = 33,
+    // Contract state errors
+    ContractPaused = 34,
+    ContractNotInitialized = 35,
+    // Validation errors
+    InvalidAssetName = 36,
+    InvalidPurchaseValue = 37,
+    InvalidMetadataUri = 38,
+    InvalidOwnerAddress = 39,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {

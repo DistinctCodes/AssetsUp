@@ -29,14 +29,12 @@ import { AppService } from './app.service';
         password: configService.get('DB_PASSWORD', 'password'),
         database: configService.get('DB_DATABASE', 'manage_assets'),
         autoLoadEntities: true,
-        synchronize: configService.get('NODE_ENV') !== 'production',
+        synchronize: true,
       }),
       inject: [ConfigService],
     }),
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-  ],
+  providers: [AppService],
 })
 export class AppModule {}

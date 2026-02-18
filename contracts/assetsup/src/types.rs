@@ -1,5 +1,5 @@
 #![allow(clippy::upper_case_acronyms)]
-use soroban_sdk::{String, contracttype};
+use soroban_sdk::{Address, BigInt, BytesN, String, Vec, contracttype};
 
 /// Represents the fundamental type of asset being managed
 /// Distinguishes between physical and digital assets for different handling requirements
@@ -63,11 +63,19 @@ pub struct CustomAttribute {
     pub value: String,
 }
 
+/// Metadata about the contract itself
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractMetadata {
+    pub version: String,
+    pub name: String,
+    pub description: String,
+    pub created_at: u64,
+}
+
 // =====================
 // Tokenization / Fractional Ownership Types (V1 & V2)
 // =====================
-
-use soroban_sdk::{Address, BigInt, BytesN, String, Vec};
 
 /// Data keys for contract storage
 #[contracttype]
@@ -207,7 +215,7 @@ pub struct TokenizedAsset {
 pub struct TokenMetadata {
     pub name: String,
     pub description: String,
-    pub asset_type: super::AssetType,
+    pub asset_type: AssetType,
     /// IPFS URI for extended metadata
     pub ipfs_uri: Option<String>,
     /// Hash of legal documentation

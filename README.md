@@ -12,10 +12,10 @@ As organizations grow, asset tracking often becomes inconsistent. Equipment is m
 
 Common challenges include:
 
-* No single source of truth for asset ownership
-* Limited tracking across branches or countries
-* Manual updates and inconsistent records
-* Difficulty auditing asset usage and history
+- No single source of truth for asset ownership
+- Limited tracking across branches or countries
+- Manual updates and inconsistent records
+- Difficulty auditing asset usage and history
 
 AssetsUp addresses these issues by offering a structured, auditable system that tracks assets from registration through retirement.
 
@@ -25,11 +25,11 @@ AssetsUp addresses these issues by offering a structured, auditable system that 
 
 AssetsUp enables organizations to:
 
-* Register physical and digital assets
-* Assign assets to departments, users, or locations
-* Track asset status, condition, and movement
-* Maintain asset history and lifecycle events
-* Generate reports for audits and decision-making
+- Register physical and digital assets
+- Assign assets to departments, users, or locations
+- Track asset status, condition, and movement
+- Maintain asset history and lifecycle events
+- Generate reports for audits and decision-making
 
 The system is designed to scale from small teams to multi-branch organizations.
 
@@ -37,12 +37,12 @@ The system is designed to scale from small teams to multi-branch organizations.
 
 ## Key Capabilities
 
-* Asset registration and categorization
-* Department and location-based ownership
-* Asset lifecycle tracking (active, assigned, retired)
-* History and change logs
-* Search and filtering across asset records
-* Role-based access control
+- Asset registration and categorization
+- Department and location-based ownership
+- Asset lifecycle tracking (active, assigned, retired)
+- History and change logs
+- Search and filtering across asset records
+- Role-based access control
 
 ---
 
@@ -50,9 +50,9 @@ The system is designed to scale from small teams to multi-branch organizations.
 
 AssetsUp follows a modular architecture:
 
-* A backend API manages asset records and business logic
-* A web interface provides dashboards and management tools
-* A relational database ensures consistency and traceability
+- A backend API manages asset records and business logic
+- A web interface provides dashboards and management tools
+- A relational database ensures consistency and traceability
 
 This structure allows new asset types and workflows to be introduced without redesigning the core system.
 
@@ -62,15 +62,24 @@ This structure allows new asset types and workflows to be introduced without red
 
 ### Frontend
 
-* Next.js
-* TypeScript
-* Tailwind CSS
+- Next.js
+- TypeScript
+- Tailwind CSS
+- react query
+- zustand
+- react hook form
+- zod
+- api client
 
 ### Backend
 
-* NestJS
-* PostgreSQL
-* TypeORM
+- NestJS
+- PostgreSQL
+- TypeORM
+
+### Contract
+
+- Stellar (rust)
 
 ---
 
@@ -78,10 +87,10 @@ This structure allows new asset types and workflows to be introduced without red
 
 ### Prerequisites
 
-* Node.js (v18 or newer)
-* PostgreSQL (v14 or newer)
-* npm or yarn
-* Git
+- Node.js (v18 or newer)
+- PostgreSQL (v14 or newer)
+- npm or yarn
+- Git
 
 ---
 
@@ -176,5 +185,6 @@ To contribute:
 1. Fork the repository
 2. Create a feature branch
 3. Submit a pull request with a clear description of your changes
-* Include a **deployment section (Docker / CI)**
-* Write a **more enterprise-focused version** for internal tools
+
+- Include a **deployment section (Docker / CI)**
+- Write a **more enterprise-focused version** for internal tools

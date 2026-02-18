@@ -9,7 +9,14 @@ pub(crate) mod branch;
 pub(crate) mod error;
 pub(crate) mod types;
 pub(crate) mod insurance;
+pub(crate) mod tokenization;
+pub(crate) mod dividends;
+pub(crate) mod voting;
+pub(crate) mod transfer_restrictions;
+pub(crate) mod detokenization;
 
+#[cfg(test)]
+mod tests;
 
 pub use types::*;
 
@@ -17,6 +24,10 @@ pub use types::*;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Admin,
+    Paused,
+    TotalAssetCount,
+    ContractMetadata,
+    AuthorizedRegistrar(Address),
     ScheduledTransfer(BytesN<32>),
     PendingApproval(BytesN<32>),
 }
@@ -32,14 +43,14 @@ impl AssetUpContract {
         if env.storage().persistent().has(&DataKey::Admin) {
             handle_error(&env, Error::AlreadyInitialized)
         }
-        
+
         // Set admin
         env.storage().persistent().set(&DataKey::Admin, &admin);
-        
+
         // Initialize contract state
         env.storage().persistent().set(&DataKey::Paused, &false);
         env.storage().persistent().set(&DataKey::TotalAssetCount, &0u64);
-        
+
         // Set contract metadata
         let metadata = ContractMetadata {
             version: String::from_str(&env, "1.0.0"),
@@ -48,10 +59,10 @@ impl AssetUpContract {
             created_at: env.ledger().timestamp(),
         };
         env.storage().persistent().set(&DataKey::ContractMetadata, &metadata);
-        
+
         // Add admin as first authorized registrar
         env.storage().persistent().set(&DataKey::AuthorizedRegistrar(admin.clone()), &true);
-        
+
         Ok(())
     }
 
@@ -102,7 +113,7 @@ impl AssetUpContract {
 
         let key = asset::DataKey::Asset(asset.id.clone());
         let store = env.storage().persistent();
-        
+
         // Check if asset already exists
         if store.has(&key) {
             return Err(Error::AssetAlreadyExists);
@@ -420,6 +431,21 @@ impl AssetUpContract {
         Ok(())
     }
 
+    pub fn unpause_contract(env: Env) -> Result<(), Error> {
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+
+        env.storage().persistent().set(&DataKey::Paused, &false);
+
+        // Emit event
+        env.events().publish(
+            (symbol_short!("c_unpause"),),
+            (admin, env.ledger().timestamp()),
+        );
+
+        Ok(())
+    }
+
     pub fn get_asset_audit_logs(
         env: Env,
         asset_id: BytesN<32>,
@@ -714,22 +740,5 @@ impl AssetUpContract {
     /// Check if detokenization is active
     pub fn is_detokenization_active(env: Env, asset_id: u64) -> Result<bool, Error> {
         detokenization::is_detokenization_active(&env, asset_id)
-    }
-}
-
-mod tests;
-    pub fn unpause_contract(env: Env) -> Result<(), Error> {
-        let admin = Self::get_admin(env.clone())?;
-        admin.require_auth();
-
-        env.storage().persistent().set(&DataKey::Paused, &false);
-
-        // Emit event
-        env.events().publish(
-            (symbol_short!("c_unpause"),),
-            (admin, env.ledger().timestamp()),
-        );
-
-        Ok(())
     }
 }

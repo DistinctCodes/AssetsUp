@@ -2,7 +2,9 @@
 resolver = "2"
 members = [
   "./asset-maintenance",
-  "assetsup"
+  "assetsup",
+  "multisig-wallet",
+  "multisig_transfer",
 ]
 
 [workspace.dependencies]
