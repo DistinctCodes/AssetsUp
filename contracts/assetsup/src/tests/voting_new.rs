@@ -2,8 +2,8 @@
 
 extern crate std;
 
-use soroban_sdk::{Address, Env, String};
 use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{Address, Env, String};
 
 use crate::tokenization;
 use crate::types::AssetType;
@@ -36,7 +36,7 @@ fn setup_tokenized_asset(env: &Env, asset_id: u64, tokenizer: &Address) {
 #[test]
 fn test_cast_vote() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let asset_id = 700u64;
 
@@ -54,7 +54,7 @@ fn test_cast_vote() {
 #[test]
 fn test_double_vote_prevention() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let asset_id = 700u64;
 
@@ -72,7 +72,7 @@ fn test_double_vote_prevention() {
 #[test]
 fn test_vote_tally() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let holder2 = Address::generate(&env);
     let asset_id = 700u64;
@@ -99,7 +99,7 @@ fn test_vote_tally() {
 #[test]
 fn test_proposal_passed() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let holder2 = Address::generate(&env);
     let asset_id = 700u64;
@@ -124,7 +124,7 @@ fn test_proposal_passed() {
 #[test]
 fn test_proposal_failed() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let holder2 = Address::generate(&env);
     let asset_id = 700u64;
@@ -150,7 +150,7 @@ fn test_proposal_failed() {
 #[test]
 fn test_insufficient_voting_power() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let new_holder = Address::generate(&env);
     let asset_id = 700u64;

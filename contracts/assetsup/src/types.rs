@@ -1,5 +1,5 @@
 #![allow(clippy::upper_case_acronyms)]
-use soroban_sdk::{Address, BytesN, String, Vec, contracttype};
+use soroban_sdk::{contracttype, Address, BytesN, String, Vec};
 
 /// Represents the fundamental type of asset being managed
 /// Distinguishes between physical and digital assets for different handling requirements

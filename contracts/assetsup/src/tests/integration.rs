@@ -2,22 +2,22 @@
 
 extern crate std;
 
-use soroban_sdk::{Address, Env, String};
 use soroban_sdk::testutils::{Address as _, Ledger as _};
+use soroban_sdk::{Address, Env, String};
 
-use crate::tokenization;
-use crate::types::AssetType;
-use crate::voting;
 use crate::detokenization;
 use crate::dividends;
+use crate::tokenization;
 use crate::transfer_restrictions;
+use crate::types::AssetType;
+use crate::voting;
 use crate::AssetUpContract;
 
 /// Integration test: Full tokenization workflow
 #[test]
 fn test_full_tokenization_workflow() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let holder2 = Address::generate(&env);
     let holder3 = Address::generate(&env);
@@ -111,8 +111,7 @@ fn test_full_tokenization_workflow() {
 
         // Step 7: Propose detokenization
         let proposer = Address::generate(&env);
-        let proposal_id =
-            detokenization::propose_detokenization(&env, asset_id, proposer).unwrap();
+        let proposal_id = detokenization::propose_detokenization(&env, asset_id, proposer).unwrap();
 
         // Step 8: Vote on detokenization
         voting::cast_vote(&env, asset_id, proposal_id, tokenizer.clone()).unwrap();
@@ -127,8 +126,7 @@ fn test_full_tokenization_workflow() {
         let passed = voting::proposal_passed(&env, asset_id, proposal_id).unwrap();
         assert!(passed);
 
-        let execute_result =
-            detokenization::execute_detokenization(&env, asset_id, proposal_id);
+        let execute_result = detokenization::execute_detokenization(&env, asset_id, proposal_id);
         assert!(execute_result.is_ok());
     });
 }
@@ -137,7 +135,7 @@ fn test_full_tokenization_workflow() {
 #[test]
 fn test_multiple_dividend_distributions() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let holder2 = Address::generate(&env);
     let asset_id = 5001u64;
@@ -178,10 +176,8 @@ fn test_multiple_dividend_distributions() {
         dividends::distribute_dividends(&env, asset_id, 500).unwrap();
 
         // Should accumulate
-        let u1 =
-            dividends::get_unclaimed_dividends(&env, asset_id, tokenizer.clone()).unwrap();
-        let u2 =
-            dividends::get_unclaimed_dividends(&env, asset_id, holder2.clone()).unwrap();
+        let u1 = dividends::get_unclaimed_dividends(&env, asset_id, tokenizer.clone()).unwrap();
+        let u2 = dividends::get_unclaimed_dividends(&env, asset_id, holder2.clone()).unwrap();
         (u1, u2)
     });
 
@@ -193,7 +189,7 @@ fn test_multiple_dividend_distributions() {
 #[test]
 fn test_locked_tokens_with_voting() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     env.ledger().with_mut(|li| {
         li.timestamp = 1000;
     });

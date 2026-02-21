@@ -1,19 +1,21 @@
 #![no_std]
 
-use crate::error::{Error, handle_error};
-use soroban_sdk::{Address, BytesN, Env, String, Vec, contract, contractimpl, contracttype, symbol_short};
+use crate::error::{handle_error, Error};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec,
+};
 
 pub(crate) mod asset;
 pub(crate) mod audit;
 pub(crate) mod branch;
+pub(crate) mod detokenization;
+pub(crate) mod dividends;
 pub(crate) mod error;
-pub(crate) mod types;
 pub(crate) mod insurance;
 pub(crate) mod tokenization;
-pub(crate) mod dividends;
-pub(crate) mod voting;
 pub(crate) mod transfer_restrictions;
-pub(crate) mod detokenization;
+pub(crate) mod types;
+pub(crate) mod voting;
 
 #[cfg(test)]
 mod tests;
@@ -49,7 +51,9 @@ impl AssetUpContract {
 
         // Initialize contract state
         env.storage().persistent().set(&DataKey::Paused, &false);
-        env.storage().persistent().set(&DataKey::TotalAssetCount, &0u64);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalAssetCount, &0u64);
 
         // Set contract metadata
         let metadata = ContractMetadata {
@@ -58,10 +62,14 @@ impl AssetUpContract {
             description: String::from_str(&env, "Professional asset registry smart contract"),
             created_at: env.ledger().timestamp(),
         };
-        env.storage().persistent().set(&DataKey::ContractMetadata, &metadata);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ContractMetadata, &metadata);
 
         // Add admin as first authorized registrar
-        env.storage().persistent().set(&DataKey::AuthorizedRegistrar(admin.clone()), &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AuthorizedRegistrar(admin.clone()), &true);
 
         Ok(())
     }
@@ -77,11 +85,19 @@ impl AssetUpContract {
     }
 
     pub fn is_paused(env: Env) -> Result<bool, Error> {
-        Ok(env.storage().persistent().get(&DataKey::Paused).unwrap_or(false))
+        Ok(env
+            .storage()
+            .persistent()
+            .get(&DataKey::Paused)
+            .unwrap_or(false))
     }
 
     pub fn get_total_asset_count(env: Env) -> Result<u64, Error> {
-        Ok(env.storage().persistent().get(&DataKey::TotalAssetCount).unwrap_or(0u64))
+        Ok(env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalAssetCount)
+            .unwrap_or(0u64))
     }
 
     pub fn get_contract_metadata(env: Env) -> Result<ContractMetadata, Error> {
@@ -93,7 +109,11 @@ impl AssetUpContract {
     }
 
     pub fn is_authorized_registrar(env: Env, address: Address) -> Result<bool, Error> {
-        Ok(env.storage().persistent().get(&DataKey::AuthorizedRegistrar(address)).unwrap_or(false))
+        Ok(env
+            .storage()
+            .persistent()
+            .get(&DataKey::AuthorizedRegistrar(address))
+            .unwrap_or(false))
     }
 
     // Asset functions
@@ -124,14 +144,17 @@ impl AssetUpContract {
 
         // Update owner registry
         let owner_key = asset::DataKey::OwnerRegistry(asset.owner.clone());
-        let mut owner_assets: Vec<BytesN<32>> = store.get(&owner_key).unwrap_or_else(|| Vec::new(&env));
+        let mut owner_assets: Vec<BytesN<32>> =
+            store.get(&owner_key).unwrap_or_else(|| Vec::new(&env));
         owner_assets.push_back(asset.id.clone());
         store.set(&owner_key, &owner_assets);
 
         // Update total asset count
         let mut total_count = Self::get_total_asset_count(env.clone())?;
         total_count += 1;
-        env.storage().persistent().set(&DataKey::TotalAssetCount, &total_count);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalAssetCount, &total_count);
 
         // Emit event
         env.events().publish(
@@ -159,7 +182,10 @@ impl AssetUpContract {
         }
 
         // Validate owner address is not zero address
-        let zero_address = Address::from_str(&env, "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF");
+        let zero_address = Address::from_str(
+            &env,
+            "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+        );
         if asset.owner == zero_address {
             return Err(Error::InvalidOwnerAddress);
         }
@@ -241,7 +267,10 @@ impl AssetUpContract {
         }
 
         // Validate new owner is not zero address
-        let zero_address = Address::from_str(&env, "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF");
+        let zero_address = Address::from_str(
+            &env,
+            "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+        );
         if new_owner == zero_address {
             return Err(Error::InvalidOwnerAddress);
         }
@@ -263,7 +292,8 @@ impl AssetUpContract {
 
         // Remove asset from old owner's registry
         let old_owner_key = asset::DataKey::OwnerRegistry(old_owner.clone());
-        let mut old_owner_assets: Vec<BytesN<32>> = store.get(&old_owner_key).unwrap_or_else(|| Vec::new(&env));
+        let mut old_owner_assets: Vec<BytesN<32>> =
+            store.get(&old_owner_key).unwrap_or_else(|| Vec::new(&env));
         if let Some(index) = old_owner_assets.iter().position(|x| x == asset_id) {
             old_owner_assets.remove(index as u32);
         }
@@ -271,7 +301,8 @@ impl AssetUpContract {
 
         // Add asset to new owner's registry
         let new_owner_key = asset::DataKey::OwnerRegistry(new_owner.clone());
-        let mut new_owner_assets: Vec<BytesN<32>> = store.get(&new_owner_key).unwrap_or_else(|| Vec::new(&env));
+        let mut new_owner_assets: Vec<BytesN<32>> =
+            store.get(&new_owner_key).unwrap_or_else(|| Vec::new(&env));
         new_owner_assets.push_back(asset_id.clone());
         store.set(&new_owner_key, &new_owner_assets);
 
@@ -357,7 +388,10 @@ impl AssetUpContract {
         })
     }
 
-    pub fn batch_get_asset_info(env: Env, asset_ids: Vec<BytesN<32>>) -> Result<Vec<asset::AssetInfo>, Error> {
+    pub fn batch_get_asset_info(
+        env: Env,
+        asset_ids: Vec<BytesN<32>>,
+    ) -> Result<Vec<asset::AssetInfo>, Error> {
         let mut results = Vec::new(&env);
         for asset_id in asset_ids.iter() {
             match Self::get_asset_info(env.clone(), asset_id.clone()) {
@@ -374,7 +408,10 @@ impl AssetUpContract {
         current_admin.require_auth();
 
         // Validate new admin is not zero address
-        let zero_address = Address::from_str(&env, "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF");
+        let zero_address = Address::from_str(
+            &env,
+            "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+        );
         if new_admin == zero_address {
             return Err(Error::InvalidOwnerAddress);
         }
@@ -383,8 +420,12 @@ impl AssetUpContract {
         env.storage().persistent().set(&DataKey::Admin, &new_admin);
 
         // Remove old admin from authorized registrars and add new admin
-        env.storage().persistent().set(&DataKey::AuthorizedRegistrar(old_admin.clone()), &false);
-        env.storage().persistent().set(&DataKey::AuthorizedRegistrar(new_admin.clone()), &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AuthorizedRegistrar(old_admin.clone()), &false);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AuthorizedRegistrar(new_admin.clone()), &true);
 
         // Emit event
         env.events().publish(
@@ -399,7 +440,9 @@ impl AssetUpContract {
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
 
-        env.storage().persistent().set(&DataKey::AuthorizedRegistrar(registrar), &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AuthorizedRegistrar(registrar), &true);
         Ok(())
     }
 
@@ -412,7 +455,9 @@ impl AssetUpContract {
             return Err(Error::Unauthorized);
         }
 
-        env.storage().persistent().set(&DataKey::AuthorizedRegistrar(registrar), &false);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AuthorizedRegistrar(registrar), &false);
         Ok(())
     }
 
@@ -580,11 +625,7 @@ impl AssetUpContract {
     }
 
     /// Update asset valuation
-    pub fn update_valuation(
-        env: Env,
-        asset_id: u64,
-        new_valuation: i128,
-    ) -> Result<(), Error> {
+    pub fn update_valuation(env: Env, asset_id: u64, new_valuation: i128) -> Result<(), Error> {
         tokenization::update_valuation(&env, asset_id, new_valuation)
     }
 
@@ -593,11 +634,7 @@ impl AssetUpContract {
     // =====================
 
     /// Distribute dividends proportionally to all holders
-    pub fn distribute_dividends(
-        env: Env,
-        asset_id: u64,
-        total_amount: i128,
-    ) -> Result<(), Error> {
+    pub fn distribute_dividends(env: Env, asset_id: u64, total_amount: i128) -> Result<(), Error> {
         dividends::distribute_dividends(&env, asset_id, total_amount)
     }
 
@@ -642,11 +679,7 @@ impl AssetUpContract {
     }
 
     /// Get vote tally for a proposal
-    pub fn get_vote_tally(
-        env: Env,
-        asset_id: u64,
-        proposal_id: u64,
-    ) -> Result<i128, Error> {
+    pub fn get_vote_tally(env: Env, asset_id: u64, proposal_id: u64) -> Result<i128, Error> {
         voting::get_vote_tally(&env, asset_id, proposal_id)
     }
 
@@ -661,11 +694,7 @@ impl AssetUpContract {
     }
 
     /// Check if proposal passed
-    pub fn proposal_passed(
-        env: Env,
-        asset_id: u64,
-        proposal_id: u64,
-    ) -> Result<bool, Error> {
+    pub fn proposal_passed(env: Env, asset_id: u64, proposal_id: u64) -> Result<bool, Error> {
         voting::proposal_passed(&env, asset_id, proposal_id)
     }
 
@@ -695,11 +724,7 @@ impl AssetUpContract {
     }
 
     /// Remove address from whitelist
-    pub fn remove_from_whitelist(
-        env: Env,
-        asset_id: u64,
-        address: Address,
-    ) -> Result<(), Error> {
+    pub fn remove_from_whitelist(env: Env, asset_id: u64, address: Address) -> Result<(), Error> {
         transfer_restrictions::remove_from_whitelist(&env, asset_id, address)
     }
 
@@ -728,11 +753,7 @@ impl AssetUpContract {
     }
 
     /// Execute detokenization (if vote passed)
-    pub fn execute_detokenization(
-        env: Env,
-        asset_id: u64,
-        proposal_id: u64,
-    ) -> Result<(), Error> {
+    pub fn execute_detokenization(env: Env, asset_id: u64, proposal_id: u64) -> Result<(), Error> {
         detokenization::execute_detokenization(&env, asset_id, proposal_id)
     }
 

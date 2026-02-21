@@ -8,7 +8,7 @@ use soroban_sdk::{vec, Address, Env, String};
 #[test]
 fn test_init_and_provider_registration() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetMaintenanceContract);
+    let contract_id = env.register(AssetMaintenanceContract, ());
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -47,7 +47,7 @@ fn test_maintenance_lifecycle() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, AssetMaintenanceContract);
+    let contract_id = env.register(AssetMaintenanceContract, ());
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -112,7 +112,7 @@ fn test_warranty_and_claims() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, AssetMaintenanceContract);
+    let contract_id = env.register(AssetMaintenanceContract, ());
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -147,7 +147,7 @@ fn test_alerts_and_stats() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, AssetMaintenanceContract);
+    let contract_id = env.register(AssetMaintenanceContract, ());
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);

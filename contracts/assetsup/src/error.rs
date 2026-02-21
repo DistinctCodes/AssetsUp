@@ -1,4 +1,4 @@
-use soroban_sdk::{Env, contracterror, panic_with_error};
+use soroban_sdk::{contracterror, panic_with_error, Env};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]

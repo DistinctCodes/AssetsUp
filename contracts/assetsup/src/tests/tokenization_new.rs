@@ -2,11 +2,11 @@
 
 extern crate std;
 
-use soroban_sdk::{Address, Env, String};
 use soroban_sdk::testutils::{Address as _, Ledger as _};
+use soroban_sdk::{Address, Env, String};
 
-use crate::types::AssetType;
 use crate::tokenization;
+use crate::types::AssetType;
 use crate::AssetUpContract;
 
 fn make_asset_id(seed: u64) -> u64 {
@@ -39,7 +39,7 @@ fn setup_tokenized(env: &Env, asset_id: u64, tokenizer: &Address) {
 #[test]
 fn test_tokenize_asset() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
 
     let asset_id = make_asset_id(100);
@@ -84,7 +84,7 @@ fn test_tokenize_asset() {
 #[test]
 fn test_tokenize_asset_invalid_supply() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
 
     let result = env.as_contract(&contract_id, || {
@@ -115,7 +115,7 @@ fn test_tokenize_asset_invalid_supply() {
 #[test]
 fn test_mint_tokens() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
 
     let asset_id = make_asset_id(200);
@@ -144,7 +144,8 @@ fn test_mint_tokens() {
         )
         .unwrap();
 
-        let updated = tokenization::mint_tokens(&env, asset_id, mint_amount, tokenizer.clone()).unwrap();
+        let updated =
+            tokenization::mint_tokens(&env, asset_id, mint_amount, tokenizer.clone()).unwrap();
         let bal = tokenization::get_token_balance(&env, asset_id, tokenizer.clone()).unwrap();
         (updated.total_supply, bal)
     });
@@ -156,7 +157,7 @@ fn test_mint_tokens() {
 #[test]
 fn test_burn_tokens() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
 
     let asset_id = make_asset_id(300);
@@ -185,7 +186,8 @@ fn test_burn_tokens() {
         )
         .unwrap();
 
-        let updated = tokenization::burn_tokens(&env, asset_id, burn_amount, tokenizer.clone()).unwrap();
+        let updated =
+            tokenization::burn_tokens(&env, asset_id, burn_amount, tokenizer.clone()).unwrap();
         updated.total_supply
     });
 
@@ -195,7 +197,7 @@ fn test_burn_tokens() {
 #[test]
 fn test_transfer_tokens() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let recipient = Address::generate(&env);
 
@@ -225,8 +227,14 @@ fn test_transfer_tokens() {
         )
         .unwrap();
 
-        tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), recipient.clone(), transfer_amount)
-            .unwrap();
+        tokenization::transfer_tokens(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+            transfer_amount,
+        )
+        .unwrap();
 
         let tb = tokenization::get_token_balance(&env, asset_id, tokenizer.clone()).unwrap();
         let rb = tokenization::get_token_balance(&env, asset_id, recipient.clone()).unwrap();
@@ -242,7 +250,7 @@ fn test_lock_tokens() {
     let env = Env::default();
     env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let recipient = Address::generate(&env);
     let asset_id = make_asset_id(500);
@@ -269,10 +277,17 @@ fn test_lock_tokens() {
         )
         .unwrap();
 
-        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, tokenizer.clone()).unwrap();
+        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, tokenizer.clone())
+            .unwrap();
 
         // Try to transfer (should fail)
-        let result = tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), recipient.clone(), 100);
+        let result = tokenization::transfer_tokens(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+            100,
+        );
         assert!(result.is_err());
     });
 
@@ -281,7 +296,13 @@ fn test_lock_tokens() {
 
     env.as_contract(&contract_id, || {
         // Transfer should now succeed
-        let result = tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), recipient.clone(), 100);
+        let result = tokenization::transfer_tokens(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+            100,
+        );
         assert!(result.is_ok());
     });
 }
@@ -289,7 +310,7 @@ fn test_lock_tokens() {
 #[test]
 fn test_ownership_percentage() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
 
     let asset_id = make_asset_id(600);
@@ -332,14 +353,15 @@ fn test_is_tokens_locked_when_active() {
     let env = Env::default();
     env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let asset_id = make_asset_id(700);
 
     let locked = env.as_contract(&contract_id, || {
         setup_tokenized(&env, asset_id, &tokenizer);
         // Lock until 5000; current timestamp is 1000 — should be locked
-        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, tokenizer.clone()).unwrap();
+        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, tokenizer.clone())
+            .unwrap();
         tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone())
     });
 
@@ -351,7 +373,7 @@ fn test_is_tokens_locked_after_expiry() {
     let env = Env::default();
     env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let recipient = Address::generate(&env);
     let asset_id = make_asset_id(800);
@@ -359,7 +381,8 @@ fn test_is_tokens_locked_after_expiry() {
     env.as_contract(&contract_id, || {
         setup_tokenized(&env, asset_id, &tokenizer);
         // Lock until 2000
-        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 2000, tokenizer.clone()).unwrap();
+        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 2000, tokenizer.clone())
+            .unwrap();
     });
 
     // Advance time past the lock
@@ -367,7 +390,11 @@ fn test_is_tokens_locked_after_expiry() {
 
     env.as_contract(&contract_id, || {
         // Lock has expired — is_tokens_locked should return false
-        assert!(!tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone()));
+        assert!(!tokenization::is_tokens_locked(
+            &env,
+            asset_id,
+            tokenizer.clone()
+        ));
 
         // Transfer should also succeed because lock expired
         let result = tokenization::transfer_tokens(
@@ -386,7 +413,7 @@ fn test_unlock_tokens_clears_lock_regardless_of_timestamp() {
     let env = Env::default();
     env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let recipient = Address::generate(&env);
     let asset_id = make_asset_id(900);
@@ -395,14 +422,23 @@ fn test_unlock_tokens_clears_lock_regardless_of_timestamp() {
         setup_tokenized(&env, asset_id, &tokenizer);
 
         // Lock until far future
-        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 99999, tokenizer.clone()).unwrap();
-        assert!(tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone()));
+        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 99999, tokenizer.clone())
+            .unwrap();
+        assert!(tokenization::is_tokens_locked(
+            &env,
+            asset_id,
+            tokenizer.clone()
+        ));
 
         // Unlock while still inside the lock window
         tokenization::unlock_tokens(&env, asset_id, tokenizer.clone()).unwrap();
 
         // Lock should be gone
-        assert!(!tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone()));
+        assert!(!tokenization::is_tokens_locked(
+            &env,
+            asset_id,
+            tokenizer.clone()
+        ));
 
         // Transfer should now succeed even though original lock hasn't "expired"
         let result = tokenization::transfer_tokens(
@@ -421,7 +457,7 @@ fn test_is_tokens_locked_no_lock_returns_false() {
     let env = Env::default();
     env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let asset_id = make_asset_id(1000);
 
@@ -439,7 +475,7 @@ fn test_lock_tokens_unauthorized() {
     let env = Env::default();
     env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let intruder = Address::generate(&env);
     let asset_id = make_asset_id(1100);
@@ -448,7 +484,8 @@ fn test_lock_tokens_unauthorized() {
         setup_tokenized(&env, asset_id, &tokenizer);
 
         // Non-tokenizer tries to lock — should fail
-        let r = tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, intruder.clone());
+        let r =
+            tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, intruder.clone());
 
         // Holder is still unlocked
         let unlocked = !tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone());

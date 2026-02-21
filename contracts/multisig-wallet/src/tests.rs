@@ -1,13 +1,12 @@
-#![cfg(test)]
-
 use super::*;
-use soroban_sdk::testutils::{Address as _, Ledger};
-use soroban_sdk::{Env, Vec, Address, IntoVal};
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{Address, Env, Symbol, Vec};
 
 #[test]
 fn test_initialize() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, MultisigWallet);
+    env.mock_all_auths();
+    let contract_id = env.register(MultisigWallet, ());
     let client = MultisigWalletClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -27,7 +26,7 @@ fn test_initialize() {
 fn test_submit_and_confirm_transaction() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, MultisigWallet);
+    let contract_id = env.register(MultisigWallet, ());
     let client = MultisigWalletClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -43,7 +42,7 @@ fn test_submit_and_confirm_transaction() {
         &owner1,
         &TransactionType::Routine,
         &target,
-        &String::from_str(&env, "some_function"),
+        &Symbol::new(&env, "some_function"),
         &Vec::new(&env),
         &3600,
         &0,
@@ -65,7 +64,7 @@ fn test_submit_and_confirm_transaction() {
 fn test_ownership_proposal() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, MultisigWallet);
+    let contract_id = env.register(MultisigWallet, ());
     let client = MultisigWalletClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -90,7 +89,7 @@ fn test_ownership_proposal() {
 fn test_emergency_freeze() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, MultisigWallet);
+    let contract_id = env.register(MultisigWallet, ());
     let client = MultisigWalletClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -108,7 +107,7 @@ fn test_emergency_freeze() {
         &owner1,
         &TransactionType::Routine,
         &target,
-        &String::from_str(&env, "func"),
+        &Symbol::new(&env, "func"),
         &Vec::new(&env),
         &3600,
         &0,

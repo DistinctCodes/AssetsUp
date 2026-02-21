@@ -1,26 +1,25 @@
 use crate::error::Error;
-use crate::types::{ActiveProposal, DetokenizationProposal, ExecutedProposal, RejectedProposal, TokenDataKey, TokenizedAsset};
+use crate::types::{
+    ActiveProposal, DetokenizationProposal, ExecutedProposal, RejectedProposal, TokenDataKey,
+    TokenizedAsset,
+};
 use crate::voting;
 use soroban_sdk::{Address, Env};
 
 /// Propose detokenization (requires voting)
-pub fn propose_detokenization(
-    env: &Env,
-    asset_id: u64,
-    proposer: Address,
-) -> Result<u64, Error> {
+pub fn propose_detokenization(env: &Env, asset_id: u64, proposer: Address) -> Result<u64, Error> {
     let store = env.storage().persistent();
 
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let _: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Check if proposal already exists
     let proposal_key = TokenDataKey::DetokenizationProposal(asset_id);
     if store.has(&proposal_key) {
-        if let Some(DetokenizationProposal::Active(_)) = store.get::<_, DetokenizationProposal>(&proposal_key) {
+        if let Some(DetokenizationProposal::Active(_)) =
+            store.get::<_, DetokenizationProposal>(&proposal_key)
+        {
             return Err(Error::DetokenizationAlreadyProposed);
         }
     }
@@ -41,18 +40,12 @@ pub fn propose_detokenization(
 }
 
 /// Execute detokenization if vote passed
-pub fn execute_detokenization(
-    env: &Env,
-    asset_id: u64,
-    proposal_id: u64,
-) -> Result<(), Error> {
+pub fn execute_detokenization(env: &Env, asset_id: u64, proposal_id: u64) -> Result<(), Error> {
     let store = env.storage().persistent();
 
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let _: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Check if proposal is active
     let proposal_key = TokenDataKey::DetokenizationProposal(asset_id);
@@ -97,15 +90,12 @@ pub fn reject_detokenization(env: &Env, asset_id: u64) -> Result<(), Error> {
 
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let _: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Get proposal
     let proposal_key = TokenDataKey::DetokenizationProposal(asset_id);
-    let proposal: DetokenizationProposal = store
-        .get(&proposal_key)
-        .ok_or(Error::InvalidProposal)?;
+    let proposal: DetokenizationProposal =
+        store.get(&proposal_key).ok_or(Error::InvalidProposal)?;
 
     match proposal {
         DetokenizationProposal::Active(ActiveProposal { proposal_id, .. }) => {
@@ -134,9 +124,7 @@ pub fn get_detokenization_proposal(
     let store = env.storage().persistent();
 
     let key = TokenDataKey::DetokenizationProposal(asset_id);
-    store
-        .get(&key)
-        .ok_or(Error::InvalidProposal)
+    store.get(&key).ok_or(Error::InvalidProposal)
 }
 
 /// Check if detokenization is in progress

@@ -2,13 +2,13 @@
 
 extern crate std;
 
-use soroban_sdk::{Address, Env, String};
 use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{Address, Env, String};
 
+use crate::detokenization;
 use crate::tokenization;
 use crate::types::AssetType;
 use crate::voting;
-use crate::detokenization;
 use crate::AssetUpContract;
 
 fn setup_tokenized_asset(env: &Env, asset_id: u64, tokenizer: &Address) {
@@ -37,7 +37,7 @@ fn setup_tokenized_asset(env: &Env, asset_id: u64, tokenizer: &Address) {
 #[test]
 fn test_propose_detokenization() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let proposer = Address::generate(&env);
     let asset_id = 1000u64;
@@ -47,7 +47,9 @@ fn test_propose_detokenization() {
         let _proposal_id =
             detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
         // Verify proposal exists
-        detokenization::get_detokenization_proposal(&env, asset_id).ok().is_some()
+        detokenization::get_detokenization_proposal(&env, asset_id)
+            .ok()
+            .is_some()
     });
 
     assert!(proposal_some);
@@ -56,7 +58,7 @@ fn test_propose_detokenization() {
 #[test]
 fn test_duplicate_proposal_prevention() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let proposer = Address::generate(&env);
     let asset_id = 1000u64;
@@ -75,7 +77,7 @@ fn test_duplicate_proposal_prevention() {
 #[test]
 fn test_detokenization_active_check() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let proposer = Address::generate(&env);
     let asset_id = 1000u64;
@@ -101,7 +103,7 @@ fn test_detokenization_active_check() {
 #[test]
 fn test_execute_detokenization_without_majority() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let proposer = Address::generate(&env);
     let asset_id = 1000u64;
@@ -121,7 +123,7 @@ fn test_execute_detokenization_without_majority() {
 #[test]
 fn test_execute_detokenization_with_majority() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let proposer = Address::generate(&env);
     let asset_id = 1000u64;
@@ -137,8 +139,7 @@ fn test_execute_detokenization_with_majority() {
         voting::cast_vote(&env, asset_id, proposal_id, tokenizer.clone()).unwrap();
 
         // Now execute - should succeed
-        let ok =
-            detokenization::execute_detokenization(&env, asset_id, proposal_id).is_ok();
+        let ok = detokenization::execute_detokenization(&env, asset_id, proposal_id).is_ok();
 
         // Should no longer be active
         let active = detokenization::is_detokenization_active(&env, asset_id).unwrap();
@@ -152,7 +153,7 @@ fn test_execute_detokenization_with_majority() {
 #[test]
 fn test_detokenization_majority_threshold() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let holder2 = Address::generate(&env);
     let proposer = Address::generate(&env);
@@ -180,8 +181,7 @@ fn test_detokenization_majority_threshold() {
         voting::cast_vote(&env, asset_id, proposal_id, tokenizer.clone()).unwrap();
 
         // Should succeed
-        let second_ok =
-            detokenization::execute_detokenization(&env, asset_id, proposal_id).is_ok();
+        let second_ok = detokenization::execute_detokenization(&env, asset_id, proposal_id).is_ok();
         (first_err, second_ok)
     });
 

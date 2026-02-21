@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, BytesN, Env, String, Vec, contracttype};
+use soroban_sdk::{contracttype, Address, BytesN, Env, String, Vec};
 
 use crate::types::ActionType;
 

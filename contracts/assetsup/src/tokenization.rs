@@ -1,7 +1,5 @@
 use crate::error::Error;
-use crate::types::{
-    OwnershipRecord, TokenDataKey, TokenMetadata, TokenizedAsset,
-};
+use crate::types::{OwnershipRecord, TokenDataKey, TokenMetadata, TokenizedAsset};
 use soroban_sdk::{Address, Env, String, Vec};
 
 /// Initialize tokenization by creating tokenized asset
@@ -99,9 +97,7 @@ pub fn mint_tokens(
     let key = TokenDataKey::TokenizedAsset(asset_id);
 
     // Get tokenized asset
-    let mut tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let mut tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Only tokenizer can mint
     if tokenized_asset.tokenizer != minter {
@@ -114,17 +110,14 @@ pub fn mint_tokens(
 
     // Update tokenizer's ownership
     let holder_key = TokenDataKey::TokenHolder(asset_id, minter.clone());
-    let mut ownership: OwnershipRecord = store
-        .get(&holder_key)
-        .ok_or(Error::HolderNotFound)?;
+    let mut ownership: OwnershipRecord = store.get(&holder_key).ok_or(Error::HolderNotFound)?;
 
     ownership.balance += amount;
     ownership.voting_power = ownership.balance;
     ownership.dividend_entitlement = ownership.balance;
 
     // Recalculate ownership percentage
-    ownership.ownership_percentage =
-        (ownership.balance * 10000) / tokenized_asset.total_supply;
+    ownership.ownership_percentage = (ownership.balance * 10000) / tokenized_asset.total_supply;
 
     store.set(&holder_key, &ownership);
     store.set(&key, &tokenized_asset.clone());
@@ -154,9 +147,7 @@ pub fn burn_tokens(
     let key = TokenDataKey::TokenizedAsset(asset_id);
 
     // Get tokenized asset
-    let mut tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let mut tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Only tokenizer can burn
     if tokenized_asset.tokenizer != burner {
@@ -165,9 +156,7 @@ pub fn burn_tokens(
 
     // Get burner's balance
     let holder_key = TokenDataKey::TokenHolder(asset_id, burner.clone());
-    let mut ownership: OwnershipRecord = store
-        .get(&holder_key)
-        .ok_or(Error::HolderNotFound)?;
+    let mut ownership: OwnershipRecord = store.get(&holder_key).ok_or(Error::HolderNotFound)?;
 
     if ownership.balance < amount {
         return Err(Error::InsufficientBalance);
@@ -179,8 +168,7 @@ pub fn burn_tokens(
     ownership.dividend_entitlement = ownership.balance;
 
     // Recalculate ownership percentage
-    ownership.ownership_percentage =
-        (ownership.balance * 10000) / tokenized_asset.total_supply;
+    ownership.ownership_percentage = (ownership.balance * 10000) / tokenized_asset.total_supply;
 
     tokenized_asset.total_supply -= amount;
     tokenized_asset.tokens_in_circulation -= amount;
@@ -213,9 +201,7 @@ pub fn transfer_tokens(
 
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Check if from address has locked tokens
     let lock_key = TokenDataKey::TokenLockedUntil(asset_id, from.clone());
@@ -227,9 +213,8 @@ pub fn transfer_tokens(
 
     // Get from balance
     let from_holder_key = TokenDataKey::TokenHolder(asset_id, from.clone());
-    let mut from_ownership: OwnershipRecord = store
-        .get(&from_holder_key)
-        .ok_or(Error::HolderNotFound)?;
+    let mut from_ownership: OwnershipRecord =
+        store.get(&from_holder_key).ok_or(Error::HolderNotFound)?;
 
     if from_ownership.balance < amount {
         return Err(Error::InsufficientBalance);
@@ -293,11 +278,7 @@ pub fn transfer_tokens(
 }
 
 /// Get token balance for an address
-pub fn get_token_balance(
-    env: &Env,
-    asset_id: u64,
-    holder: Address,
-) -> Result<i128, Error> {
+pub fn get_token_balance(env: &Env, asset_id: u64, holder: Address) -> Result<i128, Error> {
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenHolder(asset_id, holder);
 
@@ -312,9 +293,7 @@ pub fn get_token_holders(env: &Env, asset_id: u64) -> Result<Vec<Address>, Error
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenHoldersList(asset_id);
 
-    store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)
+    store.get(&key).ok_or(Error::AssetNotTokenized)
 }
 
 /// Lock tokens until a specific timestamp.
@@ -329,14 +308,10 @@ pub fn lock_tokens(
     // Verify asset is tokenized
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let _: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Only tokenizer can lock
-    let tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     if tokenized_asset.tokenizer != caller {
         return Err(Error::Unauthorized);
@@ -360,9 +335,7 @@ pub fn unlock_tokens(env: &Env, asset_id: u64, holder: Address) -> Result<(), Er
 
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let _: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     let lock_key = TokenDataKey::TokenLockedUntil(asset_id, holder.clone());
 
@@ -372,10 +345,8 @@ pub fn unlock_tokens(env: &Env, asset_id: u64, holder: Address) -> Result<(), Er
     }
 
     // Emit event: (asset_id, holder)
-    env.events().publish(
-        ("token", "tokens_unlocked"),
-        (asset_id, holder),
-    );
+    env.events()
+        .publish(("token", "tokens_unlocked"), (asset_id, holder));
 
     Ok(())
 }
@@ -400,15 +371,11 @@ pub fn calculate_ownership_percentage(
 
     // Get asset
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Get holder balance
     let holder_key = TokenDataKey::TokenHolder(asset_id, holder);
-    let ownership: OwnershipRecord = store
-        .get(&holder_key)
-        .ok_or(Error::HolderNotFound)?;
+    let ownership: OwnershipRecord = store.get(&holder_key).ok_or(Error::HolderNotFound)?;
 
     // Calculate percentage: (balance / total_supply) * 10000
     if tokenized_asset.total_supply <= 0 {
@@ -419,37 +386,23 @@ pub fn calculate_ownership_percentage(
 }
 
 /// Get tokenized asset details
-pub fn get_tokenized_asset(
-    env: &Env,
-    asset_id: u64,
-) -> Result<TokenizedAsset, Error> {
+pub fn get_tokenized_asset(env: &Env, asset_id: u64) -> Result<TokenizedAsset, Error> {
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenizedAsset(asset_id);
 
-    store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)
+    store.get(&key).ok_or(Error::AssetNotTokenized)
 }
 
 /// Get token metadata
-pub fn get_token_metadata(
-    env: &Env,
-    asset_id: u64,
-) -> Result<TokenMetadata, Error> {
+pub fn get_token_metadata(env: &Env, asset_id: u64) -> Result<TokenMetadata, Error> {
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenMetadata(asset_id);
 
-    store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)
+    store.get(&key).ok_or(Error::AssetNotTokenized)
 }
 
 /// Update asset valuation
-pub fn update_valuation(
-    env: &Env,
-    asset_id: u64,
-    new_valuation: i128,
-) -> Result<(), Error> {
+pub fn update_valuation(env: &Env, asset_id: u64, new_valuation: i128) -> Result<(), Error> {
     if new_valuation <= 0 {
         return Err(Error::InvalidValuation);
     }
@@ -457,18 +410,14 @@ pub fn update_valuation(
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenizedAsset(asset_id);
 
-    let mut tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?;
+    let mut tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     tokenized_asset.valuation = new_valuation;
     store.set(&key, &tokenized_asset);
 
     // Emit event: (asset_id, new_valuation)
-    env.events().publish(
-        ("token", "valuation_updated"),
-        (asset_id, new_valuation),
-    );
+    env.events()
+        .publish(("token", "valuation_updated"), (asset_id, new_valuation));
 
     Ok(())
 }

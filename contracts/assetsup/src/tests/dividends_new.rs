@@ -2,12 +2,12 @@
 
 extern crate std;
 
-use soroban_sdk::{Address, Env, String};
 use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{Address, Env, String};
 
+use crate::dividends;
 use crate::tokenization;
 use crate::types::AssetType;
-use crate::dividends;
 use crate::AssetUpContract;
 
 fn setup_tokenized_asset(env: &Env, asset_id: u64, tokenizer: &Address) {
@@ -36,7 +36,7 @@ fn setup_tokenized_asset(env: &Env, asset_id: u64, tokenizer: &Address) {
 #[test]
 fn test_distribute_dividends_no_revenue_sharing() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let asset_id = 800u64;
 
@@ -52,7 +52,7 @@ fn test_distribute_dividends_no_revenue_sharing() {
 #[test]
 fn test_distribute_dividends() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let holder2 = Address::generate(&env);
     let asset_id = 800u64;
@@ -84,7 +84,7 @@ fn test_distribute_dividends() {
 #[test]
 fn test_claim_dividends() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let asset_id = 800u64;
 
@@ -113,7 +113,7 @@ fn test_claim_dividends() {
 #[test]
 fn test_claim_dividends_insufficient() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let asset_id = 800u64;
 
@@ -133,7 +133,7 @@ fn test_claim_dividends_insufficient() {
 #[test]
 fn test_proportional_dividend_distribution() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AssetUpContract);
+    let contract_id = env.register(AssetUpContract, ());
     let tokenizer = Address::generate(&env);
     let holder2 = Address::generate(&env);
     let holder3 = Address::generate(&env);

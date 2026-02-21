@@ -28,10 +28,7 @@ pub fn add_to_whitelist(env: &Env, asset_id: u64, address: Address) -> Result<()
     let store = env.storage().persistent();
 
     let key = TokenDataKey::Whitelist(asset_id);
-    let mut whitelist: Vec<Address> = store
-        .get(&key)
-        .flatten()
-        .unwrap_or_else(|| Vec::new(env));
+    let mut whitelist: Vec<Address> = store.get(&key).flatten().unwrap_or_else(|| Vec::new(env));
 
     // Check if already in whitelist
     if whitelist.iter().any(|a| a == address) {
@@ -42,27 +39,18 @@ pub fn add_to_whitelist(env: &Env, asset_id: u64, address: Address) -> Result<()
     store.set(&key, &whitelist);
 
     // Emit event: (asset_id, address)
-    env.events().publish(
-        ("transfer", "whitelist_added"),
-        (asset_id, address),
-    );
+    env.events()
+        .publish(("transfer", "whitelist_added"), (asset_id, address));
 
     Ok(())
 }
 
 /// Remove an address from the whitelist
-pub fn remove_from_whitelist(
-    env: &Env,
-    asset_id: u64,
-    address: Address,
-) -> Result<(), Error> {
+pub fn remove_from_whitelist(env: &Env, asset_id: u64, address: Address) -> Result<(), Error> {
     let store = env.storage().persistent();
 
     let key = TokenDataKey::Whitelist(asset_id);
-    let mut whitelist: Vec<Address> = store
-        .get(&key)
-        .flatten()
-        .unwrap_or_else(|| Vec::new(env));
+    let mut whitelist: Vec<Address> = store.get(&key).flatten().unwrap_or_else(|| Vec::new(env));
 
     // Find and remove address
     if let Some(index) = whitelist.iter().position(|a| a == address) {
@@ -70,10 +58,8 @@ pub fn remove_from_whitelist(
         store.set(&key, &whitelist);
 
         // Emit event: (asset_id, address)
-        env.events().publish(
-            ("transfer", "whitelist_removed"),
-            (asset_id, address),
-        );
+        env.events()
+            .publish(("transfer", "whitelist_removed"), (asset_id, address));
     }
 
     Ok(())
@@ -84,10 +70,7 @@ pub fn is_whitelisted(env: &Env, asset_id: u64, address: Address) -> Result<bool
     let store = env.storage().persistent();
 
     let key = TokenDataKey::Whitelist(asset_id);
-    let whitelist: Vec<Address> = store
-        .get(&key)
-        .flatten()
-        .unwrap_or_else(|| Vec::new(env));
+    let whitelist: Vec<Address> = store.get(&key).flatten().unwrap_or_else(|| Vec::new(env));
 
     Ok(whitelist.iter().any(|a| a == address))
 }
@@ -97,10 +80,7 @@ pub fn get_whitelist(env: &Env, asset_id: u64) -> Result<Vec<Address>, Error> {
     let store = env.storage().persistent();
 
     let key = TokenDataKey::Whitelist(asset_id);
-    Ok(store
-        .get(&key)
-        .flatten()
-        .unwrap_or_else(|| Vec::new(env)))
+    Ok(store.get(&key).flatten().unwrap_or_else(|| Vec::new(env)))
 }
 
 /// Validate if a transfer is allowed based on restrictions
@@ -148,16 +128,11 @@ pub fn has_transfer_restrictions(env: &Env, asset_id: u64) -> Result<bool, Error
 }
 
 /// Get transfer restrictions for an asset
-pub fn get_transfer_restriction(
-    env: &Env,
-    asset_id: u64,
-) -> Result<TransferRestriction, Error> {
+pub fn get_transfer_restriction(env: &Env, asset_id: u64) -> Result<TransferRestriction, Error> {
     let store = env.storage().persistent();
 
     let key = TokenDataKey::TransferRestriction(asset_id);
-    store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)
+    store.get(&key).ok_or(Error::AssetNotTokenized)
 }
 
 /// Clear transfer restrictions
