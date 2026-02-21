@@ -1,0 +1,31 @@
+export enum AssetStatus {
+  ACTIVE = 'ACTIVE',
+  ASSIGNED = 'ASSIGNED',
+  MAINTENANCE = 'MAINTENANCE',
+  RETIRED = 'RETIRED',
+}
+
+export enum AssetCondition {
+  NEW = 'NEW',
+  GOOD = 'GOOD',
+  FAIR = 'FAIR',
+  POOR = 'POOR',
+  DAMAGED = 'DAMAGED',
+}
+
+export enum AssetHistoryAction {
+  CREATED = 'CREATED',
+  UPDATED = 'UPDATED',
+  STATUS_CHANGED = 'STATUS_CHANGED',
+  TRANSFERRED = 'TRANSFERRED',
+  MAINTENANCE = 'MAINTENANCE',
+  NOTE_ADDED = 'NOTE_ADDED',
+  DOCUMENT_UPLOADED = 'DOCUMENT_UPLOADED',
+}
+
+export enum StellarStatus {
+  NOT_REGISTERED = 'NOT_REGISTERED',
+  PENDING        = 'PENDING',
+  CONFIRMED      = 'CONFIRMED',
+  FAILED         = 'FAILED',
+}
