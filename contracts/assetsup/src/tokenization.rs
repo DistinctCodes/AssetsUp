@@ -344,12 +344,14 @@ pub fn get_token_holders(env: &Env, asset_id: u64) -> Result<Vec<Address>, Error
         .ok_or(Error::AssetNotTokenized)
 }
 
-/// Lock tokens until a specific timestamp
+/// Lock tokens until a specific timestamp.
+/// Only the tokenizer of the asset can lock a holder's tokens.
 pub fn lock_tokens(
     env: &Env,
     asset_id: u64,
     holder: Address,
     until_timestamp: u64,
+    caller: Address,
 ) -> Result<(), Error> {
     // Verify asset is tokenized
     let store = env.storage().persistent();
@@ -365,8 +367,9 @@ pub fn lock_tokens(
         .ok_or(Error::AssetNotTokenized)?
         .ok_or(Error::AssetNotTokenized)?;
 
-    // Note: In production, would check authorization
-    // For now, assuming called from trusted context
+    if tokenized_asset.tokenizer != caller {
+        return Err(Error::Unauthorized);
+    }
 
     let lock_key = TokenDataKey::TokenLockedUntil(asset_id, holder.clone());
     store.set(&lock_key, &until_timestamp);
@@ -410,6 +413,16 @@ pub fn unlock_tokens(env: &Env, asset_id: u64, holder: Address) -> Result<(), Er
     );
 
     Ok(())
+}
+
+/// Returns true if the holder's tokens are currently locked (lock timestamp is in the future).
+pub fn is_tokens_locked(env: &Env, asset_id: u64, holder: Address) -> bool {
+    let store = env.storage().persistent();
+    let lock_key = TokenDataKey::TokenLockedUntil(asset_id, holder);
+    match store.get::<_, u64>(&lock_key) {
+        Some(lock_until) => env.ledger().timestamp() < lock_until,
+        None => false,
+    }
 }
 
 /// Calculate ownership percentage for a holder (in basis points)

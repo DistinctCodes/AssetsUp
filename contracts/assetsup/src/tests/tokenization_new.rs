@@ -240,8 +240,8 @@ fn test_lock_tokens() {
     )
     .unwrap();
 
-    // Lock tokens until timestamp 5000
-    tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000).unwrap();
+    // Lock tokens until timestamp 5000 (tokenizer is the caller)
+    tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, tokenizer.clone()).unwrap();
 
     // Try to transfer (should fail)
     let recipient = Address::random(&env);
@@ -295,4 +295,142 @@ fn test_ownership_percentage() {
 
     // 100% = 10000 basis points
     assert_eq!(percentage, BigInt::from_i128(&env, 10000));
+}
+
+// =====================
+// Token Lock Tests
+// =====================
+
+fn setup_tokenized(env: &Env, asset_id: u64, tokenizer: &Address) {
+    tokenization::tokenize_asset(
+        env,
+        asset_id,
+        String::from_str(env, "TOKEN"),
+        BigInt::from_i128(env, 1000),
+        2,
+        BigInt::from_i128(env, 100),
+        tokenizer.clone(),
+        crate::types::TokenMetadata {
+            name: String::from_str(env, "Lock Test Asset"),
+            description: String::from_str(env, "Test"),
+            asset_type: AssetType::Digital,
+            ipfs_uri: None,
+            legal_docs_hash: None,
+            valuation_report_hash: None,
+            accredited_investor_required: false,
+            geographic_restrictions: soroban_sdk::Vec::new(env),
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_is_tokens_locked_when_active() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
+
+    let tokenizer = Address::random(&env);
+    let asset_id = make_asset_id(700);
+
+    setup_tokenized(&env, asset_id, &tokenizer);
+
+    // Lock until 5000; current timestamp is 1000 — should be locked
+    tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, tokenizer.clone()).unwrap();
+    assert!(tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone()));
+}
+
+#[test]
+fn test_is_tokens_locked_after_expiry() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
+
+    let tokenizer = Address::random(&env);
+    let asset_id = make_asset_id(800);
+
+    setup_tokenized(&env, asset_id, &tokenizer);
+
+    // Lock until 2000
+    tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 2000, tokenizer.clone()).unwrap();
+
+    // Advance time past the lock
+    env.ledger().with_mut(|li| li.timestamp = 3000);
+
+    // Lock has expired — is_tokens_locked should return false
+    assert!(!tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone()));
+
+    // Transfer should also succeed because lock expired
+    let recipient = Address::random(&env);
+    let result = tokenization::transfer_tokens(
+        &env,
+        asset_id,
+        tokenizer.clone(),
+        recipient.clone(),
+        BigInt::from_i128(&env, 100),
+    );
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_unlock_tokens_clears_lock_regardless_of_timestamp() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
+
+    let tokenizer = Address::random(&env);
+    let asset_id = make_asset_id(900);
+
+    setup_tokenized(&env, asset_id, &tokenizer);
+
+    // Lock until far future
+    tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 99999, tokenizer.clone()).unwrap();
+    assert!(tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone()));
+
+    // Unlock while still inside the lock window
+    tokenization::unlock_tokens(&env, asset_id, tokenizer.clone()).unwrap();
+
+    // Lock should be gone
+    assert!(!tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone()));
+
+    // Transfer should now succeed even though original lock hasn't "expired"
+    let recipient = Address::random(&env);
+    let result = tokenization::transfer_tokens(
+        &env,
+        asset_id,
+        tokenizer.clone(),
+        recipient.clone(),
+        BigInt::from_i128(&env, 100),
+    );
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_is_tokens_locked_no_lock_returns_false() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
+
+    let tokenizer = Address::random(&env);
+    let asset_id = make_asset_id(1000);
+
+    setup_tokenized(&env, asset_id, &tokenizer);
+
+    // No lock set — should return false
+    assert!(!tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone()));
+}
+
+#[test]
+fn test_lock_tokens_unauthorized() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
+
+    let tokenizer = Address::random(&env);
+    let intruder = Address::random(&env);
+    let asset_id = make_asset_id(1100);
+
+    setup_tokenized(&env, asset_id, &tokenizer);
+
+    // Non-tokenizer tries to lock — should fail
+    let result = tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, intruder.clone());
+    assert!(result.is_err());
+
+    // Holder is still unlocked
+    assert!(!tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone()));
 }

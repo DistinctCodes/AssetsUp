@@ -543,19 +543,26 @@ impl AssetUpContract {
         tokenization::get_token_holders(&env, asset_id)
     }
 
-    /// Lock tokens until timestamp
+    /// Lock tokens until timestamp (only the asset tokenizer can call this)
     pub fn lock_tokens(
         env: Env,
         asset_id: u64,
         holder: Address,
         until_timestamp: u64,
+        caller: Address,
     ) -> Result<(), Error> {
-        tokenization::lock_tokens(&env, asset_id, holder, until_timestamp)
+        caller.require_auth();
+        tokenization::lock_tokens(&env, asset_id, holder, until_timestamp, caller)
     }
 
     /// Unlock tokens
     pub fn unlock_tokens(env: Env, asset_id: u64, holder: Address) -> Result<(), Error> {
         tokenization::unlock_tokens(&env, asset_id, holder)
+    }
+
+    /// Check if a holder's tokens are currently locked
+    pub fn is_tokens_locked(env: Env, asset_id: u64, holder: Address) -> bool {
+        tokenization::is_tokens_locked(&env, asset_id, holder)
     }
 
     /// Get ownership percentage for a holder (in basis points)
