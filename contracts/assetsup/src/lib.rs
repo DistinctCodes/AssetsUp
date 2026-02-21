@@ -1,7 +1,7 @@
 #![no_std]
 
 use crate::error::{Error, handle_error};
-use soroban_sdk::{Address, BigInt, BytesN, Env, String, Vec, contract, contractimpl, contracttype, symbol_short};
+use soroban_sdk::{Address, BytesN, Env, String, Vec, contract, contractimpl, contracttype, symbol_short};
 
 pub(crate) mod asset;
 pub(crate) mod audit;
@@ -462,9 +462,9 @@ impl AssetUpContract {
         env: Env,
         asset_id: u64,
         symbol: String,
-        total_supply: BigInt,
+        total_supply: i128,
         decimals: u32,
-        min_voting_threshold: BigInt,
+        min_voting_threshold: i128,
         tokenizer: Address,
         name: String,
         description: String,
@@ -499,7 +499,7 @@ impl AssetUpContract {
     pub fn mint_tokens(
         env: Env,
         asset_id: u64,
-        amount: BigInt,
+        amount: i128,
         minter: Address,
     ) -> Result<TokenizedAsset, Error> {
         minter.require_auth();
@@ -510,7 +510,7 @@ impl AssetUpContract {
     pub fn burn_tokens(
         env: Env,
         asset_id: u64,
-        amount: BigInt,
+        amount: i128,
         burner: Address,
     ) -> Result<TokenizedAsset, Error> {
         burner.require_auth();
@@ -523,7 +523,7 @@ impl AssetUpContract {
         asset_id: u64,
         from: Address,
         to: Address,
-        amount: BigInt,
+        amount: i128,
     ) -> Result<(), Error> {
         from.require_auth();
 
@@ -534,7 +534,7 @@ impl AssetUpContract {
     }
 
     /// Get token balance for an address
-    pub fn get_token_balance(env: Env, asset_id: u64, holder: Address) -> Result<BigInt, Error> {
+    pub fn get_token_balance(env: Env, asset_id: u64, holder: Address) -> Result<i128, Error> {
         tokenization::get_token_balance(&env, asset_id, holder)
     }
 
@@ -570,7 +570,7 @@ impl AssetUpContract {
         env: Env,
         asset_id: u64,
         holder: Address,
-    ) -> Result<BigInt, Error> {
+    ) -> Result<i128, Error> {
         tokenization::calculate_ownership_percentage(&env, asset_id, holder)
     }
 
@@ -583,7 +583,7 @@ impl AssetUpContract {
     pub fn update_valuation(
         env: Env,
         asset_id: u64,
-        new_valuation: BigInt,
+        new_valuation: i128,
     ) -> Result<(), Error> {
         tokenization::update_valuation(&env, asset_id, new_valuation)
     }
@@ -596,13 +596,13 @@ impl AssetUpContract {
     pub fn distribute_dividends(
         env: Env,
         asset_id: u64,
-        total_amount: BigInt,
+        total_amount: i128,
     ) -> Result<(), Error> {
         dividends::distribute_dividends(&env, asset_id, total_amount)
     }
 
     /// Claim unclaimed dividends
-    pub fn claim_dividends(env: Env, asset_id: u64, holder: Address) -> Result<BigInt, Error> {
+    pub fn claim_dividends(env: Env, asset_id: u64, holder: Address) -> Result<i128, Error> {
         holder.require_auth();
         dividends::claim_dividends(&env, asset_id, holder)
     }
@@ -612,7 +612,7 @@ impl AssetUpContract {
         env: Env,
         asset_id: u64,
         holder: Address,
-    ) -> Result<BigInt, Error> {
+    ) -> Result<i128, Error> {
         dividends::get_unclaimed_dividends(&env, asset_id, holder)
     }
 
@@ -646,7 +646,7 @@ impl AssetUpContract {
         env: Env,
         asset_id: u64,
         proposal_id: u64,
-    ) -> Result<BigInt, Error> {
+    ) -> Result<i128, Error> {
         voting::get_vote_tally(&env, asset_id, proposal_id)
     }
 

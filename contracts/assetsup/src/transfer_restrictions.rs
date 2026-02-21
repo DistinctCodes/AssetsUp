@@ -1,6 +1,6 @@
 use crate::error::Error;
-use crate::types::{ContractEvent, TokenDataKey, TransferRestriction};
-use soroban_sdk::{Address, Env, String, Vec};
+use crate::types::{TokenDataKey, TransferRestriction};
+use soroban_sdk::{Address, Env, Vec};
 
 /// Set transfer restrictions for an asset
 pub fn set_transfer_restriction(
@@ -14,12 +14,10 @@ pub fn set_transfer_restriction(
     let key = TokenDataKey::TransferRestriction(asset_id);
     store.set(&key, &restriction);
 
+    // Emit event: (asset_id, require_accredited)
     env.events().publish(
         ("transfer", "restriction_set"),
-        ContractEvent::TransferRestrictionSet {
-            asset_id,
-            require_accredited: restriction.require_accredited,
-        },
+        (asset_id, restriction.require_accredited),
     );
 
     Ok(())
@@ -43,9 +41,10 @@ pub fn add_to_whitelist(env: &Env, asset_id: u64, address: Address) -> Result<()
     whitelist.push_back(address.clone());
     store.set(&key, &whitelist);
 
+    // Emit event: (asset_id, address)
     env.events().publish(
         ("transfer", "whitelist_added"),
-        ContractEvent::WhitelistAddressAdded { asset_id, address },
+        (asset_id, address),
     );
 
     Ok(())
@@ -70,9 +69,10 @@ pub fn remove_from_whitelist(
         whitelist.remove(index as u32);
         store.set(&key, &whitelist);
 
+        // Emit event: (asset_id, address)
         env.events().publish(
             ("transfer", "whitelist_removed"),
-            ContractEvent::WhitelistAddressRemoved { asset_id, address },
+            (asset_id, address),
         );
     }
 
@@ -157,7 +157,6 @@ pub fn get_transfer_restriction(
     let key = TokenDataKey::TransferRestriction(asset_id);
     store
         .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
         .ok_or(Error::AssetNotTokenized)
 }
 

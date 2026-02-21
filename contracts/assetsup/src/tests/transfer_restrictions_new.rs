@@ -2,21 +2,22 @@
 
 extern crate std;
 
-use soroban_sdk::{Address, BigInt, Env, String};
+use soroban_sdk::{Address, Env, String};
+use soroban_sdk::testutils::Address as _;
 
 use crate::tokenization;
 use crate::types::{AssetType, TransferRestriction};
 use crate::transfer_restrictions;
+use crate::AssetUpContract;
 
-fn setup_tokenized_asset(env: &Env, tokenizer: &Address) -> u64 {
-    let asset_id = 900u64;
-    let _ = tokenization::tokenize_asset(
+fn setup_tokenized_asset(env: &Env, asset_id: u64, tokenizer: &Address) {
+    tokenization::tokenize_asset(
         env,
         asset_id,
         String::from_str(env, "RESTR"),
-        BigInt::from_i128(env, 1000),
+        1000,
         2,
-        BigInt::from_i128(env, 100),
+        100,
         tokenizer.clone(),
         crate::types::TokenMetadata {
             name: String::from_str(env, "Restriction Test"),
@@ -28,101 +29,134 @@ fn setup_tokenized_asset(env: &Env, tokenizer: &Address) -> u64 {
             accredited_investor_required: false,
             geographic_restrictions: soroban_sdk::Vec::new(env),
         },
-    );
-    asset_id
+    )
+    .unwrap();
 }
 
 #[test]
 fn test_set_transfer_restriction() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register_contract(None, AssetUpContract);
+    let tokenizer = Address::generate(&env);
+    let asset_id = 900u64;
 
-    let restriction = TransferRestriction {
-        require_accredited: true,
-        geographic_allowed: soroban_sdk::Vec::new(&env),
-    };
+    let (set_ok, has_restrictions) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    let result = transfer_restrictions::set_transfer_restriction(&env, asset_id, restriction);
-    assert!(result.is_ok());
+        let restriction = TransferRestriction {
+            require_accredited: true,
+            geographic_allowed: soroban_sdk::Vec::new(&env),
+        };
 
-    // Verify restriction was set
-    let has_restrictions = transfer_restrictions::has_transfer_restrictions(&env, asset_id).unwrap();
+        let ok = transfer_restrictions::set_transfer_restriction(&env, asset_id, restriction)
+            .is_ok();
+        let has = transfer_restrictions::has_transfer_restrictions(&env, asset_id).unwrap();
+        (ok, has)
+    });
+
+    assert!(set_ok);
     assert!(has_restrictions);
 }
 
 #[test]
 fn test_whitelist_operations() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let whitelisted = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register_contract(None, AssetUpContract);
+    let tokenizer = Address::generate(&env);
+    let whitelisted = Address::generate(&env);
+    let asset_id = 900u64;
 
-    // Add to whitelist
-    transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
+    let (is_wl_after_add, list_len, is_wl_after_remove) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    // Check if whitelisted
-    let is_wl = transfer_restrictions::is_whitelisted(&env, asset_id, whitelisted.clone()).unwrap();
-    assert!(is_wl);
+        // Add to whitelist
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
 
-    // Get whitelist
-    let whitelist = transfer_restrictions::get_whitelist(&env, asset_id).unwrap();
-    assert_eq!(whitelist.len(), 1);
+        let is_wl_add =
+            transfer_restrictions::is_whitelisted(&env, asset_id, whitelisted.clone()).unwrap();
+        let whitelist = transfer_restrictions::get_whitelist(&env, asset_id).unwrap();
+        let len = whitelist.len();
 
-    // Remove from whitelist
-    transfer_restrictions::remove_from_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
+        // Remove from whitelist
+        transfer_restrictions::remove_from_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
 
-    // Verify removed
-    let is_wl = transfer_restrictions::is_whitelisted(&env, asset_id, whitelisted).unwrap();
-    assert!(!is_wl);
+        let is_wl_rem =
+            transfer_restrictions::is_whitelisted(&env, asset_id, whitelisted.clone()).unwrap();
+        (is_wl_add, len, is_wl_rem)
+    });
+
+    assert!(is_wl_after_add);
+    assert_eq!(list_len, 1);
+    assert!(!is_wl_after_remove);
 }
 
 #[test]
 fn test_whitelist_duplicate_prevention() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let whitelisted = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register_contract(None, AssetUpContract);
+    let tokenizer = Address::generate(&env);
+    let whitelisted = Address::generate(&env);
+    let asset_id = 900u64;
 
-    // Add to whitelist twice
-    transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
-    transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
+    let list_len = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    // Should still have only 1 entry
-    let whitelist = transfer_restrictions::get_whitelist(&env, asset_id).unwrap();
-    assert_eq!(whitelist.len(), 1);
+        // Add to whitelist twice
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
+
+        // Should still have only 1 entry
+        transfer_restrictions::get_whitelist(&env, asset_id).unwrap().len()
+    });
+
+    assert_eq!(list_len, 1);
 }
 
 #[test]
 fn test_validate_transfer_no_restrictions() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let recipient = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register_contract(None, AssetUpContract);
+    let tokenizer = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset_id = 900u64;
 
-    // Validate transfer when no restrictions exist
-    let valid = transfer_restrictions::validate_transfer(&env, asset_id, tokenizer, recipient).unwrap();
+    let valid = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+
+        // Validate transfer when no restrictions exist
+        transfer_restrictions::validate_transfer(&env, asset_id, tokenizer.clone(), recipient.clone())
+            .unwrap()
+    });
+
     assert!(valid);
 }
 
 #[test]
 fn test_get_transfer_restriction() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register_contract(None, AssetUpContract);
+    let tokenizer = Address::generate(&env);
+    let asset_id = 900u64;
 
-    // Should fail initially (no restriction)
-    let restriction = transfer_restrictions::get_transfer_restriction(&env, asset_id);
-    assert!(restriction.is_err());
+    let (before_err, after_require_accredited) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    // Set restriction
-    let new_restriction = TransferRestriction {
-        require_accredited: true,
-        geographic_allowed: soroban_sdk::Vec::new(&env),
-    };
-    transfer_restrictions::set_transfer_restriction(&env, asset_id, new_restriction.clone()).unwrap();
+        // Should fail initially (no restriction)
+        let before = transfer_restrictions::get_transfer_restriction(&env, asset_id).is_err();
 
-    // Should now exist
-    let restriction = transfer_restrictions::get_transfer_restriction(&env, asset_id).unwrap();
-    assert_eq!(restriction.require_accredited, true);
+        // Set restriction
+        let new_restriction = TransferRestriction {
+            require_accredited: true,
+            geographic_allowed: soroban_sdk::Vec::new(&env),
+        };
+        transfer_restrictions::set_transfer_restriction(&env, asset_id, new_restriction).unwrap();
+
+        // Should now exist
+        let after =
+            transfer_restrictions::get_transfer_restriction(&env, asset_id).unwrap();
+        (before, after.require_accredited)
+    });
+
+    assert!(before_err);
+    assert!(after_require_accredited);
 }

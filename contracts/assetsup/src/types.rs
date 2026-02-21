@@ -1,5 +1,5 @@
 #![allow(clippy::upper_case_acronyms)]
-use soroban_sdk::{Address, BigInt, BytesN, String, Vec, contracttype};
+use soroban_sdk::{Address, BytesN, String, Vec, contracttype};
 
 /// Represents the fundamental type of asset being managed
 /// Distinguishes between physical and digital assets for different handling requirements
@@ -91,7 +91,7 @@ pub enum TokenDataKey {
     TokenLockedUntil(u64, Address),
     /// Stores vote record for (asset_id, proposal_id, voter_address)
     VoteRecord(u64, u64, Address),
-    /// Stores vote tally (BigInt) for (asset_id, proposal_id)
+    /// Stores vote tally (i128) for (asset_id, proposal_id)
     VoteTally(u64, u64),
     /// Stores TransferRestriction for asset_id
     TransferRestriction(u64),
@@ -101,80 +101,8 @@ pub enum TokenDataKey {
     UnclaimedDividend(u64, Address),
     /// Stores detokenization proposal status
     DetokenizationProposal(u64),
-}
-
-/// Events emitted by the contract
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ContractEvent {
-    AssetTokenized {
-        asset_id: u64,
-        supply: BigInt,
-        symbol: String,
-        decimals: u32,
-        tokenizer: Address,
-    },
-    TokensMinted {
-        asset_id: u64,
-        amount: BigInt,
-        new_supply: BigInt,
-    },
-    TokensBurned {
-        asset_id: u64,
-        amount: BigInt,
-        new_supply: BigInt,
-    },
-    TokensTransferred {
-        asset_id: u64,
-        from: Address,
-        to: Address,
-        amount: BigInt,
-    },
-    TokensLocked {
-        asset_id: u64,
-        holder: Address,
-        until_timestamp: u64,
-    },
-    TokensUnlocked {
-        asset_id: u64,
-        holder: Address,
-    },
-    DividendDistributed {
-        asset_id: u64,
-        total_amount: BigInt,
-        holder_count: u32,
-    },
-    DividendClaimed {
-        asset_id: u64,
-        holder: Address,
-        amount: BigInt,
-    },
-    VoteCast {
-        asset_id: u64,
-        proposal_id: u64,
-        voter: Address,
-        weight: BigInt,
-    },
-    AssetDetokenized {
-        asset_id: u64,
-        proposal_id: u64,
-    },
-    ValuationUpdated {
-        asset_id: u64,
-        new_valuation: BigInt,
-    },
-    TransferRestrictionSet {
-        asset_id: u64,
-        require_accredited: bool,
-    },
-    WhitelistAddressAdded {
-        asset_id: u64,
-        address: Address,
-    },
-    WhitelistAddressRemoved {
-        asset_id: u64,
-        address: Address,
-    },
+    /// Stores TokenMetadata for asset_id
+    TokenMetadata(u64),
 }
 
 /// Represents a tokenized asset on-chain
@@ -184,29 +112,29 @@ pub struct TokenizedAsset {
     /// Original asset ID (reference to registry)
     pub asset_id: u64,
     /// Total number of tokens issued
-    pub total_supply: BigInt,
+    pub total_supply: i128,
     /// Token symbol (unique per asset)
     pub symbol: String,
     /// Number of decimals for fractional ownership
     pub decimals: u32,
     /// Total tokens currently locked (non-transferable)
-    pub locked_tokens: BigInt,
+    pub locked_tokens: i128,
     /// Tokenizer / asset owner
     pub tokenizer: Address,
     /// Asset valuation (in stroops)
-    pub valuation: BigInt,
+    pub valuation: i128,
     /// Number of unique token holders
     pub token_holders_count: u32,
     /// Tokens currently in circulation (not burned)
-    pub tokens_in_circulation: BigInt,
+    pub tokens_in_circulation: i128,
     /// Minimum tokens required to vote
-    pub min_voting_threshold: BigInt,
+    pub min_voting_threshold: i128,
     /// Revenue sharing enabled flag
     pub revenue_sharing_enabled: bool,
     /// Timestamp when asset was tokenized
     pub tokenization_timestamp: u64,
-    /// Percentage required for detokenization (basis points, e.g., 5000 = 50%)
-    pub detokenization_required_threshold: u32,
+    /// Percentage required for detokenization (e.g. 50 = 50%)
+    pub detokenize_threshold: u32,
 }
 
 /// Metadata associated with a tokenized asset
@@ -234,19 +162,19 @@ pub struct TokenMetadata {
 pub struct OwnershipRecord {
     pub owner: Address,
     /// Current token balance
-    pub balance: BigInt,
+    pub balance: i128,
     /// Timestamp of first acquisition
     pub acquisition_timestamp: u64,
     /// Average price per token at acquisition
-    pub average_purchase_price: BigInt,
+    pub average_purchase_price: i128,
     /// Voting power (weighted by balance)
-    pub voting_power: BigInt,
+    pub voting_power: i128,
     /// Entitlement to dividends
-    pub dividend_entitlement: BigInt,
+    pub dividend_entitlement: i128,
     /// Unclaimed dividends pending
-    pub unclaimed_dividends: BigInt,
+    pub unclaimed_dividends: i128,
     /// Ownership percentage in basis points (e.g., 5000 = 50%)
-    pub ownership_percentage: BigInt,
+    pub ownership_percentage: i128,
 }
 
 /// Transfer restrictions for tokens
@@ -259,21 +187,41 @@ pub struct TransferRestriction {
     pub geographic_allowed: Vec<String>,
 }
 
-/// Detokenization proposal
+// =====================
+// DetokenizationProposal — Option B: wrapper structs preserve named fields
+// while satisfying #[contracttype]'s restriction on enum variant fields.
+// =====================
+
+/// Data for an active detokenization proposal
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ActiveProposal {
+    pub proposal_id: u64,
+    pub proposer: Address,
+    pub created_at: u64,
+}
+
+/// Data for an executed detokenization proposal
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExecutedProposal {
+    pub proposal_id: u64,
+    pub executed_at: u64,
+}
+
+/// Data for a rejected detokenization proposal
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RejectedProposal {
+    pub proposal_id: u64,
+    pub rejected_at: u64,
+}
+
+/// Detokenization proposal — each variant wraps its own named struct
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DetokenizationProposal {
-    Active {
-        proposal_id: u64,
-        proposer: Address,
-        created_at: u64,
-    },
-    Executed {
-        proposal_id: u64,
-        executed_at: u64,
-    },
-    Rejected {
-        proposal_id: u64,
-        rejected_at: u64,
-    },
+    Active(ActiveProposal),
+    Executed(ExecutedProposal),
+    Rejected(RejectedProposal),
 }
