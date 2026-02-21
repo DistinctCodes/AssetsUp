@@ -1,5 +1,7 @@
-use crate::{handle_error, Error};
-use soroban_sdk::{contracttype, log, Address, BytesN, Env, Map, String, Symbol, Vec};
+#![allow(dead_code)]
+
+use crate::Error;
+use soroban_sdk::{contracttype, log, Address, BytesN, Env, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]

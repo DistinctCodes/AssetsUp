@@ -52,6 +52,7 @@ impl MultiSigTransferContract {
     // ----------------------------
     // Create transfer request
     // ----------------------------
+    #[allow(clippy::too_many_arguments)]
     pub fn create_transfer_request(
         e: Env,
         caller: Address,

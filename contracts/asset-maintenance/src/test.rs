@@ -35,11 +35,11 @@ fn test_init_and_provider_registration() {
 
     let fetched = client.get_provider_details(&provider_addr).unwrap();
     assert_eq!(fetched.name, String::from_str(&env, "Service Corp"));
-    assert_eq!(fetched.is_active, true);
+    assert!(fetched.is_active);
 
     client.deactivate_provider(&provider_addr);
     let deactivated = client.get_provider_details(&provider_addr).unwrap();
-    assert_eq!(deactivated.is_active, false);
+    assert!(!deactivated.is_active);
 }
 
 #[test]
@@ -172,14 +172,11 @@ fn test_alerts_and_stats() {
 
     client.acknowledge_maintenance_alert(&asset_id, &0, &admin);
     let acknowledged_alerts = client.get_alerts(&asset_id);
-    assert_eq!(acknowledged_alerts.get(0).unwrap().acknowledged, true);
+    assert!(acknowledged_alerts.get(0).unwrap().acknowledged);
 
     // Test stats
     let stats = client.get_asset_stats(&asset_id);
     assert_eq!(stats.service_count, 0); // No service yet
 
-    assert_eq!(
-        client.is_maintenance_cost_excessive(&asset_id, &1000),
-        false
-    );
+    assert!(!client.is_maintenance_cost_excessive(&asset_id, &1000));
 }

@@ -29,6 +29,7 @@ pub fn asset_is_retired(
     Ok(false) // placeholder
 }
 
+#[allow(dead_code)]
 pub fn get_owner(
     e: &Env,
     registry: &Address,

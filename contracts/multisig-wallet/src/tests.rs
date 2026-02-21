@@ -19,7 +19,7 @@ fn test_initialize() {
 
     assert_eq!(client.get_owners(), owners);
     assert_eq!(client.get_threshold(), threshold);
-    assert_eq!(client.is_frozen(), false);
+    assert!(!client.is_frozen());
 }
 
 #[test]

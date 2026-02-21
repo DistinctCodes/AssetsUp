@@ -538,7 +538,7 @@ impl AssetMaintenanceContract {
             }
         }
 
-        score.min(100).max(0)
+        score.clamp(0, 100)
     }
 
     fn verify_asset_exists(_env: &Env, _asset_id: u64) -> bool {

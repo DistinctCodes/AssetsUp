@@ -85,6 +85,7 @@ pub fn execute_detokenization(env: &Env, asset_id: u64, proposal_id: u64) -> Res
 }
 
 /// Reject detokenization proposal
+#[allow(dead_code)]
 pub fn reject_detokenization(env: &Env, asset_id: u64) -> Result<(), Error> {
     let store = env.storage().persistent();
 

@@ -17,6 +17,7 @@ pub struct AuditEntry {
     pub note: String,
 }
 
+#[allow(dead_code)]
 pub fn log_action(
     env: &Env,
     asset_id: &BytesN<32>,

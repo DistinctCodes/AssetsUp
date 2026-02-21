@@ -87,8 +87,8 @@ pub fn get_whitelist(env: &Env, asset_id: u64) -> Result<Vec<Address>, Error> {
 pub fn validate_transfer(
     env: &Env,
     asset_id: u64,
-    from: Address,
-    to: Address,
+    _from: Address,
+    _to: Address,
 ) -> Result<bool, Error> {
     let store = env.storage().persistent();
 
@@ -120,6 +120,7 @@ pub fn validate_transfer(
 }
 
 /// Check if transfer restrictions are enabled for an asset
+#[allow(dead_code)]
 pub fn has_transfer_restrictions(env: &Env, asset_id: u64) -> Result<bool, Error> {
     let store = env.storage().persistent();
 
@@ -128,6 +129,7 @@ pub fn has_transfer_restrictions(env: &Env, asset_id: u64) -> Result<bool, Error
 }
 
 /// Get transfer restrictions for an asset
+#[allow(dead_code)]
 pub fn get_transfer_restriction(env: &Env, asset_id: u64) -> Result<TransferRestriction, Error> {
     let store = env.storage().persistent();
 
@@ -136,6 +138,7 @@ pub fn get_transfer_restriction(env: &Env, asset_id: u64) -> Result<TransferRest
 }
 
 /// Clear transfer restrictions
+#[allow(dead_code)]
 pub fn clear_transfer_restrictions(env: &Env, asset_id: u64) -> Result<(), Error> {
     let store = env.storage().persistent();
 

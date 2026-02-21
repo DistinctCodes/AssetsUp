@@ -67,6 +67,7 @@ pub fn approval_rule_updated(e: &Env, category: &BytesN<32>, required: u32, time
     );
 }
 
+#[allow(dead_code)]
 pub fn approver_added(e: &Env, approver: &Address, added_by: &Address, timestamp: u64) {
     e.events().publish(
         ("ApproverAdded",),
@@ -74,6 +75,7 @@ pub fn approver_added(e: &Env, approver: &Address, added_by: &Address, timestamp
     );
 }
 
+#[allow(dead_code)]
 pub fn approver_removed(e: &Env, approver: &Address, removed_by: &Address, timestamp: u64) {
     e.events().publish(
         ("ApproverRemoved",),

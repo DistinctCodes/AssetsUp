@@ -67,6 +67,7 @@ impl MultisigWallet {
     }
 
     /// Submit transaction proposal
+    #[allow(clippy::too_many_arguments)]
     pub fn submit_transaction(
         env: Env,
         initiator: Address,

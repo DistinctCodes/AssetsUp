@@ -95,6 +95,7 @@ pub fn proposal_passed(env: &Env, asset_id: u64, proposal_id: u64) -> Result<boo
 }
 
 /// Get list of voters who participated in a proposal
+#[allow(dead_code)]
 pub fn get_proposal_voters(
     env: &Env,
     asset_id: u64,

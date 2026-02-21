@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(clippy::too_many_arguments)]
 
 use crate::error::{handle_error, Error};
 use soroban_sdk::{
@@ -183,7 +184,7 @@ impl AssetUpContract {
 
         // Validate owner address is not zero address
         let zero_address = Address::from_str(
-            &env,
+            env,
             "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
         );
         if asset.owner == zero_address {

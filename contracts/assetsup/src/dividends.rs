@@ -39,7 +39,7 @@ pub fn distribute_dividends(env: &Env, asset_id: u64, total_amount: i128) -> Res
     // Emit event: (asset_id, total_amount, holder_count)
     env.events().publish(
         ("dividend", "distributed"),
-        (asset_id, total_amount, holders.len() as u32),
+        (asset_id, total_amount, holders.len()),
     );
 
     Ok(())

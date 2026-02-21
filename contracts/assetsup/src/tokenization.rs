@@ -4,6 +4,7 @@ use soroban_sdk::{Address, Env, String, Vec};
 
 /// Initialize tokenization by creating tokenized asset
 /// Only contract admin or asset owner can tokenize
+#[allow(clippy::too_many_arguments)]
 pub fn tokenize_asset(
     env: &Env,
     asset_id: u64,
@@ -394,6 +395,7 @@ pub fn get_tokenized_asset(env: &Env, asset_id: u64) -> Result<TokenizedAsset, E
 }
 
 /// Get token metadata
+#[allow(dead_code)]
 pub fn get_token_metadata(env: &Env, asset_id: u64) -> Result<TokenMetadata, Error> {
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenMetadata(asset_id);
