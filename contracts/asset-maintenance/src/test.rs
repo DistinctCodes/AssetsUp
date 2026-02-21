@@ -178,5 +178,8 @@ fn test_alerts_and_stats() {
     let stats = client.get_asset_stats(&asset_id);
     assert_eq!(stats.service_count, 0); // No service yet
 
-    assert_eq!(client.is_maintenance_cost_excessive(&asset_id, &1000), false);
+    assert_eq!(
+        client.is_maintenance_cost_excessive(&asset_id, &1000),
+        false
+    );
 }

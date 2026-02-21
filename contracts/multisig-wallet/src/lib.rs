@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, symbol_short, Address, Env, Symbol, Val, Vec,
-};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Val, Vec};
 
 mod errors;
 #[cfg(test)]
@@ -526,8 +524,10 @@ impl MultisigWallet {
         // For now, let's just set it.
         env.storage().instance().set(&DataKey::Frozen, &true);
 
-        env.events()
-            .publish((symbol_short!("frozen"),), (caller, env.ledger().timestamp()));
+        env.events().publish(
+            (symbol_short!("frozen"),),
+            (caller, env.ledger().timestamp()),
+        );
         Ok(())
     }
 
