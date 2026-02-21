@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, BytesN, Env, String, Vec, contracttype};
+use soroban_sdk::{contracttype, Address, BytesN, Env, String, Vec};
 
 use crate::types::ActionType;
 
@@ -17,6 +17,7 @@ pub struct AuditEntry {
     pub note: String,
 }
 
+#[allow(dead_code)]
 pub fn log_action(
     env: &Env,
     asset_id: &BytesN<32>,

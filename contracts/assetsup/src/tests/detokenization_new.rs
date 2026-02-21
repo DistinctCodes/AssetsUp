@@ -2,22 +2,23 @@
 
 extern crate std;
 
-use soroban_sdk::{Address, BigInt, Env, String};
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{Address, Env, String};
 
+use crate::detokenization;
 use crate::tokenization;
 use crate::types::AssetType;
 use crate::voting;
-use crate::detokenization;
+use crate::AssetUpContract;
 
-fn setup_tokenized_asset(env: &Env, tokenizer: &Address) -> u64 {
-    let asset_id = 1000u64;
-    let _ = tokenization::tokenize_asset(
+fn setup_tokenized_asset(env: &Env, asset_id: u64, tokenizer: &Address) {
+    tokenization::tokenize_asset(
         env,
         asset_id,
         String::from_str(env, "DETON"),
-        BigInt::from_i128(env, 1000),
+        1000,
         2,
-        BigInt::from_i128(env, 100),
+        100,
         tokenizer.clone(),
         crate::types::TokenMetadata {
             name: String::from_str(env, "Detokenization Test"),
@@ -29,122 +30,161 @@ fn setup_tokenized_asset(env: &Env, tokenizer: &Address) -> u64 {
             accredited_investor_required: false,
             geographic_restrictions: soroban_sdk::Vec::new(env),
         },
-    );
-    asset_id
+    )
+    .unwrap();
 }
 
 #[test]
 fn test_propose_detokenization() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let proposer = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let proposer = Address::generate(&env);
+    let asset_id = 1000u64;
 
-    let proposal_id = detokenization::propose_detokenization(&env, asset_id, proposer).unwrap();
+    let proposal_some = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+        let _proposal_id =
+            detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
+        // Verify proposal exists
+        detokenization::get_detokenization_proposal(&env, asset_id)
+            .ok()
+            .is_some()
+    });
 
-    // Verify proposal exists
-    let proposal = detokenization::get_detokenization_proposal(&env, asset_id).ok();
-    assert!(proposal.is_some());
+    assert!(proposal_some);
 }
 
 #[test]
 fn test_duplicate_proposal_prevention() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let proposer = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let proposer = Address::generate(&env);
+    let asset_id = 1000u64;
 
-    // Propose once
-    detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
+    let second_err = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+        // Propose once
+        detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
+        // Try to propose again
+        detokenization::propose_detokenization(&env, asset_id, proposer.clone()).is_err()
+    });
 
-    // Try to propose again
-    let result = detokenization::propose_detokenization(&env, asset_id, proposer);
-    assert!(result.is_err());
+    assert!(second_err);
 }
 
 #[test]
 fn test_detokenization_active_check() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let proposer = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let proposer = Address::generate(&env);
+    let asset_id = 1000u64;
 
-    // Should not be active initially
-    let is_active = detokenization::is_detokenization_active(&env, asset_id).unwrap();
-    assert!(!is_active);
+    let (before_active, after_active) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    // Propose
-    detokenization::propose_detokenization(&env, asset_id, proposer).unwrap();
+        // Should not be active initially
+        let before = detokenization::is_detokenization_active(&env, asset_id).unwrap();
 
-    // Should be active now
-    let is_active = detokenization::is_detokenization_active(&env, asset_id).unwrap();
-    assert!(is_active);
+        // Propose
+        detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
+
+        // Should be active now
+        let after = detokenization::is_detokenization_active(&env, asset_id).unwrap();
+        (before, after)
+    });
+
+    assert!(!before_active);
+    assert!(after_active);
 }
 
 #[test]
 fn test_execute_detokenization_without_majority() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let proposer = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let proposer = Address::generate(&env);
+    let asset_id = 1000u64;
 
-    // Propose
-    let proposal_id = detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
+    let execute_err = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+        // Propose
+        let proposal_id =
+            detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
+        // Try to execute without votes
+        detokenization::execute_detokenization(&env, asset_id, proposal_id).is_err()
+    });
 
-    // Try to execute without votes
-    let result = detokenization::execute_detokenization(&env, asset_id, proposal_id);
-    assert!(result.is_err()); // Should fail - no majority
+    assert!(execute_err); // Should fail - no majority
 }
 
 #[test]
 fn test_execute_detokenization_with_majority() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let proposer = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let proposer = Address::generate(&env);
+    let asset_id = 1000u64;
 
-    // Propose
-    let proposal_id = detokenization::propose_detokenization(&env, asset_id, proposer).unwrap();
+    let (execute_ok, is_active) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    // Get >50% votes
-    // Tokenizer has 1000 tokens (100%), cast vote
-    voting::cast_vote(&env, asset_id, proposal_id, tokenizer.clone()).unwrap();
+        // Propose
+        let proposal_id =
+            detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
 
-    // Now execute - should succeed
-    let result = detokenization::execute_detokenization(&env, asset_id, proposal_id);
-    assert!(result.is_ok());
+        // Tokenizer has 1000 tokens (100%), cast vote
+        voting::cast_vote(&env, asset_id, proposal_id, tokenizer.clone()).unwrap();
 
-    // Should no longer be active
-    let is_active = detokenization::is_detokenization_active(&env, asset_id).unwrap();
+        // Now execute - should succeed
+        let ok = detokenization::execute_detokenization(&env, asset_id, proposal_id).is_ok();
+
+        // Should no longer be active
+        let active = detokenization::is_detokenization_active(&env, asset_id).unwrap();
+        (ok, active)
+    });
+
+    assert!(execute_ok);
     assert!(!is_active);
 }
 
 #[test]
 fn test_detokenization_majority_threshold() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let holder2 = Address::random(&env);
-    let proposer = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let holder2 = Address::generate(&env);
+    let proposer = Address::generate(&env);
+    let asset_id = 1000u64;
 
-    // Transfer 400 to holder2 (40% < 50% threshold)
-    tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), BigInt::from_i128(&env, 400))
-        .unwrap();
+    let (first_execute_err, second_execute_ok) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    // Propose
-    let proposal_id = detokenization::propose_detokenization(&env, asset_id, proposer).unwrap();
+        // Transfer 400 to holder2 (40% < 50% threshold)
+        tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), 400)
+            .unwrap();
 
-    // Only holder2 votes (40%)
-    voting::cast_vote(&env, asset_id, proposal_id, holder2).unwrap();
+        // Propose
+        let proposal_id =
+            detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
 
-    // Should fail execution
-    let result = detokenization::execute_detokenization(&env, asset_id, proposal_id);
-    assert!(result.is_err());
+        // Only holder2 votes (40%)
+        voting::cast_vote(&env, asset_id, proposal_id, holder2.clone()).unwrap();
 
-    // Now tokenizer also votes (100% total)
-    voting::cast_vote(&env, asset_id, proposal_id, tokenizer).unwrap();
+        // Should fail execution (only 40%)
+        let first_err =
+            detokenization::execute_detokenization(&env, asset_id, proposal_id).is_err();
 
-    // Should succeed
-    let result = detokenization::execute_detokenization(&env, asset_id, proposal_id);
-    assert!(result.is_ok());
+        // Now tokenizer also votes (100% total)
+        voting::cast_vote(&env, asset_id, proposal_id, tokenizer.clone()).unwrap();
+
+        // Should succeed
+        let second_ok = detokenization::execute_detokenization(&env, asset_id, proposal_id).is_ok();
+        (first_err, second_ok)
+    });
+
+    assert!(first_execute_err);
+    assert!(second_execute_ok);
 }

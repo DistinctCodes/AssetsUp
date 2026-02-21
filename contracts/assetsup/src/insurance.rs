@@ -1,9 +1,7 @@
-#![allow(clippy::too_many_arguments)]
+#![allow(dead_code)]
 
-use soroban_sdk::{
-    contracttype, Address, BytesN, Env, String, Vec, Map, Symbol, log
-};
-use crate::{Error, handle_error};
+use crate::Error;
+use soroban_sdk::{contracttype, log, Address, BytesN, Env, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -83,10 +81,7 @@ pub enum DataKey {
     AssetPolicies(BytesN<32>),
 }
 
-pub fn create_policy(
-    env: Env,
-    policy: InsurancePolicy,
-) -> Result<(), Error> {
+pub fn create_policy(env: Env, policy: InsurancePolicy) -> Result<(), Error> {
     policy.insurer.require_auth();
 
     if policy.coverage_amount <= 0 || policy.deductible >= policy.coverage_amount {
@@ -113,18 +108,13 @@ pub fn create_policy(
     Ok(())
 }
 
-pub fn file_claim(
-    env: Env,
-    claim: InsuranceClaim,
-) -> Result<(), Error> {
+pub fn file_claim(env: Env, claim: InsuranceClaim) -> Result<(), Error> {
     claim.claimant.require_auth();
 
     let store = env.storage().persistent();
     let policy_key = DataKey::Policy(claim.policy_id.clone());
 
-    let policy: InsurancePolicy = store
-        .get(&policy_key)
-        .ok_or(Error::AssetNotFound)?;
+    let policy: InsurancePolicy = store.get(&policy_key).ok_or(Error::AssetNotFound)?;
 
     if policy.status != PolicyStatus::Active {
         return Err(Error::Unauthorized);
@@ -141,11 +131,7 @@ pub fn file_claim(
     Ok(())
 }
 
-pub fn approve_claim(
-    env: Env,
-    claim_id: BytesN<32>,
-    approver: Address,
-) -> Result<(), Error> {
+pub fn approve_claim(env: Env, claim_id: BytesN<32>, approver: Address) -> Result<(), Error> {
     approver.require_auth();
 
     let store = env.storage().persistent();
@@ -162,10 +148,7 @@ pub fn approve_claim(
     Ok(())
 }
 
-pub fn pay_claim(
-    env: Env,
-    claim_id: BytesN<32>,
-) -> Result<(), Error> {
+pub fn pay_claim(env: Env, claim_id: BytesN<32>) -> Result<(), Error> {
     let store = env.storage().persistent();
     let key = DataKey::Claim(claim_id.clone());
 

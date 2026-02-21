@@ -2,21 +2,22 @@
 
 extern crate std;
 
-use soroban_sdk::{Address, BigInt, Env, String};
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{Address, Env, String};
 
 use crate::tokenization;
 use crate::types::AssetType;
 use crate::voting;
+use crate::AssetUpContract;
 
-fn setup_tokenized_asset(env: &Env, tokenizer: &Address) -> u64 {
-    let asset_id = 700u64;
-    let _ = tokenization::tokenize_asset(
+fn setup_tokenized_asset(env: &Env, asset_id: u64, tokenizer: &Address) {
+    tokenization::tokenize_asset(
         env,
         asset_id,
         String::from_str(env, "VOTE"),
-        BigInt::from_i128(env, 1000),
+        1000,
         2,
-        BigInt::from_i128(env, 100),
+        100,
         tokenizer.clone(),
         crate::types::TokenMetadata {
             name: String::from_str(env, "Voting Test"),
@@ -28,96 +29,120 @@ fn setup_tokenized_asset(env: &Env, tokenizer: &Address) -> u64 {
             accredited_investor_required: false,
             geographic_restrictions: soroban_sdk::Vec::new(env),
         },
-    );
-    asset_id
+    )
+    .unwrap();
 }
 
 #[test]
 fn test_cast_vote() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let asset_id = 700u64;
 
-    // Cast vote
-    let result = voting::cast_vote(&env, asset_id, 1, tokenizer.clone());
-    assert!(result.is_ok());
+    let (cast_ok, has_voted) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+        let result = voting::cast_vote(&env, asset_id, 1, tokenizer.clone());
+        let voted = voting::has_voted(&env, asset_id, 1, tokenizer.clone()).unwrap();
+        (result.is_ok(), voted)
+    });
 
-    // Verify vote was recorded
-    let has_voted = voting::has_voted(&env, asset_id, 1, tokenizer).unwrap();
+    assert!(cast_ok);
     assert!(has_voted);
 }
 
 #[test]
 fn test_double_vote_prevention() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let asset_id = 700u64;
 
-    // Cast first vote
-    voting::cast_vote(&env, asset_id, 1, tokenizer.clone()).unwrap();
+    let second_vote_err = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+        // Cast first vote
+        voting::cast_vote(&env, asset_id, 1, tokenizer.clone()).unwrap();
+        // Try to vote again
+        voting::cast_vote(&env, asset_id, 1, tokenizer.clone()).is_err()
+    });
 
-    // Try to vote again
-    let result = voting::cast_vote(&env, asset_id, 1, tokenizer);
-    assert!(result.is_err());
+    assert!(second_vote_err);
 }
 
 #[test]
 fn test_vote_tally() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let holder2 = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let holder2 = Address::generate(&env);
+    let asset_id = 700u64;
 
-    // Transfer some tokens to second holder
-    tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), BigInt::from_i128(&env, 300))
-        .unwrap();
+    let tally = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    // Cast votes
-    voting::cast_vote(&env, asset_id, 1, tokenizer.clone()).unwrap();
-    voting::cast_vote(&env, asset_id, 1, holder2.clone()).unwrap();
+        // Transfer some tokens to second holder
+        tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), 300)
+            .unwrap();
 
-    // Check tally
-    let tally = voting::get_vote_tally(&env, asset_id, 1).unwrap();
+        // Cast votes
+        voting::cast_vote(&env, asset_id, 1, tokenizer.clone()).unwrap();
+        voting::cast_vote(&env, asset_id, 1, holder2.clone()).unwrap();
+
+        // Check tally
+        voting::get_vote_tally(&env, asset_id, 1).unwrap()
+    });
 
     // Tokenizer has 700, holder2 has 300 = 1000 total
-    assert_eq!(tally, BigInt::from_i128(&env, 1000));
+    assert_eq!(tally, 1000_i128);
 }
 
 #[test]
 fn test_proposal_passed() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let holder2 = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let holder2 = Address::generate(&env);
+    let asset_id = 700u64;
 
-    // Transfer 600 tokens to holder2 (>50% of 1000)
-    tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), BigInt::from_i128(&env, 600))
-        .unwrap();
+    let passed = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    // Holder2 votes (600 votes)
-    voting::cast_vote(&env, asset_id, 1, holder2).unwrap();
+        // Transfer 600 tokens to holder2 (>50% of 1000)
+        tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), 600)
+            .unwrap();
 
-    // Check if proposal passed
-    let passed = voting::proposal_passed(&env, asset_id, 1).unwrap();
+        // Holder2 votes (600 votes)
+        voting::cast_vote(&env, asset_id, 1, holder2.clone()).unwrap();
+
+        // Check if proposal passed
+        voting::proposal_passed(&env, asset_id, 1).unwrap()
+    });
+
     assert!(passed);
 }
 
 #[test]
 fn test_proposal_failed() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let holder2 = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let holder2 = Address::generate(&env);
+    let asset_id = 700u64;
 
-    // Transfer 400 tokens to holder2 (<50% of 1000)
-    tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), BigInt::from_i128(&env, 400))
-        .unwrap();
+    let passed = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    // Both vote (600 + 400 = 1000, but holder2 has only 40%)
-    voting::cast_vote(&env, asset_id, 1, holder2.clone()).unwrap();
+        // Transfer 400 tokens to holder2 (<50% of 1000)
+        tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), 400)
+            .unwrap();
 
-    // Check if proposal failed (single voter with <50%)
-    let passed = voting::proposal_passed(&env, asset_id, 1).unwrap();
+        // Holder2 votes with 400 tokens (40% — below threshold)
+        voting::cast_vote(&env, asset_id, 1, holder2.clone()).unwrap();
+
+        // Check if proposal failed
+        voting::proposal_passed(&env, asset_id, 1).unwrap()
+    });
+
     // With only 400/1000 votes, should not pass 50% threshold
     assert!(!passed);
 }
@@ -125,15 +150,21 @@ fn test_proposal_failed() {
 #[test]
 fn test_insufficient_voting_power() {
     let env = Env::default();
-    let tokenizer = Address::random(&env);
-    let new_holder = Address::random(&env);
-    let asset_id = setup_tokenized_asset(&env, &tokenizer);
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let new_holder = Address::generate(&env);
+    let asset_id = 700u64;
 
-    // Transfer tokens down to below voting threshold (100)
-    tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), new_holder.clone(), BigInt::from_i128(&env, 950))
-        .unwrap();
+    let vote_err = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    // New holder has 50 tokens (below 100 threshold), should not be able to vote
-    let result = voting::cast_vote(&env, asset_id, 1, new_holder);
-    assert!(result.is_err());
+        // Transfer 50 tokens to new_holder (below 100 threshold)
+        tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), new_holder.clone(), 50)
+            .unwrap();
+
+        // new_holder has 50 tokens (below 100 threshold), should not be able to vote
+        voting::cast_vote(&env, asset_id, 1, new_holder.clone()).is_err()
+    });
+
+    assert!(vote_err);
 }

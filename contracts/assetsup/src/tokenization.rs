@@ -1,23 +1,22 @@
 use crate::error::Error;
-use crate::types::{
-    ContractEvent, OwnershipRecord, TokenDataKey, TokenMetadata, TokenizedAsset,
-};
-use soroban_sdk::{Address, BigInt, Env, String, Vec};
+use crate::types::{OwnershipRecord, TokenDataKey, TokenMetadata, TokenizedAsset};
+use soroban_sdk::{Address, Env, String, Vec};
 
 /// Initialize tokenization by creating tokenized asset
 /// Only contract admin or asset owner can tokenize
+#[allow(clippy::too_many_arguments)]
 pub fn tokenize_asset(
     env: &Env,
     asset_id: u64,
     symbol: String,
-    total_supply: BigInt,
+    total_supply: i128,
     decimals: u32,
-    min_voting_threshold: BigInt,
+    min_voting_threshold: i128,
     tokenizer: Address,
     metadata: TokenMetadata,
 ) -> Result<TokenizedAsset, Error> {
     // Validate inputs
-    if total_supply <= BigInt::from_i128(env, 0) {
+    if total_supply <= 0 {
         return Err(Error::InvalidTokenSupply);
     }
 
@@ -32,37 +31,37 @@ pub fn tokenize_asset(
     let timestamp = env.ledger().timestamp();
     let tokenized_asset = TokenizedAsset {
         asset_id,
-        total_supply: total_supply.clone(),
+        total_supply,
         symbol: symbol.clone(),
         decimals,
-        locked_tokens: BigInt::from_i128(env, 0),
+        locked_tokens: 0,
         tokenizer: tokenizer.clone(),
-        valuation: total_supply.clone(),
+        valuation: total_supply,
         token_holders_count: 1,
-        tokens_in_circulation: total_supply.clone(),
+        tokens_in_circulation: total_supply,
         min_voting_threshold,
         revenue_sharing_enabled: false,
         tokenization_timestamp: timestamp,
-        detokenization_required_threshold: 50, // 50% majority
+        detokenize_threshold: 50, // 50% majority
     };
 
     // Store tokenized asset
     store.set(&key, &tokenized_asset);
 
     // Store metadata
-    let metadata_key = TokenDataKey::TokenizedAsset(asset_id);
-    store.set(&(b"token_metadata", asset_id), &metadata);
+    let metadata_key = TokenDataKey::TokenMetadata(asset_id);
+    store.set(&metadata_key, &metadata);
 
     // Initialize tokenizer as first holder with full supply
     let ownership = OwnershipRecord {
         owner: tokenizer.clone(),
-        balance: total_supply.clone(),
+        balance: total_supply,
         acquisition_timestamp: timestamp,
-        average_purchase_price: BigInt::from_i128(env, 1),
-        voting_power: total_supply.clone(),
-        dividend_entitlement: total_supply.clone(),
-        unclaimed_dividends: BigInt::from_i128(env, 0),
-        ownership_percentage: BigInt::from_i128(env, 10000), // 100% in basis points
+        average_purchase_price: 1,
+        voting_power: total_supply,
+        dividend_entitlement: total_supply,
+        unclaimed_dividends: 0,
+        ownership_percentage: 10000, // 100% in basis points
     };
 
     let holder_key = TokenDataKey::TokenHolder(asset_id, tokenizer.clone());
@@ -74,16 +73,10 @@ pub fn tokenize_asset(
     let holders_list_key = TokenDataKey::TokenHoldersList(asset_id);
     store.set(&holders_list_key, &holders);
 
-    // Emit event
+    // Emit event: (asset_id, supply, symbol, decimals, tokenizer)
     env.events().publish(
         ("token", "asset_tokenized"),
-        ContractEvent::AssetTokenized {
-            asset_id,
-            supply: total_supply,
-            symbol,
-            decimals,
-            tokenizer,
-        },
+        (asset_id, total_supply, symbol, decimals, tokenizer),
     );
 
     Ok(tokenized_asset)
@@ -94,10 +87,10 @@ pub fn tokenize_asset(
 pub fn mint_tokens(
     env: &Env,
     asset_id: u64,
-    amount: BigInt,
+    amount: i128,
     minter: Address,
 ) -> Result<TokenizedAsset, Error> {
-    if amount <= BigInt::from_i128(env, 0) {
+    if amount <= 0 {
         return Err(Error::InvalidTokenSupply);
     }
 
@@ -105,10 +98,7 @@ pub fn mint_tokens(
     let key = TokenDataKey::TokenizedAsset(asset_id);
 
     // Get tokenized asset
-    let mut tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let mut tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Only tokenizer can mint
     if tokenized_asset.tokenizer != minter {
@@ -116,35 +106,27 @@ pub fn mint_tokens(
     }
 
     // Update total supply
-    tokenized_asset.total_supply = &tokenized_asset.total_supply + &amount;
-    tokenized_asset.tokens_in_circulation = &tokenized_asset.tokens_in_circulation + &amount;
+    tokenized_asset.total_supply += amount;
+    tokenized_asset.tokens_in_circulation += amount;
 
     // Update tokenizer's ownership
     let holder_key = TokenDataKey::TokenHolder(asset_id, minter.clone());
-    let mut ownership: OwnershipRecord = store
-        .get(&holder_key)
-        .ok_or(Error::HolderNotFound)?
-        .ok_or(Error::HolderNotFound)?;
+    let mut ownership: OwnershipRecord = store.get(&holder_key).ok_or(Error::HolderNotFound)?;
 
-    ownership.balance = &ownership.balance + &amount;
-    ownership.voting_power = ownership.balance.clone();
-    ownership.dividend_entitlement = ownership.balance.clone();
+    ownership.balance += amount;
+    ownership.voting_power = ownership.balance;
+    ownership.dividend_entitlement = ownership.balance;
 
     // Recalculate ownership percentage
-    ownership.ownership_percentage =
-        (&ownership.balance * BigInt::from_i128(env, 10000)) / &tokenized_asset.total_supply;
+    ownership.ownership_percentage = (ownership.balance * 10000) / tokenized_asset.total_supply;
 
     store.set(&holder_key, &ownership);
     store.set(&key, &tokenized_asset.clone());
 
-    // Emit event
+    // Emit event: (asset_id, amount, new_supply)
     env.events().publish(
         ("token", "tokens_minted"),
-        ContractEvent::TokensMinted {
-            asset_id,
-            amount,
-            new_supply: tokenized_asset.total_supply.clone(),
-        },
+        (asset_id, amount, tokenized_asset.total_supply),
     );
 
     Ok(tokenized_asset)
@@ -155,10 +137,10 @@ pub fn mint_tokens(
 pub fn burn_tokens(
     env: &Env,
     asset_id: u64,
-    amount: BigInt,
+    amount: i128,
     burner: Address,
 ) -> Result<TokenizedAsset, Error> {
-    if amount <= BigInt::from_i128(env, 0) {
+    if amount <= 0 {
         return Err(Error::InvalidTokenSupply);
     }
 
@@ -166,10 +148,7 @@ pub fn burn_tokens(
     let key = TokenDataKey::TokenizedAsset(asset_id);
 
     // Get tokenized asset
-    let mut tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let mut tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Only tokenizer can burn
     if tokenized_asset.tokenizer != burner {
@@ -178,38 +157,30 @@ pub fn burn_tokens(
 
     // Get burner's balance
     let holder_key = TokenDataKey::TokenHolder(asset_id, burner.clone());
-    let mut ownership: OwnershipRecord = store
-        .get(&holder_key)
-        .ok_or(Error::HolderNotFound)?
-        .ok_or(Error::HolderNotFound)?;
+    let mut ownership: OwnershipRecord = store.get(&holder_key).ok_or(Error::HolderNotFound)?;
 
     if ownership.balance < amount {
         return Err(Error::InsufficientBalance);
     }
 
     // Update balances
-    ownership.balance = &ownership.balance - &amount;
-    ownership.voting_power = ownership.balance.clone();
-    ownership.dividend_entitlement = ownership.balance.clone();
+    ownership.balance -= amount;
+    ownership.voting_power = ownership.balance;
+    ownership.dividend_entitlement = ownership.balance;
 
     // Recalculate ownership percentage
-    ownership.ownership_percentage =
-        (&ownership.balance * BigInt::from_i128(env, 10000)) / &tokenized_asset.total_supply;
+    ownership.ownership_percentage = (ownership.balance * 10000) / tokenized_asset.total_supply;
 
-    tokenized_asset.total_supply = &tokenized_asset.total_supply - &amount;
-    tokenized_asset.tokens_in_circulation = &tokenized_asset.tokens_in_circulation - &amount;
+    tokenized_asset.total_supply -= amount;
+    tokenized_asset.tokens_in_circulation -= amount;
 
     store.set(&holder_key, &ownership);
     store.set(&key, &tokenized_asset.clone());
 
-    // Emit event
+    // Emit event: (asset_id, amount, new_supply)
     env.events().publish(
         ("token", "tokens_burned"),
-        ContractEvent::TokensBurned {
-            asset_id,
-            amount,
-            new_supply: tokenized_asset.total_supply.clone(),
-        },
+        (asset_id, amount, tokenized_asset.total_supply),
     );
 
     Ok(tokenized_asset)
@@ -221,9 +192,9 @@ pub fn transfer_tokens(
     asset_id: u64,
     from: Address,
     to: Address,
-    amount: BigInt,
+    amount: i128,
 ) -> Result<(), Error> {
-    if amount <= BigInt::from_i128(env, 0) {
+    if amount <= 0 {
         return Err(Error::InvalidTokenSupply);
     }
 
@@ -231,14 +202,11 @@ pub fn transfer_tokens(
 
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Check if from address has locked tokens
     let lock_key = TokenDataKey::TokenLockedUntil(asset_id, from.clone());
-    if let Some(Some(lock_time)) = store.get::<_, u64>(&lock_key) {
+    if let Some(lock_time) = store.get::<_, u64>(&lock_key) {
         if env.ledger().timestamp() < lock_time {
             return Err(Error::TokensAreLocked);
         }
@@ -246,10 +214,8 @@ pub fn transfer_tokens(
 
     // Get from balance
     let from_holder_key = TokenDataKey::TokenHolder(asset_id, from.clone());
-    let mut from_ownership: OwnershipRecord = store
-        .get(&from_holder_key)
-        .ok_or(Error::HolderNotFound)?
-        .ok_or(Error::HolderNotFound)?;
+    let mut from_ownership: OwnershipRecord =
+        store.get(&from_holder_key).ok_or(Error::HolderNotFound)?;
 
     if from_ownership.balance < amount {
         return Err(Error::InsufficientBalance);
@@ -258,35 +224,35 @@ pub fn transfer_tokens(
     // Get to balance (or create new holder)
     let to_holder_key = TokenDataKey::TokenHolder(asset_id, to.clone());
     let mut to_ownership: OwnershipRecord = match store.get(&to_holder_key) {
-        Some(Some(ownership)) => ownership,
-        _ => {
+        Some(ownership) => ownership,
+        None => {
             // Create new holder
             let timestamp = env.ledger().timestamp();
             OwnershipRecord {
                 owner: to.clone(),
-                balance: BigInt::from_i128(env, 0),
+                balance: 0,
                 acquisition_timestamp: timestamp,
-                average_purchase_price: BigInt::from_i128(env, 1),
-                voting_power: BigInt::from_i128(env, 0),
-                dividend_entitlement: BigInt::from_i128(env, 0),
-                unclaimed_dividends: BigInt::from_i128(env, 0),
-                ownership_percentage: BigInt::from_i128(env, 0),
+                average_purchase_price: 1,
+                voting_power: 0,
+                dividend_entitlement: 0,
+                unclaimed_dividends: 0,
+                ownership_percentage: 0,
             }
         }
     };
 
     // Update balances
-    from_ownership.balance = &from_ownership.balance - &amount;
-    from_ownership.voting_power = from_ownership.balance.clone();
-    from_ownership.dividend_entitlement = from_ownership.balance.clone();
+    from_ownership.balance -= amount;
+    from_ownership.voting_power = from_ownership.balance;
+    from_ownership.dividend_entitlement = from_ownership.balance;
     from_ownership.ownership_percentage =
-        (&from_ownership.balance * BigInt::from_i128(env, 10000)) / &tokenized_asset.total_supply;
+        (from_ownership.balance * 10000) / tokenized_asset.total_supply;
 
-    to_ownership.balance = &to_ownership.balance + &amount;
-    to_ownership.voting_power = to_ownership.balance.clone();
-    to_ownership.dividend_entitlement = to_ownership.balance.clone();
+    to_ownership.balance += amount;
+    to_ownership.voting_power = to_ownership.balance;
+    to_ownership.dividend_entitlement = to_ownership.balance;
     to_ownership.ownership_percentage =
-        (&to_ownership.balance * BigInt::from_i128(env, 10000)) / &tokenized_asset.total_supply;
+        (to_ownership.balance * 10000) / tokenized_asset.total_supply;
 
     store.set(&from_holder_key, &from_ownership);
     store.set(&to_holder_key, &to_ownership);
@@ -295,7 +261,6 @@ pub fn transfer_tokens(
     let holders_list_key = TokenDataKey::TokenHoldersList(asset_id);
     let mut holders: Vec<Address> = store
         .get(&holders_list_key)
-        .ok_or(Error::AssetNotTokenized)?
         .ok_or(Error::AssetNotTokenized)?;
 
     let is_new_holder = !holders.iter().any(|h| h == to);
@@ -304,32 +269,23 @@ pub fn transfer_tokens(
         store.set(&holders_list_key, &holders);
     }
 
-    // Emit event
+    // Emit event: (asset_id, from, to, amount)
     env.events().publish(
         ("token", "tokens_transferred"),
-        ContractEvent::TokensTransferred {
-            asset_id,
-            from: from.clone(),
-            to: to.clone(),
-            amount,
-        },
+        (asset_id, from.clone(), to.clone(), amount),
     );
 
     Ok(())
 }
 
 /// Get token balance for an address
-pub fn get_token_balance(
-    env: &Env,
-    asset_id: u64,
-    holder: Address,
-) -> Result<BigInt, Error> {
+pub fn get_token_balance(env: &Env, asset_id: u64, holder: Address) -> Result<i128, Error> {
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenHolder(asset_id, holder);
 
-    match store.get(&key) {
-        Some(Some(ownership)) => Ok(ownership.balance),
-        _ => Ok(BigInt::from_i128(env, 0)),
+    match store.get::<_, OwnershipRecord>(&key) {
+        Some(ownership) => Ok(ownership.balance),
+        None => Ok(0),
     }
 }
 
@@ -338,46 +294,37 @@ pub fn get_token_holders(env: &Env, asset_id: u64) -> Result<Vec<Address>, Error
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenHoldersList(asset_id);
 
-    store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)
+    store.get(&key).ok_or(Error::AssetNotTokenized)
 }
 
-/// Lock tokens until a specific timestamp
+/// Lock tokens until a specific timestamp.
+/// Only the tokenizer of the asset can lock a holder's tokens.
 pub fn lock_tokens(
     env: &Env,
     asset_id: u64,
     holder: Address,
     until_timestamp: u64,
+    caller: Address,
 ) -> Result<(), Error> {
     // Verify asset is tokenized
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let _: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Only tokenizer can lock
-    let tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
-    // Note: In production, would check authorization
-    // For now, assuming called from trusted context
+    if tokenized_asset.tokenizer != caller {
+        return Err(Error::Unauthorized);
+    }
 
     let lock_key = TokenDataKey::TokenLockedUntil(asset_id, holder.clone());
     store.set(&lock_key, &until_timestamp);
 
+    // Emit event: (asset_id, holder, until_timestamp)
     env.events().publish(
         ("token", "tokens_locked"),
-        ContractEvent::TokensLocked {
-            asset_id,
-            holder,
-            until_timestamp,
-        },
+        (asset_id, holder, until_timestamp),
     );
 
     Ok(())
@@ -389,10 +336,7 @@ pub fn unlock_tokens(env: &Env, asset_id: u64, holder: Address) -> Result<(), Er
 
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let _: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     let lock_key = TokenDataKey::TokenLockedUntil(asset_id, holder.clone());
 
@@ -401,15 +345,21 @@ pub fn unlock_tokens(env: &Env, asset_id: u64, holder: Address) -> Result<(), Er
         store.remove(&lock_key);
     }
 
-    env.events().publish(
-        ("token", "tokens_unlocked"),
-        ContractEvent::TokensUnlocked {
-            asset_id,
-            holder,
-        },
-    );
+    // Emit event: (asset_id, holder)
+    env.events()
+        .publish(("token", "tokens_unlocked"), (asset_id, holder));
 
     Ok(())
+}
+
+/// Returns true if the holder's tokens are currently locked (lock timestamp is in the future).
+pub fn is_tokens_locked(env: &Env, asset_id: u64, holder: Address) -> bool {
+    let store = env.storage().persistent();
+    let lock_key = TokenDataKey::TokenLockedUntil(asset_id, holder);
+    match store.get::<_, u64>(&lock_key) {
+        Some(lock_until) => env.ledger().timestamp() < lock_until,
+        None => false,
+    }
 }
 
 /// Calculate ownership percentage for a holder (in basis points)
@@ -417,86 +367,59 @@ pub fn calculate_ownership_percentage(
     env: &Env,
     asset_id: u64,
     holder: Address,
-) -> Result<BigInt, Error> {
+) -> Result<i128, Error> {
     let store = env.storage().persistent();
 
     // Get asset
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Get holder balance
     let holder_key = TokenDataKey::TokenHolder(asset_id, holder);
-    let ownership: OwnershipRecord = store
-        .get(&holder_key)
-        .ok_or(Error::HolderNotFound)?
-        .ok_or(Error::HolderNotFound)?;
+    let ownership: OwnershipRecord = store.get(&holder_key).ok_or(Error::HolderNotFound)?;
 
     // Calculate percentage: (balance / total_supply) * 10000
-    if tokenized_asset.total_supply <= BigInt::from_i128(env, 0) {
-        return Ok(BigInt::from_i128(env, 0));
+    if tokenized_asset.total_supply <= 0 {
+        return Ok(0);
     }
 
-    Ok((&ownership.balance * BigInt::from_i128(env, 10000)) / &tokenized_asset.total_supply)
+    Ok((ownership.balance * 10000) / tokenized_asset.total_supply)
 }
 
 /// Get tokenized asset details
-pub fn get_tokenized_asset(
-    env: &Env,
-    asset_id: u64,
-) -> Result<TokenizedAsset, Error> {
+pub fn get_tokenized_asset(env: &Env, asset_id: u64) -> Result<TokenizedAsset, Error> {
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenizedAsset(asset_id);
 
-    store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)
+    store.get(&key).ok_or(Error::AssetNotTokenized)
 }
 
 /// Get token metadata
-pub fn get_token_metadata(
-    env: &Env,
-    asset_id: u64,
-) -> Result<TokenMetadata, Error> {
+#[allow(dead_code)]
+pub fn get_token_metadata(env: &Env, asset_id: u64) -> Result<TokenMetadata, Error> {
     let store = env.storage().persistent();
+    let key = TokenDataKey::TokenMetadata(asset_id);
 
-    store
-        .get(&(b"token_metadata", asset_id))
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)
+    store.get(&key).ok_or(Error::AssetNotTokenized)
 }
 
 /// Update asset valuation
-pub fn update_valuation(
-    env: &Env,
-    asset_id: u64,
-    new_valuation: BigInt,
-) -> Result<(), Error> {
-    if new_valuation <= BigInt::from_i128(env, 0) {
+pub fn update_valuation(env: &Env, asset_id: u64, new_valuation: i128) -> Result<(), Error> {
+    if new_valuation <= 0 {
         return Err(Error::InvalidValuation);
     }
 
     let store = env.storage().persistent();
     let key = TokenDataKey::TokenizedAsset(asset_id);
 
-    let mut tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let mut tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
-    tokenized_asset.valuation = new_valuation.clone();
+    tokenized_asset.valuation = new_valuation;
     store.set(&key, &tokenized_asset);
 
-    env.events().publish(
-        ("token", "valuation_updated"),
-        ContractEvent::ValuationUpdated {
-            asset_id,
-            new_valuation,
-        },
-    );
+    // Emit event: (asset_id, new_valuation)
+    env.events()
+        .publish(("token", "valuation_updated"), (asset_id, new_valuation));
 
     Ok(())
 }

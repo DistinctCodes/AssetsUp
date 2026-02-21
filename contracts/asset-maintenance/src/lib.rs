@@ -1,7 +1,5 @@
 #![no_std]
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec};
 
 mod test;
 
@@ -143,11 +141,11 @@ pub enum DataKey {
     Admin,
     AssetRegistry,
     Provider(Address),
-    MaintenanceHistory(u64),      // asset_id -> Vec<MaintenanceRecord>
-    MaintenanceSchedule(u64),     // asset_id -> ScheduledMaintenance
-    Warranty(u64),                // asset_id -> WarrantyInfo
-    Alerts(u64),                 // asset_id -> Vec<MaintenanceAlert>
-    AssetStats(u64),              // asset_id -> AssetStats (downtime, total cost, etc.)
+    MaintenanceHistory(u64),  // asset_id -> Vec<MaintenanceRecord>
+    MaintenanceSchedule(u64), // asset_id -> ScheduledMaintenance
+    Warranty(u64),            // asset_id -> WarrantyInfo
+    Alerts(u64),              // asset_id -> Vec<MaintenanceAlert>
+    AssetStats(u64),          // asset_id -> AssetStats (downtime, total cost, etc.)
 }
 
 #[contracttype]
@@ -540,7 +538,7 @@ impl AssetMaintenanceContract {
             }
         }
 
-        score.min(100).max(0)
+        score.clamp(0, 100)
     }
 
     fn verify_asset_exists(_env: &Env, _asset_id: u64) -> bool {
