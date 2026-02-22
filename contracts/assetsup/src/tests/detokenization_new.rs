@@ -232,7 +232,12 @@ fn test_token_elimination_on_execution() {
             let holders_result = tokenization::get_token_holders(&env, asset_id);
             let holders_cleared = holders_result.is_err();
 
-            (before_exists, after_exists, balance_cleared, holders_cleared)
+            (
+                before_exists,
+                after_exists,
+                balance_cleared,
+                holders_cleared,
+            )
         });
 
     // Assert asset existed before

@@ -73,7 +73,8 @@ pub fn execute_detokenization(env: &Env, asset_id: u64, proposal_id: u64) -> Res
 
     // Get list of all token holders before clearing
     let holders_list_key = TokenDataKey::TokenHoldersList(asset_id);
-    let holders = store.get::<_, soroban_sdk::Vec<Address>>(&holders_list_key)
+    let holders = store
+        .get::<_, soroban_sdk::Vec<Address>>(&holders_list_key)
         .ok_or(Error::AssetNotTokenized)?;
 
     // Remove all token holder records
