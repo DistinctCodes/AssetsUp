@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { useAsset, useAssetHistory } from "@/lib/query/hooks/useAsset";
 
-type Tab = "overview" | "history";
+type Tab = "overview" | "history" | "documents";
 
 export default function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -41,6 +41,7 @@ export default function AssetDetailPage() {
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "overview", label: "Overview", icon: <FileText size={15} /> },
     { key: "history", label: "History", icon: <Clock size={15} /> },
+    { key: "documents", label: "Documents", icon: <FileText size={15} /> },
   ];
 
   return (
@@ -231,6 +232,98 @@ export default function AssetDetailPage() {
             </ol>
           )}
         </div>
+      )}
+
+      {tab === "documents" && <AssetDocumentsSection assetId={id} />}
+    </div>
+  );
+}
+
+// Asset Documents Section
+import {
+  useAssetDocuments,
+  useUploadDocument,
+  useDeleteDocument,
+} from "@/lib/query/hooks/useAsset";
+
+function AssetDocumentsSection({ assetId }: { assetId: string }) {
+  const { data: documents = [], isLoading } = useAssetDocuments(assetId);
+  const uploadMutation = useUploadDocument(assetId);
+  const deleteMutation = useDeleteDocument(assetId);
+  const [file, setFile] = useState<File | null>(null);
+  const [name, setName] = useState("");
+
+  const handleUpload = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (file) {
+      uploadMutation.mutate({ file, name: name || file.name });
+      setFile(null);
+      setName("");
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <h2 className="text-sm font-semibold text-gray-900 mb-4">
+        Asset Documents
+      </h2>
+      <form className="mb-6 flex gap-2 items-center" onSubmit={handleUpload}>
+        <input
+          type="file"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="border rounded px-2 py-1 text-sm"
+        />
+        <input
+          type="text"
+          placeholder="Document name (optional)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="border rounded px-2 py-1 text-sm"
+        />
+        <Button type="submit" disabled={!file || uploadMutation.isLoading}>
+          {uploadMutation.isLoading ? "Uploading..." : "Upload"}
+        </Button>
+      </form>
+      {isLoading ? (
+        <div className="text-gray-400 text-sm">Loading documents...</div>
+      ) : documents.length === 0 ? (
+        <div className="text-gray-400 text-sm">No documents uploaded yet.</div>
+      ) : (
+        <ul className="divide-y divide-gray-200">
+          {documents.map((doc) => (
+            <li key={doc.id} className="py-3 flex items-center justify-between">
+              <div>
+                <a
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener"
+                  className="text-blue-600 hover:underline font-medium"
+                >
+                  {doc.name}
+                </a>
+                <span className="ml-2 text-xs text-gray-400">{doc.type}</span>
+                <span className="ml-2 text-xs text-gray-400">
+                  {(doc.size / 1024).toFixed(1)} KB
+                </span>
+                <span className="ml-2 text-xs text-gray-400">
+                  Uploaded by {doc.uploadedBy?.firstName}{" "}
+                  {doc.uploadedBy?.lastName}
+                </span>
+                <span className="ml-2 text-xs text-gray-400">
+                  {format(new Date(doc.createdAt), "MMM d, yyyy")}
+                </span>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => deleteMutation.mutate(doc.id)}
+                disabled={deleteMutation.isLoading}
+              >
+                Delete
+              </Button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
