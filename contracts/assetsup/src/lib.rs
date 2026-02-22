@@ -822,7 +822,10 @@ impl AssetUpContract {
     }
 
     /// Get a specific policy
-    pub fn get_insurance_policy(env: Env, policy_id: BytesN<32>) -> Option<insurance::InsurancePolicy> {
+    pub fn get_insurance_policy(
+        env: Env,
+        policy_id: BytesN<32>,
+    ) -> Option<insurance::InsurancePolicy> {
         insurance::get_policy(env, policy_id)
     }
 
