@@ -1,6 +1,6 @@
 use crate::asset::Asset;
-use crate::insurance::{InsuranceClaim, InsurancePolicy, PolicyStatus, PolicyType, ClaimStatus};
-use crate::types::{AssetStatus, CustomAttribute, TokenMetadata, AssetType};
+use crate::insurance::{ClaimStatus, InsuranceClaim, InsurancePolicy, PolicyStatus, PolicyType};
+use crate::types::{AssetStatus, AssetType, CustomAttribute, TokenMetadata};
 use crate::{AssetUpContract, AssetUpContractClient};
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String, Vec};
 
@@ -22,7 +22,7 @@ pub fn create_mock_addresses(env: &Env) -> (Address, Address, Address, Address) 
 pub fn initialize_contract<'a>(env: &'a Env, admin: &Address) -> AssetUpContractClient<'a> {
     let contract_id = env.register(AssetUpContract, ());
     let client = AssetUpContractClient::new(env, &contract_id);
-    
+
     env.mock_all_auths();
     client.initialize(admin);
     client
@@ -31,7 +31,7 @@ pub fn initialize_contract<'a>(env: &'a Env, admin: &Address) -> AssetUpContract
 /// Create a test asset
 pub fn create_test_asset(env: &Env, owner: &Address, id: BytesN<32>) -> Asset {
     let timestamp = env.ledger().timestamp();
-    
+
     Asset {
         id,
         name: String::from_str(env, "Test Asset"),
@@ -48,6 +48,7 @@ pub fn create_test_asset(env: &Env, owner: &Address, id: BytesN<32>) -> Asset {
 }
 
 /// Create a test asset with custom attributes
+#[allow(dead_code)]
 pub fn create_test_asset_with_attributes(
     env: &Env,
     owner: &Address,
@@ -61,7 +62,7 @@ pub fn create_test_asset_with_attributes(
         key: String::from_str(env, "serial_number"),
         value: String::from_str(env, "SN123456"),
     });
-    
+
     Asset {
         id,
         name: String::from_str(env, name),
@@ -88,6 +89,7 @@ pub fn generate_asset_id(env: &Env, seed: u32) -> BytesN<32> {
 }
 
 /// Create token metadata for testing
+#[allow(dead_code)]
 pub fn create_test_token_metadata(env: &Env) -> TokenMetadata {
     TokenMetadata {
         name: String::from_str(env, "Test Token"),
@@ -110,7 +112,7 @@ pub fn create_test_policy(
     asset_id: BytesN<32>,
 ) -> InsurancePolicy {
     let current_time = env.ledger().timestamp();
-    
+
     InsurancePolicy {
         policy_id,
         holder: holder.clone(),
@@ -129,6 +131,7 @@ pub fn create_test_policy(
 }
 
 /// Create a test insurance claim
+#[allow(dead_code)]
 pub fn create_test_claim(
     env: &Env,
     claim_id: BytesN<32>,
@@ -137,7 +140,7 @@ pub fn create_test_claim(
     claimant: &Address,
 ) -> InsuranceClaim {
     let current_time = env.ledger().timestamp();
-    
+
     InsuranceClaim {
         claim_id,
         policy_id,

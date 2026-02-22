@@ -328,7 +328,8 @@ fn test_renew_expired_policy() {
             li.timestamp = 1000;
         });
 
-        let mut policy = create_test_policy(&env, policy_id.clone(), holder, insurer.clone(), asset_id);
+        let mut policy =
+            create_test_policy(&env, policy_id.clone(), holder, insurer.clone(), asset_id);
         // Set policy to expire at timestamp 2000
         policy.start_date = 1000;
         policy.end_date = 2000;
@@ -343,14 +344,9 @@ fn test_renew_expired_policy() {
         insurance::expire_policy(env.clone(), policy_id.clone()).unwrap();
 
         // Now renew it to timestamp 3500
-        let renew_result = insurance::renew_policy(
-            env.clone(),
-            policy_id.clone(),
-            3500,
-            1500,
-            insurer.clone(),
-        )
-        .is_ok();
+        let renew_result =
+            insurance::renew_policy(env.clone(), policy_id.clone(), 3500, 1500, insurer.clone())
+                .is_ok();
 
         let final_policy = insurance::get_policy(env.clone(), policy_id.clone()).unwrap();
 
@@ -409,8 +405,13 @@ fn test_status_transition_validation() {
 
     let (suspend_ok, cancel_after_suspend_ok, suspend_cancelled_err) =
         env.as_contract(&contract_id, || {
-            let policy =
-                create_test_policy(&env, policy_id.clone(), holder.clone(), insurer.clone(), asset_id);
+            let policy = create_test_policy(
+                &env,
+                policy_id.clone(),
+                holder.clone(),
+                insurer.clone(),
+                asset_id,
+            );
             insurance::create_policy(env.clone(), policy).unwrap();
 
             // Active -> Suspended (should work)

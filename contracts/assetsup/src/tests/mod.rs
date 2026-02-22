@@ -2,16 +2,16 @@
 mod helpers;
 
 // Core contract tests
-mod initialization;
 mod admin;
 mod asset;
+mod initialization;
 
 // Tokenization and ownership tests
-mod tokenization;
-mod voting;
-mod dividends;
-mod transfer_restrictions;
 mod detokenization;
+mod dividends;
+mod tokenization;
+mod transfer_restrictions;
+mod voting;
 
 // Insurance tests
 mod insurance;

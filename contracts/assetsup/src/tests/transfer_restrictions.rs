@@ -1,15 +1,15 @@
 use crate::tests::helpers::*;
 use crate::types::AssetType;
-use soroban_sdk::{String, Vec};
+use soroban_sdk::String;
 
 #[test]
 fn test_add_to_whitelist() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
     let client = initialize_contract(&env, &admin);
-    
+
     env.mock_all_auths();
-    
+
     client.tokenize_asset(
         &1u64,
         &String::from_str(&env, "TST"),
@@ -21,14 +21,14 @@ fn test_add_to_whitelist() {
         &String::from_str(&env, "A test tokenized asset"),
         &AssetType::Physical,
     );
-    
+
     // Initially not whitelisted
-    assert_eq!(client.is_whitelisted(&1u64, &user2), false);
-    
+    assert!(!client.is_whitelisted(&1u64, &user2));
+
     // Add to whitelist
     client.add_to_whitelist(&1u64, &user2);
-    
-    assert_eq!(client.is_whitelisted(&1u64, &user2), true);
+
+    assert!(client.is_whitelisted(&1u64, &user2));
 }
 
 #[test]
@@ -36,9 +36,9 @@ fn test_remove_from_whitelist() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
     let client = initialize_contract(&env, &admin);
-    
+
     env.mock_all_auths();
-    
+
     client.tokenize_asset(
         &1u64,
         &String::from_str(&env, "TST"),
@@ -50,14 +50,14 @@ fn test_remove_from_whitelist() {
         &String::from_str(&env, "A test tokenized asset"),
         &AssetType::Physical,
     );
-    
+
     // Add to whitelist
     client.add_to_whitelist(&1u64, &user2);
-    assert_eq!(client.is_whitelisted(&1u64, &user2), true);
-    
+    assert!(client.is_whitelisted(&1u64, &user2));
+
     // Remove from whitelist
     client.remove_from_whitelist(&1u64, &user2);
-    assert_eq!(client.is_whitelisted(&1u64, &user2), false);
+    assert!(!client.is_whitelisted(&1u64, &user2));
 }
 
 #[test]
@@ -65,9 +65,9 @@ fn test_get_whitelist() {
     let env = create_env();
     let (admin, user1, user2, user3) = create_mock_addresses(&env);
     let client = initialize_contract(&env, &admin);
-    
+
     env.mock_all_auths();
-    
+
     client.tokenize_asset(
         &1u64,
         &String::from_str(&env, "TST"),
@@ -79,11 +79,11 @@ fn test_get_whitelist() {
         &String::from_str(&env, "A test tokenized asset"),
         &AssetType::Physical,
     );
-    
+
     // Add multiple addresses to whitelist
     client.add_to_whitelist(&1u64, &user2);
     client.add_to_whitelist(&1u64, &user3);
-    
+
     let whitelist = client.get_whitelist(&1u64);
     assert_eq!(whitelist.len(), 2);
 }
@@ -93,9 +93,9 @@ fn test_add_duplicate_to_whitelist() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
     let client = initialize_contract(&env, &admin);
-    
+
     env.mock_all_auths();
-    
+
     client.tokenize_asset(
         &1u64,
         &String::from_str(&env, "TST"),
@@ -107,11 +107,11 @@ fn test_add_duplicate_to_whitelist() {
         &String::from_str(&env, "A test tokenized asset"),
         &AssetType::Physical,
     );
-    
+
     // Add to whitelist twice
     client.add_to_whitelist(&1u64, &user2);
     client.add_to_whitelist(&1u64, &user2);
-    
+
     // Should still only have one entry
     let whitelist = client.get_whitelist(&1u64);
     assert_eq!(whitelist.len(), 1);
@@ -122,9 +122,9 @@ fn test_set_transfer_restriction() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
     let client = initialize_contract(&env, &admin);
-    
+
     env.mock_all_auths();
-    
+
     client.tokenize_asset(
         &1u64,
         &String::from_str(&env, "TST"),
@@ -136,10 +136,10 @@ fn test_set_transfer_restriction() {
         &String::from_str(&env, "A test tokenized asset"),
         &AssetType::Physical,
     );
-    
+
     // Set transfer restriction
     client.set_transfer_restriction(&1u64, &true);
-    
+
     // Restriction should be set (no error means success)
 }
 
@@ -148,9 +148,9 @@ fn test_transfer_with_whitelist() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
     let client = initialize_contract(&env, &admin);
-    
+
     env.mock_all_auths();
-    
+
     client.tokenize_asset(
         &1u64,
         &String::from_str(&env, "TST"),
@@ -162,13 +162,13 @@ fn test_transfer_with_whitelist() {
         &String::from_str(&env, "A test tokenized asset"),
         &AssetType::Physical,
     );
-    
+
     // Add user2 to whitelist
     client.add_to_whitelist(&1u64, &user2);
-    
+
     // Transfer should succeed
     client.transfer_tokens(&1u64, &user1, &user2, &100000i128);
-    
+
     let balance = client.get_token_balance(&1u64, &user2);
     assert_eq!(balance, 100000);
 }
@@ -178,9 +178,9 @@ fn test_empty_whitelist() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
     let client = initialize_contract(&env, &admin);
-    
+
     env.mock_all_auths();
-    
+
     client.tokenize_asset(
         &1u64,
         &String::from_str(&env, "TST"),
@@ -192,7 +192,7 @@ fn test_empty_whitelist() {
         &String::from_str(&env, "A test tokenized asset"),
         &AssetType::Physical,
     );
-    
+
     let whitelist = client.get_whitelist(&1u64);
     assert_eq!(whitelist.len(), 0);
 }
