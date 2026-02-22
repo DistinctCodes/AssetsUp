@@ -770,4 +770,64 @@ impl AssetUpContract {
     pub fn is_detokenization_active(env: Env, asset_id: u64) -> Result<bool, Error> {
         detokenization::is_detokenization_active(&env, asset_id)
     }
+
+    // =====================
+    // Insurance Policy Management
+    // =====================
+
+    /// Create a new insurance policy
+    pub fn create_insurance_policy(
+        env: Env,
+        policy: insurance::InsurancePolicy,
+    ) -> Result<(), Error> {
+        policy.insurer.require_auth();
+        insurance::create_policy(env, policy)
+    }
+
+    /// Cancel a policy (holder or insurer)
+    pub fn cancel_insurance_policy(
+        env: Env,
+        policy_id: BytesN<32>,
+        caller: Address,
+    ) -> Result<(), Error> {
+        caller.require_auth();
+        insurance::cancel_policy(env, policy_id, caller)
+    }
+
+    /// Suspend a policy (insurer only)
+    pub fn suspend_insurance_policy(
+        env: Env,
+        policy_id: BytesN<32>,
+        insurer: Address,
+    ) -> Result<(), Error> {
+        insurer.require_auth();
+        insurance::suspend_policy(env, policy_id, insurer)
+    }
+
+    /// Expire a policy (permissionless)
+    pub fn expire_insurance_policy(env: Env, policy_id: BytesN<32>) -> Result<(), Error> {
+        insurance::expire_policy(env, policy_id)
+    }
+
+    /// Renew a policy (insurer only)
+    pub fn renew_insurance_policy(
+        env: Env,
+        policy_id: BytesN<32>,
+        new_end_date: u64,
+        new_premium: i128,
+        insurer: Address,
+    ) -> Result<(), Error> {
+        insurer.require_auth();
+        insurance::renew_policy(env, policy_id, new_end_date, new_premium, insurer)
+    }
+
+    /// Get a specific policy
+    pub fn get_insurance_policy(env: Env, policy_id: BytesN<32>) -> Option<insurance::InsurancePolicy> {
+        insurance::get_policy(env, policy_id)
+    }
+
+    /// Get all policies for an asset
+    pub fn get_asset_insurance_policies(env: Env, asset_id: BytesN<32>) -> Vec<BytesN<32>> {
+        insurance::get_asset_policies(env, asset_id)
+    }
 }

@@ -1,5 +1,6 @@
 mod detokenization_new;
 mod dividends_new;
+mod insurance_new;
 mod integration;
 mod tokenization_new;
 mod transfer_restrictions_new;

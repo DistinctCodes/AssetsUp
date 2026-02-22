@@ -188,3 +188,83 @@ fn test_detokenization_majority_threshold() {
     assert!(first_execute_err);
     assert!(second_execute_ok);
 }
+
+#[test]
+fn test_token_elimination_on_execution() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let holder2 = Address::generate(&env);
+    let proposer = Address::generate(&env);
+    let asset_id = 1000u64;
+
+    let (before_exists, after_exists, balance_cleared, holders_cleared) =
+        env.as_contract(&contract_id, || {
+            setup_tokenized_asset(&env, asset_id, &tokenizer);
+
+            // Transfer some tokens to create multiple holders
+            tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), 300)
+                .unwrap();
+
+            // Verify asset exists before detokenization
+            let before_exists = tokenization::get_tokenized_asset(&env, asset_id).is_ok();
+
+            // Propose detokenization
+            let proposal_id =
+                detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
+
+            // Both holders vote (100%)
+            voting::cast_vote(&env, asset_id, proposal_id, tokenizer.clone()).unwrap();
+            voting::cast_vote(&env, asset_id, proposal_id, holder2.clone()).unwrap();
+
+            // Execute detokenization
+            detokenization::execute_detokenization(&env, asset_id, proposal_id).unwrap();
+
+            // Verify tokens are removed from circulation
+            let after_exists = tokenization::get_tokenized_asset(&env, asset_id).is_ok();
+
+            // Verify balances are cleared
+            let balance1 = tokenization::get_token_balance(&env, asset_id, tokenizer.clone());
+            let balance2 = tokenization::get_token_balance(&env, asset_id, holder2.clone());
+            let balance_cleared = balance1.unwrap_or(0) == 0 && balance2.unwrap_or(0) == 0;
+
+            // Verify holders list is cleared
+            let holders_result = tokenization::get_token_holders(&env, asset_id);
+            let holders_cleared = holders_result.is_err();
+
+            (before_exists, after_exists, balance_cleared, holders_cleared)
+        });
+
+    // Assert asset existed before
+    assert!(before_exists);
+    // Assert asset no longer exists after detokenization
+    assert!(!after_exists);
+    // Assert balances are cleared
+    assert!(balance_cleared);
+    // Assert holders list is cleared
+    assert!(holders_cleared);
+}
+
+#[test]
+fn test_cannot_propose_after_execution() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let proposer = Address::generate(&env);
+    let asset_id = 1000u64;
+
+    let second_proposal_err = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+
+        // Propose and execute detokenization
+        let proposal_id =
+            detokenization::propose_detokenization(&env, asset_id, proposer.clone()).unwrap();
+        voting::cast_vote(&env, asset_id, proposal_id, tokenizer.clone()).unwrap();
+        detokenization::execute_detokenization(&env, asset_id, proposal_id).unwrap();
+
+        // Try to propose again after execution - should fail because asset is not tokenized
+        detokenization::propose_detokenization(&env, asset_id, proposer.clone()).is_err()
+    });
+
+    assert!(second_proposal_err);
+}
