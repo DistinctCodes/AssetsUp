@@ -1,4 +1,4 @@
-import { apiClient } from '@/lib/api/client';
+import apiClient from '@/lib/api/client';
 import {
   Asset,
   AssetDocument,
@@ -33,135 +33,116 @@ export const assetApiClient = {
     limit: number;
     totalPages: number;
   }> {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          searchParams.append(key, String(value));
-        }
-      });
-    }
-    const qs = searchParams.toString();
-    return apiClient.request<{
-      assets: Asset[];
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
-    }>(`/assets${qs ? `?${qs}` : ''}`);
+    return apiClient
+      .get<{
+        assets: Asset[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>('/assets', { params })
+      .then((res) => res.data);
   },
 
   getAsset(id: string): Promise<Asset> {
-    return apiClient.request<Asset>(`/assets/${id}`);
+    return apiClient.get<Asset>(`/assets/${id}`).then((res) => res.data);
   },
 
   getAssetHistory(id: string, filters?: AssetHistoryFilters): Promise<AssetHistoryEvent[]> {
-    const params = new URLSearchParams();
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.append(key, String(value));
-        }
-      });
-    }
-    const qs = params.toString();
-    return apiClient.request<AssetHistoryEvent[]>(
-      `/assets/${id}/history${qs ? `?${qs}` : ''}`
-    );
+    return apiClient
+      .get<AssetHistoryEvent[]>(`/assets/${id}/history`, { params: filters })
+      .then((res) => res.data);
   },
 
   getAssetDocuments(id: string): Promise<AssetDocument[]> {
-    return apiClient.request<AssetDocument[]>(`/assets/${id}/documents`);
+    return apiClient
+      .get<AssetDocument[]>(`/assets/${id}/documents`)
+      .then((res) => res.data);
   },
 
   getMaintenanceRecords(id: string): Promise<MaintenanceRecord[]> {
-    return apiClient.request<MaintenanceRecord[]>(`/assets/${id}/maintenance`);
+    return apiClient
+      .get<MaintenanceRecord[]>(`/assets/${id}/maintenance`)
+      .then((res) => res.data);
   },
 
   getAssetNotes(id: string): Promise<AssetNote[]> {
-    return apiClient.request<AssetNote[]>(`/assets/${id}/notes`);
+    return apiClient.get<AssetNote[]>(`/assets/${id}/notes`).then((res) => res.data);
   },
 
   getDepartments(): Promise<DepartmentWithCount[]> {
-    return apiClient.request<DepartmentWithCount[]>('/departments');
+    return apiClient
+      .get<DepartmentWithCount[]>('/departments')
+      .then((res) => res.data);
   },
 
   createDepartment(data: { name: string; description?: string }): Promise<Department> {
-    return apiClient.request<Department>('/departments', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return apiClient.post<Department>('/departments', data).then((res) => res.data);
   },
 
   deleteDepartment(id: string): Promise<void> {
-    return apiClient.request<void>(`/departments/${id}`, { method: 'DELETE' });
+    return apiClient.delete<void>(`/departments/${id}`).then((res) => res.data);
   },
 
   getCategories(): Promise<CategoryWithCount[]> {
-    return apiClient.request<CategoryWithCount[]>('/categories');
+    return apiClient
+      .get<CategoryWithCount[]>('/categories')
+      .then((res) => res.data);
   },
 
   createCategory(data: { name: string; description?: string }): Promise<Category> {
-    return apiClient.request<Category>('/categories', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return apiClient.post<Category>('/categories', data).then((res) => res.data);
   },
 
   deleteCategory(id: string): Promise<void> {
-    return apiClient.request<void>(`/categories/${id}`, { method: 'DELETE' });
+    return apiClient.delete<void>(`/categories/${id}`).then((res) => res.data);
   },
 
   getUsers(): Promise<AssetUser[]> {
-    return apiClient.request<AssetUser[]>('/users');
+    return apiClient.get<AssetUser[]>('/users').then((res) => res.data);
   },
 
   updateAssetStatus(id: string, data: UpdateAssetStatusInput): Promise<Asset> {
-    return apiClient.request<Asset>(`/assets/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
+    return apiClient
+      .patch<Asset>(`/assets/${id}/status`, data)
+      .then((res) => res.data);
   },
 
   transferAsset(id: string, data: TransferAssetInput): Promise<Asset> {
-    return apiClient.request<Asset>(`/assets/${id}/transfer`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return apiClient.post<Asset>(`/assets/${id}/transfer`, data).then((res) => res.data);
   },
 
   deleteAsset(id: string): Promise<void> {
-    return apiClient.request<void>(`/assets/${id}`, { method: 'DELETE' });
+    return apiClient.delete<void>(`/assets/${id}`).then((res) => res.data);
   },
 
   uploadDocument(assetId: string, file: File, name?: string): Promise<AssetDocument> {
     const form = new FormData();
     form.append('file', file);
     if (name) form.append('name', name);
-    return apiClient.request<AssetDocument>(`/assets/${assetId}/documents`, {
-      method: 'POST',
-      body: form,
-      headers: {},
-    });
+    return apiClient
+      .post<AssetDocument>(`/assets/${assetId}/documents`, form)
+      .then((res) => res.data);
   },
 
   deleteDocument(assetId: string, documentId: string): Promise<void> {
-    return apiClient.request<void>(`/assets/${assetId}/documents/${documentId}`, {
-      method: 'DELETE',
-    });
+    return apiClient
+      .delete<void>(`/assets/${assetId}/documents/${documentId}`)
+      .then((res) => res.data);
   },
 
-  createMaintenanceRecord(assetId: string, data: CreateMaintenanceInput): Promise<MaintenanceRecord> {
-    return apiClient.request<MaintenanceRecord>(`/assets/${assetId}/maintenance`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  createMaintenanceRecord(
+    assetId: string,
+    data: CreateMaintenanceInput
+  ): Promise<MaintenanceRecord> {
+    return apiClient
+      .post<MaintenanceRecord>(`/assets/${assetId}/maintenance`, data)
+      .then((res) => res.data);
   },
 
   createNote(assetId: string, data: CreateNoteInput): Promise<AssetNote> {
-    return apiClient.request<AssetNote>(`/assets/${assetId}/notes`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return apiClient
+      .post<AssetNote>(`/assets/${assetId}/notes`, data)
+      .then((res) => res.data);
   },
 };

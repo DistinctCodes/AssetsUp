@@ -1,7 +1,7 @@
-import api from './client';
+import apiClient from './client';
 import { ReportSummary } from '../users';
 
 export async function getReportsSummary(): Promise<ReportSummary> {
-  const res = await api.get('/api/reports/summary');
+  const res = await apiClient.get('/reports/summary');
   return res.data;
 }

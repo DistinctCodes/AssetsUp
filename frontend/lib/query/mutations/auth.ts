@@ -1,5 +1,5 @@
 import { useMutation, UseMutationOptions } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api/client';
+import { authApi } from '@/lib/api/client';
 import { queryKeys } from '../keys';
 import {
   RegisterInput,
@@ -18,7 +18,7 @@ export function useRegisterMutation(
 ) {
   return useMutation<AuthResponse, ApiError, RegisterInput>({
     mutationKey: queryKeys.auth.register,
-    mutationFn: (data: RegisterInput) => apiClient.register(data),
+    mutationFn: (data: RegisterInput) => authApi.register(data),
     ...options,
   });
 }
@@ -33,7 +33,7 @@ export function useLoginMutation(
 ) {
   return useMutation<AuthResponse, ApiError, LoginInput>({
     mutationKey: queryKeys.auth.login,
-    mutationFn: (data: LoginInput) => apiClient.login(data),
+    mutationFn: (data: LoginInput) => authApi.login(data),
     ...options,
   });
 }
