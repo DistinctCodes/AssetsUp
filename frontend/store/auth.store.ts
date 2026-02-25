@@ -14,8 +14,10 @@ interface AuthStore {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  isInitialized: boolean;
   setAuth: (token: string, user: User) => void;
   logout: () => void;
+  initialize: () => void;
   loadAuthFromStorage: () => void;
 }
 
@@ -25,6 +27,7 @@ export const useAuthStore = create<AuthStore>()(
       user: null,
       token: null,
       isAuthenticated: false,
+      isInitialized: false,
       
       setAuth: (token: string, user: User) => {
         // Store token in localStorage for API calls
@@ -52,11 +55,29 @@ export const useAuthStore = create<AuthStore>()(
         });
       },
       
+      initialize: () => {
+        const { isInitialized } = get();
+        if (isInitialized) return;
+        
+        const token = localStorage.getItem('token');
+        if (token) {
+          const user = JSON.parse(localStorage.getItem('user') || 'null');
+          if (user) {
+            set({
+              token,
+              user,
+              isAuthenticated: true,
+              isInitialized: true,
+            });
+            return;
+          }
+        }
+        set({ isInitialized: true });
+      },
+      
       loadAuthFromStorage: () => {
         const token = localStorage.getItem('token');
         if (token) {
-          // For now, we'll need to validate the token or decode it
-          // In a real app, you might want to validate the token on app load
           const user = JSON.parse(localStorage.getItem('user') || 'null');
           if (user) {
             set({
@@ -74,6 +95,7 @@ export const useAuthStore = create<AuthStore>()(
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
+        isInitialized: state.isInitialized,
       }),
     }
   )
