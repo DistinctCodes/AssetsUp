@@ -1,3 +1,4 @@
+// frontend/app/(dashboard)/settings/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -6,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { User, Lock, CheckCircle } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
-import { useUpdateProfile } from "@/lib/query/hooks/query.hook";
+import { useUpdateProfile } from "@/lib/query/hooks/useUsers";
 
 // ── Profile schema ──────────────────────────────────────────────
 const profileSchema = z.object({
@@ -28,7 +29,7 @@ const passwordSchema = z
 type PasswordForm = z.infer<typeof passwordSchema>;
 
 export default function SettingsPage() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const updateProfile = useUpdateProfile();
   const [profileSaved, setProfileSaved] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);

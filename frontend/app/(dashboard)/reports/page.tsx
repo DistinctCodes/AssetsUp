@@ -5,8 +5,8 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { BarChart3, Package } from "lucide-react";
 import { clsx } from "clsx";
-import { useAssets } from "@/lib/query/hooks/useAsset";
-import { Asset, AssetStatus } from "@/lib/query/types/asset";
+import { useReportsSummary } from "@/lib/query/hooks/useReports";
+import { AssetStatus } from "@/lib/query/types/asset";
 import { StatusBadge } from "@/components/assets/status-badge";
 
 const STATUS_COLORS: Record<AssetStatus, string> = {
@@ -17,7 +17,7 @@ const STATUS_COLORS: Record<AssetStatus, string> = {
 };
 
 export default function ReportsPage() {
-  const { data, isLoading } = useAssets({ page: 1, limit: 1000 });
+  const { data, isLoading } = useReportsSummary();
 
   if (isLoading) {
     return (
@@ -29,50 +29,7 @@ export default function ReportsPage() {
 
   if (!data) return null;
 
-  const assets = data?.assets ?? [];
-  const total = assets.length;
-
-  const byStatus = assets.reduce<Record<AssetStatus, number>>(
-    (acc, asset) => {
-      acc[asset.status] += 1;
-      return acc;
-    },
-    {
-      [AssetStatus.ACTIVE]: 0,
-      [AssetStatus.ASSIGNED]: 0,
-      [AssetStatus.MAINTENANCE]: 0,
-      [AssetStatus.RETIRED]: 0,
-    },
-  );
-
-  const byCategory = Object.values(
-    assets.reduce<Record<string, { name: string; count: number }>>((acc, asset) => {
-      const categoryName = asset.category?.name ?? "Uncategorized";
-      if (!acc[categoryName]) {
-        acc[categoryName] = { name: categoryName, count: 0 };
-      }
-      acc[categoryName].count += 1;
-      return acc;
-    }, {}),
-  );
-
-  const byDepartment = Object.values(
-    assets.reduce<Record<string, { name: string; count: number }>>((acc, asset) => {
-      const departmentName = asset.department?.name ?? "Unassigned";
-      if (!acc[departmentName]) {
-        acc[departmentName] = { name: departmentName, count: 0 };
-      }
-      acc[departmentName].count += 1;
-      return acc;
-    }, {}),
-  );
-
-  const recent = [...assets]
-    .sort(
-      (left, right) =>
-        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
-    )
-    .slice(0, 10);
+  const { total, byStatus, byCategory, byDepartment, recent } = data;
 
   const statusItems = Object.entries(byStatus) as [AssetStatus, number][];
   const topCategories = [...byCategory]
@@ -230,7 +187,7 @@ export default function ReportsPage() {
             </p>
           ) : (
             <div className="space-y-2">
-              {recent.map((asset: Asset) => (
+              {recent.map((asset) => (
                 <Link
                   key={asset.id}
                   href={`/assets/${asset.id}`}

@@ -1,3 +1,4 @@
+// frontend/app/(public)/assets/[id]/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -8,18 +9,13 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { useAsset, useAssetHistory } from "@/lib/query/hooks/useAsset";
-import { useAuthStore } from "@/store/auth.store";
-import { TransferAssetDialog } from "@/components/assets/transfer-dialog";
-import { MoveHorizontal } from "lucide-react";
 
-type Tab = "overview" | "history" | "documents";
+type Tab = "overview" | "history";
 
 export default function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
-  const [isTransferOpen, setIsTransferOpen] = useState(false);
-  const { user } = useAuthStore();
 
   const { data: asset, isLoading } = useAsset(id);
   const { data: history = [] } = useAssetHistory(id);
@@ -46,7 +42,6 @@ export default function AssetDetailPage() {
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "overview", label: "Overview", icon: <FileText size={15} /> },
     { key: "history", label: "History", icon: <Clock size={15} /> },
-    { key: "documents", label: "Documents", icon: <FileText size={15} /> },
   ];
 
   return (
@@ -78,16 +73,6 @@ export default function AssetDetailPage() {
               <ConditionBadge condition={asset.condition} />
             </div>
           </div>
-
-          {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
-            <Button
-              onClick={() => setIsTransferOpen(true)}
-              className="flex items-center gap-2"
-            >
-              <MoveHorizontal size={16} />
-              Transfer Asset
-            </Button>
-          )}
         </div>
       </div>
 
@@ -97,10 +82,11 @@ export default function AssetDetailPage() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === key
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              tab === key
                 ? "border-gray-900 text-gray-900"
                 : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
+            }`}
           >
             {icon}
             {label}
@@ -122,9 +108,7 @@ export default function AssetDetailPage() {
               <DetailRow
                 label="Assigned To"
                 value={
-                  asset.assignedTo
-                    ? `${asset.assignedTo.firstName} ${asset.assignedTo.lastName}`
-                    : undefined
+                  asset.assignedTo ? `${asset.assignedTo.name}` : undefined
                 }
                 fallback="Unassigned"
               />
@@ -238,114 +222,13 @@ export default function AssetDetailPage() {
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {format(new Date(event.createdAt), "MMM d, yyyy · h:mm a")}
-                    {event.performedBy &&
-                      ` · ${event.performedBy.firstName} ${event.performedBy.lastName}`}
+                    {event.performedBy && ` · ${event.performedBy.name}`}
                   </p>
                 </li>
               ))}
             </ol>
           )}
         </div>
-      )}
-
-      {tab === "documents" && <AssetDocumentsSection assetId={id} />}
-
-      {isTransferOpen && (
-        <TransferAssetDialog
-          assetId={id}
-          assetName={asset.name}
-          onClose={() => setIsTransferOpen(false)}
-        />
-      )}
-    </div>
-  );
-}
-
-// Asset Documents Section
-import {
-  useAssetDocuments,
-  useUploadDocument,
-  useDeleteDocument,
-} from "@/lib/query/hooks/useAsset";
-
-function AssetDocumentsSection({ assetId }: { assetId: string }) {
-  const { data: documents = [], isLoading } = useAssetDocuments(assetId);
-  const uploadMutation = useUploadDocument(assetId);
-  const deleteMutation = useDeleteDocument(assetId);
-  const [file, setFile] = useState<File | null>(null);
-  const [name, setName] = useState("");
-
-  const handleUpload = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (file) {
-      uploadMutation.mutate({ file, name: name || file.name });
-      setFile(null);
-      setName("");
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <h2 className="text-sm font-semibold text-gray-900 mb-4">
-        Asset Documents
-      </h2>
-      <form className="mb-6 flex gap-2 items-center" onSubmit={handleUpload}>
-        <input
-          type="file"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="border rounded px-2 py-1 text-sm"
-        />
-        <input
-          type="text"
-          placeholder="Document name (optional)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="border rounded px-2 py-1 text-sm"
-        />
-        <Button type="submit" disabled={!file || uploadMutation.isLoading}>
-          {uploadMutation.isLoading ? "Uploading..." : "Upload"}
-        </Button>
-      </form>
-      {isLoading ? (
-        <div className="text-gray-400 text-sm">Loading documents...</div>
-      ) : documents.length === 0 ? (
-        <div className="text-gray-400 text-sm">No documents uploaded yet.</div>
-      ) : (
-        <ul className="divide-y divide-gray-200">
-          {documents.map((doc) => (
-            <li key={doc.id} className="py-3 flex items-center justify-between">
-              <div>
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener"
-                  className="text-blue-600 hover:underline font-medium"
-                >
-                  {doc.name}
-                </a>
-                <span className="ml-2 text-xs text-gray-400">{doc.type}</span>
-                <span className="ml-2 text-xs text-gray-400">
-                  {(doc.size / 1024).toFixed(1)} KB
-                </span>
-                <span className="ml-2 text-xs text-gray-400">
-                  Uploaded by {doc.uploadedBy?.firstName}{" "}
-                  {doc.uploadedBy?.lastName}
-                </span>
-                <span className="ml-2 text-xs text-gray-400">
-                  {format(new Date(doc.createdAt), "MMM d, yyyy")}
-                </span>
-              </div>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => deleteMutation.mutate(doc.id)}
-                disabled={deleteMutation.isLoading}
-              >
-                Delete
-              </Button>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );
