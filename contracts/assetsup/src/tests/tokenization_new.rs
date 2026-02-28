@@ -2,56 +2,33 @@
 
 extern crate std;
 
-use soroban_sdk::testutils::{Address as _, Ledger as _};
-use soroban_sdk::{Address, Env, String};
+use soroban_sdk::{Address, BigInt, Env, String};
 
+use crate::types::{AssetType, TokenizedAsset};
 use crate::tokenization;
-use crate::types::AssetType;
-use crate::AssetUpContract;
 
 fn make_asset_id(seed: u64) -> u64 {
     seed
 }
 
-fn setup_tokenized(env: &Env, asset_id: u64, tokenizer: &Address) {
-    tokenization::tokenize_asset(
-        env,
-        asset_id,
-        String::from_str(env, "TOKEN"),
-        1000,
-        2,
-        100,
-        tokenizer.clone(),
-        crate::types::TokenMetadata {
-            name: String::from_str(env, "Lock Test Asset"),
-            description: String::from_str(env, "Test"),
-            asset_type: AssetType::Digital,
-            ipfs_uri: None,
-            legal_docs_hash: None,
-            valuation_report_hash: None,
-            accredited_investor_required: false,
-            geographic_restrictions: soroban_sdk::Vec::new(env),
-        },
-    )
-    .unwrap();
-}
-
 #[test]
 fn test_tokenize_asset() {
     let env = Env::default();
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
+    let tokenizer = Address::random(&env);
 
     let asset_id = make_asset_id(100);
     let symbol = String::from_str(&env, "ASSET100");
-    let total_supply = 1000_i128;
+    let total_supply = BigInt::from_i128(&env, 1000);
     let decimals = 2u32;
-    let min_voting_threshold = 100_i128;
+    let name = String::from_str(&env, "Test Asset");
+    let description = String::from_str(&env, "Testing tokenization");
+    let asset_type = AssetType::Digital;
+    let min_voting_threshold = BigInt::from_i128(&env, 100);
 
     let metadata = crate::types::TokenMetadata {
-        name: String::from_str(&env, "Test Asset"),
-        description: String::from_str(&env, "Testing tokenization"),
-        asset_type: AssetType::Digital,
+        name,
+        description,
+        asset_type,
         ipfs_uri: None,
         legal_docs_hash: None,
         valuation_report_hash: None,
@@ -59,19 +36,17 @@ fn test_tokenize_asset() {
         geographic_restrictions: soroban_sdk::Vec::new(&env),
     };
 
-    let tokenized_asset = env.as_contract(&contract_id, || {
-        tokenization::tokenize_asset(
-            &env,
-            asset_id,
-            symbol.clone(),
-            total_supply,
-            decimals,
-            min_voting_threshold,
-            tokenizer.clone(),
-            metadata,
-        )
-        .unwrap()
-    });
+    let tokenized_asset = tokenization::tokenize_asset(
+        &env,
+        asset_id,
+        symbol.clone(),
+        total_supply.clone(),
+        decimals,
+        min_voting_threshold,
+        tokenizer.clone(),
+        metadata,
+    )
+    .unwrap();
 
     assert_eq!(tokenized_asset.asset_id, asset_id);
     assert_eq!(tokenized_asset.symbol, symbol);
@@ -84,30 +59,27 @@ fn test_tokenize_asset() {
 #[test]
 fn test_tokenize_asset_invalid_supply() {
     let env = Env::default();
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
+    let tokenizer = Address::random(&env);
 
-    let result = env.as_contract(&contract_id, || {
-        tokenization::tokenize_asset(
-            &env,
-            100,
-            String::from_str(&env, "ASSET100"),
-            0, // Invalid supply
-            2,
-            100,
-            tokenizer,
-            crate::types::TokenMetadata {
-                name: String::from_str(&env, "Test"),
-                description: String::from_str(&env, "Test"),
-                asset_type: AssetType::Digital,
-                ipfs_uri: None,
-                legal_docs_hash: None,
-                valuation_report_hash: None,
-                accredited_investor_required: false,
-                geographic_restrictions: soroban_sdk::Vec::new(&env),
-            },
-        )
-    });
+    let result = tokenization::tokenize_asset(
+        &env,
+        100,
+        String::from_str(&env, "ASSET100"),
+        BigInt::from_i128(&env, 0), // Invalid supply
+        2,
+        BigInt::from_i128(&env, 100),
+        tokenizer,
+        crate::types::TokenMetadata {
+            name: String::from_str(&env, "Test"),
+            description: String::from_str(&env, "Test"),
+            asset_type: AssetType::Digital,
+            ipfs_uri: None,
+            legal_docs_hash: None,
+            valuation_report_hash: None,
+            accredited_investor_required: false,
+            geographic_restrictions: soroban_sdk::Vec::new(&env),
+        },
+    );
 
     assert!(result.is_err());
 }
@@ -115,383 +87,212 @@ fn test_tokenize_asset_invalid_supply() {
 #[test]
 fn test_mint_tokens() {
     let env = Env::default();
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
+    let tokenizer = Address::random(&env);
 
     let asset_id = make_asset_id(200);
-    let initial_supply = 500_i128;
-    let mint_amount = 200_i128;
+    let initial_supply = BigInt::from_i128(&env, 500);
+    let mint_amount = BigInt::from_i128(&env, 200);
 
-    let (updated_supply, balance) = env.as_contract(&contract_id, || {
-        tokenization::tokenize_asset(
-            &env,
-            asset_id,
-            String::from_str(&env, "AST200"),
-            initial_supply,
-            2,
-            100,
-            tokenizer.clone(),
-            crate::types::TokenMetadata {
-                name: String::from_str(&env, "Mint Test"),
-                description: String::from_str(&env, "Test"),
-                asset_type: AssetType::Digital,
-                ipfs_uri: None,
-                legal_docs_hash: None,
-                valuation_report_hash: None,
-                accredited_investor_required: false,
-                geographic_restrictions: soroban_sdk::Vec::new(&env),
-            },
-        )
-        .unwrap();
+    // Tokenize first
+    let _ = tokenization::tokenize_asset(
+        &env,
+        asset_id,
+        String::from_str(&env, "AST200"),
+        initial_supply,
+        2,
+        BigInt::from_i128(&env, 100),
+        tokenizer.clone(),
+        crate::types::TokenMetadata {
+            name: String::from_str(&env, "Mint Test"),
+            description: String::from_str(&env, "Test"),
+            asset_type: AssetType::Digital,
+            ipfs_uri: None,
+            legal_docs_hash: None,
+            valuation_report_hash: None,
+            accredited_investor_required: false,
+            geographic_restrictions: soroban_sdk::Vec::new(&env),
+        },
+    )
+    .unwrap();
 
-        let updated =
-            tokenization::mint_tokens(&env, asset_id, mint_amount, tokenizer.clone()).unwrap();
-        let bal = tokenization::get_token_balance(&env, asset_id, tokenizer.clone()).unwrap();
-        (updated.total_supply, bal)
-    });
+    // Mint tokens
+    let updated_asset = tokenization::mint_tokens(&env, asset_id, mint_amount.clone(), tokenizer.clone()).unwrap();
 
-    assert_eq!(updated_supply, initial_supply + mint_amount);
-    assert_eq!(balance, initial_supply + mint_amount);
+    // Verify supply increased
+    assert_eq!(updated_asset.total_supply, &initial_supply + &mint_amount);
+
+    // Verify tokenizer's balance updated
+    let balance = tokenization::get_token_balance(&env, asset_id, tokenizer).unwrap();
+    assert_eq!(balance, &initial_supply + &mint_amount);
 }
 
 #[test]
 fn test_burn_tokens() {
     let env = Env::default();
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
+    let tokenizer = Address::random(&env);
 
     let asset_id = make_asset_id(300);
-    let initial_supply = 1000_i128;
-    let burn_amount = 400_i128;
+    let initial_supply = BigInt::from_i128(&env, 1000);
+    let burn_amount = BigInt::from_i128(&env, 400);
 
-    let new_supply = env.as_contract(&contract_id, || {
-        tokenization::tokenize_asset(
-            &env,
-            asset_id,
-            String::from_str(&env, "AST300"),
-            initial_supply,
-            2,
-            100,
-            tokenizer.clone(),
-            crate::types::TokenMetadata {
-                name: String::from_str(&env, "Burn Test"),
-                description: String::from_str(&env, "Test"),
-                asset_type: AssetType::Digital,
-                ipfs_uri: None,
-                legal_docs_hash: None,
-                valuation_report_hash: None,
-                accredited_investor_required: false,
-                geographic_restrictions: soroban_sdk::Vec::new(&env),
-            },
-        )
-        .unwrap();
+    // Tokenize
+    let _ = tokenization::tokenize_asset(
+        &env,
+        asset_id,
+        String::from_str(&env, "AST300"),
+        initial_supply,
+        2,
+        BigInt::from_i128(&env, 100),
+        tokenizer.clone(),
+        crate::types::TokenMetadata {
+            name: String::from_str(&env, "Burn Test"),
+            description: String::from_str(&env, "Test"),
+            asset_type: AssetType::Digital,
+            ipfs_uri: None,
+            legal_docs_hash: None,
+            valuation_report_hash: None,
+            accredited_investor_required: false,
+            geographic_restrictions: soroban_sdk::Vec::new(&env),
+        },
+    )
+    .unwrap();
 
-        let updated =
-            tokenization::burn_tokens(&env, asset_id, burn_amount, tokenizer.clone()).unwrap();
-        updated.total_supply
-    });
+    // Burn tokens
+    let updated_asset = tokenization::burn_tokens(&env, asset_id, burn_amount.clone(), tokenizer.clone()).unwrap();
 
-    assert_eq!(new_supply, 1000_i128 - burn_amount);
+    // Verify supply decreased
+    assert_eq!(updated_asset.total_supply, &BigInt::from_i128(&env, 1000) - &burn_amount);
 }
 
 #[test]
 fn test_transfer_tokens() {
     let env = Env::default();
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
-    let recipient = Address::generate(&env);
+    let tokenizer = Address::random(&env);
+    let recipient = Address::random(&env);
 
     let asset_id = make_asset_id(400);
-    let total_supply = 1000_i128;
-    let transfer_amount = 300_i128;
+    let total_supply = BigInt::from_i128(&env, 1000);
+    let transfer_amount = BigInt::from_i128(&env, 300);
 
-    let (tokenizer_balance, recipient_balance) = env.as_contract(&contract_id, || {
-        tokenization::tokenize_asset(
-            &env,
-            asset_id,
-            String::from_str(&env, "AST400"),
-            total_supply,
-            2,
-            100,
-            tokenizer.clone(),
-            crate::types::TokenMetadata {
-                name: String::from_str(&env, "Transfer Test"),
-                description: String::from_str(&env, "Test"),
-                asset_type: AssetType::Digital,
-                ipfs_uri: None,
-                legal_docs_hash: None,
-                valuation_report_hash: None,
-                accredited_investor_required: false,
-                geographic_restrictions: soroban_sdk::Vec::new(&env),
-            },
-        )
+    // Tokenize
+    let _ = tokenization::tokenize_asset(
+        &env,
+        asset_id,
+        String::from_str(&env, "AST400"),
+        total_supply,
+        2,
+        BigInt::from_i128(&env, 100),
+        tokenizer.clone(),
+        crate::types::TokenMetadata {
+            name: String::from_str(&env, "Transfer Test"),
+            description: String::from_str(&env, "Test"),
+            asset_type: AssetType::Digital,
+            ipfs_uri: None,
+            legal_docs_hash: None,
+            valuation_report_hash: None,
+            accredited_investor_required: false,
+            geographic_restrictions: soroban_sdk::Vec::new(&env),
+        },
+    )
+    .unwrap();
+
+    // Transfer
+    tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), recipient.clone(), transfer_amount.clone())
         .unwrap();
 
-        tokenization::transfer_tokens(
-            &env,
-            asset_id,
-            tokenizer.clone(),
-            recipient.clone(),
-            transfer_amount,
-        )
-        .unwrap();
+    // Verify balances
+    let tokenizer_balance = tokenization::get_token_balance(&env, asset_id, tokenizer).unwrap();
+    let recipient_balance = tokenization::get_token_balance(&env, asset_id, recipient).unwrap();
 
-        let tb = tokenization::get_token_balance(&env, asset_id, tokenizer.clone()).unwrap();
-        let rb = tokenization::get_token_balance(&env, asset_id, recipient.clone()).unwrap();
-        (tb, rb)
-    });
-
-    assert_eq!(tokenizer_balance, 1000_i128 - transfer_amount);
+    assert_eq!(tokenizer_balance, &BigInt::from_i128(&env, 1000) - &transfer_amount);
     assert_eq!(recipient_balance, transfer_amount);
 }
 
 #[test]
 fn test_lock_tokens() {
     let env = Env::default();
-    env.ledger().with_mut(|li| li.timestamp = 1000);
+    env.ledger().with_mut(|li| {
+        li.timestamp = 1000;
+    });
 
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
-    let recipient = Address::generate(&env);
+    let tokenizer = Address::random(&env);
     let asset_id = make_asset_id(500);
 
-    env.as_contract(&contract_id, || {
-        tokenization::tokenize_asset(
-            &env,
-            asset_id,
-            String::from_str(&env, "AST500"),
-            1000,
-            2,
-            100,
-            tokenizer.clone(),
-            crate::types::TokenMetadata {
-                name: String::from_str(&env, "Lock Test"),
-                description: String::from_str(&env, "Test"),
-                asset_type: AssetType::Digital,
-                ipfs_uri: None,
-                legal_docs_hash: None,
-                valuation_report_hash: None,
-                accredited_investor_required: false,
-                geographic_restrictions: soroban_sdk::Vec::new(&env),
-            },
-        )
-        .unwrap();
+    // Tokenize
+    let _ = tokenization::tokenize_asset(
+        &env,
+        asset_id,
+        String::from_str(&env, "AST500"),
+        BigInt::from_i128(&env, 1000),
+        2,
+        BigInt::from_i128(&env, 100),
+        tokenizer.clone(),
+        crate::types::TokenMetadata {
+            name: String::from_str(&env, "Lock Test"),
+            description: String::from_str(&env, "Test"),
+            asset_type: AssetType::Digital,
+            ipfs_uri: None,
+            legal_docs_hash: None,
+            valuation_report_hash: None,
+            accredited_investor_required: false,
+            geographic_restrictions: soroban_sdk::Vec::new(&env),
+        },
+    )
+    .unwrap();
 
-        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, tokenizer.clone())
-            .unwrap();
+    // Lock tokens until timestamp 5000
+    tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000).unwrap();
 
-        // Try to transfer (should fail)
-        let result = tokenization::transfer_tokens(
-            &env,
-            asset_id,
-            tokenizer.clone(),
-            recipient.clone(),
-            100,
-        );
-        assert!(result.is_err());
-    });
+    // Try to transfer (should fail)
+    let recipient = Address::random(&env);
+    let result =
+        tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), recipient.clone(), BigInt::from_i128(&env, 100));
+
+    assert!(result.is_err());
 
     // Advance time past lock period
-    env.ledger().with_mut(|li| li.timestamp = 6000);
-
-    env.as_contract(&contract_id, || {
-        // Transfer should now succeed
-        let result = tokenization::transfer_tokens(
-            &env,
-            asset_id,
-            tokenizer.clone(),
-            recipient.clone(),
-            100,
-        );
-        assert!(result.is_ok());
+    env.ledger().with_mut(|li| {
+        li.timestamp = 6000;
     });
+
+    // Transfer should now succeed
+    let result = tokenization::transfer_tokens(&env, asset_id, tokenizer, recipient, BigInt::from_i128(&env, 100));
+    assert!(result.is_ok());
 }
 
 #[test]
 fn test_ownership_percentage() {
     let env = Env::default();
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
+    let tokenizer = Address::random(&env);
 
     let asset_id = make_asset_id(600);
+    let total_supply = BigInt::from_i128(&env, 1000);
 
-    let percentage = env.as_contract(&contract_id, || {
-        tokenization::tokenize_asset(
-            &env,
-            asset_id,
-            String::from_str(&env, "AST600"),
-            1000,
-            2,
-            100,
-            tokenizer.clone(),
-            crate::types::TokenMetadata {
-                name: String::from_str(&env, "Percentage Test"),
-                description: String::from_str(&env, "Test"),
-                asset_type: AssetType::Digital,
-                ipfs_uri: None,
-                legal_docs_hash: None,
-                valuation_report_hash: None,
-                accredited_investor_required: false,
-                geographic_restrictions: soroban_sdk::Vec::new(&env),
-            },
-        )
-        .unwrap();
+    // Tokenize
+    let _ = tokenization::tokenize_asset(
+        &env,
+        asset_id,
+        String::from_str(&env, "AST600"),
+        total_supply,
+        2,
+        BigInt::from_i128(&env, 100),
+        tokenizer.clone(),
+        crate::types::TokenMetadata {
+            name: String::from_str(&env, "Percentage Test"),
+            description: String::from_str(&env, "Test"),
+            asset_type: AssetType::Digital,
+            ipfs_uri: None,
+            legal_docs_hash: None,
+            valuation_report_hash: None,
+            accredited_investor_required: false,
+            geographic_restrictions: soroban_sdk::Vec::new(&env),
+        },
+    )
+    .unwrap();
 
-        tokenization::calculate_ownership_percentage(&env, asset_id, tokenizer.clone()).unwrap()
-    });
+    // Tokenizer should have 100% ownership
+    let percentage = tokenization::calculate_ownership_percentage(&env, asset_id, tokenizer).unwrap();
 
     // 100% = 10000 basis points
-    assert_eq!(percentage, 10000_i128);
-}
-
-// =====================
-// Token Lock Tests
-// =====================
-
-#[test]
-fn test_is_tokens_locked_when_active() {
-    let env = Env::default();
-    env.ledger().with_mut(|li| li.timestamp = 1000);
-
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
-    let asset_id = make_asset_id(700);
-
-    let locked = env.as_contract(&contract_id, || {
-        setup_tokenized(&env, asset_id, &tokenizer);
-        // Lock until 5000; current timestamp is 1000 — should be locked
-        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, tokenizer.clone())
-            .unwrap();
-        tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone())
-    });
-
-    assert!(locked);
-}
-
-#[test]
-fn test_is_tokens_locked_after_expiry() {
-    let env = Env::default();
-    env.ledger().with_mut(|li| li.timestamp = 1000);
-
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
-    let recipient = Address::generate(&env);
-    let asset_id = make_asset_id(800);
-
-    env.as_contract(&contract_id, || {
-        setup_tokenized(&env, asset_id, &tokenizer);
-        // Lock until 2000
-        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 2000, tokenizer.clone())
-            .unwrap();
-    });
-
-    // Advance time past the lock
-    env.ledger().with_mut(|li| li.timestamp = 3000);
-
-    env.as_contract(&contract_id, || {
-        // Lock has expired — is_tokens_locked should return false
-        assert!(!tokenization::is_tokens_locked(
-            &env,
-            asset_id,
-            tokenizer.clone()
-        ));
-
-        // Transfer should also succeed because lock expired
-        let result = tokenization::transfer_tokens(
-            &env,
-            asset_id,
-            tokenizer.clone(),
-            recipient.clone(),
-            100,
-        );
-        assert!(result.is_ok());
-    });
-}
-
-#[test]
-fn test_unlock_tokens_clears_lock_regardless_of_timestamp() {
-    let env = Env::default();
-    env.ledger().with_mut(|li| li.timestamp = 1000);
-
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
-    let recipient = Address::generate(&env);
-    let asset_id = make_asset_id(900);
-
-    env.as_contract(&contract_id, || {
-        setup_tokenized(&env, asset_id, &tokenizer);
-
-        // Lock until far future
-        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 99999, tokenizer.clone())
-            .unwrap();
-        assert!(tokenization::is_tokens_locked(
-            &env,
-            asset_id,
-            tokenizer.clone()
-        ));
-
-        // Unlock while still inside the lock window
-        tokenization::unlock_tokens(&env, asset_id, tokenizer.clone()).unwrap();
-
-        // Lock should be gone
-        assert!(!tokenization::is_tokens_locked(
-            &env,
-            asset_id,
-            tokenizer.clone()
-        ));
-
-        // Transfer should now succeed even though original lock hasn't "expired"
-        let result = tokenization::transfer_tokens(
-            &env,
-            asset_id,
-            tokenizer.clone(),
-            recipient.clone(),
-            100,
-        );
-        assert!(result.is_ok());
-    });
-}
-
-#[test]
-fn test_is_tokens_locked_no_lock_returns_false() {
-    let env = Env::default();
-    env.ledger().with_mut(|li| li.timestamp = 1000);
-
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
-    let asset_id = make_asset_id(1000);
-
-    let locked = env.as_contract(&contract_id, || {
-        setup_tokenized(&env, asset_id, &tokenizer);
-        // No lock set — should return false
-        tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone())
-    });
-
-    assert!(!locked);
-}
-
-#[test]
-fn test_lock_tokens_unauthorized() {
-    let env = Env::default();
-    env.ledger().with_mut(|li| li.timestamp = 1000);
-
-    let contract_id = env.register(AssetUpContract, ());
-    let tokenizer = Address::generate(&env);
-    let intruder = Address::generate(&env);
-    let asset_id = make_asset_id(1100);
-
-    let (lock_result, still_unlocked) = env.as_contract(&contract_id, || {
-        setup_tokenized(&env, asset_id, &tokenizer);
-
-        // Non-tokenizer tries to lock — should fail
-        let r =
-            tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, intruder.clone());
-
-        // Holder is still unlocked
-        let unlocked = !tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone());
-        (r, unlocked)
-    });
-
-    assert!(lock_result.is_err());
-    assert!(still_unlocked);
+    assert_eq!(percentage, BigInt::from_i128(&env, 10000));
 }

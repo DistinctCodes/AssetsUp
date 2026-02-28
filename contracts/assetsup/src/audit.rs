@@ -1,4 +1,6 @@
-use soroban_sdk::{contracttype, Address, BytesN, Env, String, Vec};
+use soroban_sdk::{Address, BytesN, Env, String, Vec, contracttype};
+
+use crate::types::ActionType;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -9,20 +11,18 @@ pub enum DataKey {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuditEntry {
-    pub timestamp: u64,
-    pub action: String,
     pub actor: Address,
-    pub details: String,
+    pub action: ActionType,
+    pub timestamp: u64,
+    pub note: String,
 }
 
-/// Internal function to append an audit log entry for an asset
-/// This function is used by various modules to record significant events
-pub(crate) fn append_audit_log(
+pub fn log_action(
     env: &Env,
     asset_id: &BytesN<32>,
-    action: String,
     actor: Address,
-    details: String,
+    action: ActionType,
+    note: String,
 ) {
     let key = DataKey::AuditLog(asset_id.clone());
     let mut log: Vec<AuditEntry> = env
@@ -32,18 +32,16 @@ pub(crate) fn append_audit_log(
         .unwrap_or_else(|| Vec::new(env));
 
     let entry = AuditEntry {
-        timestamp: env.ledger().timestamp(),
-        action,
         actor,
-        details,
+        action,
+        timestamp: env.ledger().timestamp(),
+        note,
     };
 
     log.push_back(entry);
     env.storage().persistent().set(&key, &log);
 }
 
-/// Public function to retrieve the audit log for an asset
-/// Returns an empty vector if no history exists
 pub fn get_asset_log(env: &Env, asset_id: &BytesN<32>) -> Vec<AuditEntry> {
     let key = DataKey::AuditLog(asset_id.clone());
     env.storage()
