@@ -26,13 +26,19 @@ impl MultiSigTransferContract {
     pub fn initialize(e: Env, admin: Address, asset_registry: Address) {
         storage::set_admin(&e, &admin);
         storage::set_registry(&e, &asset_registry);
-        e.storage().persistent().set(&storage::DataKey::NextRequestId, &1u64);
+        e.storage()
+            .persistent()
+            .set(&storage::DataKey::NextRequestId, &1u64);
     }
 
     // ----------------------------
     // Admin: configure rules
     // ----------------------------
-    pub fn configure_approval_rule(e: Env, caller: Address, rule: ApprovalRule) -> Result<(), MultiSigError> {
+    pub fn configure_approval_rule(
+        e: Env,
+        caller: Address,
+        rule: ApprovalRule,
+    ) -> Result<(), MultiSigError> {
         utils::require_admin(&e, &caller)?;
 
         let mut rules_map = storage::rules_map(&e);
@@ -46,6 +52,7 @@ impl MultiSigTransferContract {
     // ----------------------------
     // Create transfer request
     // ----------------------------
+    #[allow(clippy::too_many_arguments)]
     pub fn create_transfer_request(
         e: Env,
         caller: Address,
@@ -143,11 +150,17 @@ impl MultiSigTransferContract {
     // ----------------------------
     // Approve request
     // ----------------------------
-    pub fn approve_transfer_request(e: Env, caller: Address, request_id: u64) -> Result<(), MultiSigError> {
+    pub fn approve_transfer_request(
+        e: Env,
+        caller: Address,
+        request_id: u64,
+    ) -> Result<(), MultiSigError> {
         let (_admin, _registry) = utils::require_init(&e)?;
 
         let mut requests = storage::requests_map(&e);
-        let mut req = requests.get(request_id).ok_or(MultiSigError::RequestNotFound)?;
+        let mut req = requests
+            .get(request_id)
+            .ok_or(MultiSigError::RequestNotFound)?;
 
         if req.status != RequestStatus::Pending {
             return Err(MultiSigError::RequestNotPending);
@@ -201,7 +214,9 @@ impl MultiSigTransferContract {
         let (_admin, _registry) = utils::require_init(&e)?;
 
         let mut requests = storage::requests_map(&e);
-        let mut req = requests.get(request_id).ok_or(MultiSigError::RequestNotFound)?;
+        let mut req = requests
+            .get(request_id)
+            .ok_or(MultiSigError::RequestNotFound)?;
 
         if req.status != RequestStatus::Pending {
             return Err(MultiSigError::RequestNotPending);
@@ -233,7 +248,9 @@ impl MultiSigTransferContract {
         let _ = caller; // anyone can execute, kept for audit if desired
 
         let mut requests = storage::requests_map(&e);
-        let mut req = requests.get(request_id).ok_or(MultiSigError::RequestNotFound)?;
+        let mut req = requests
+            .get(request_id)
+            .ok_or(MultiSigError::RequestNotFound)?;
 
         if req.status != RequestStatus::Approved {
             return Err(MultiSigError::NotEnoughApprovals);
@@ -269,11 +286,17 @@ impl MultiSigTransferContract {
     // ----------------------------
     // Cancel request (initiator or admin)
     // ----------------------------
-    pub fn cancel_transfer_request(e: Env, caller: Address, request_id: u64) -> Result<(), MultiSigError> {
+    pub fn cancel_transfer_request(
+        e: Env,
+        caller: Address,
+        request_id: u64,
+    ) -> Result<(), MultiSigError> {
         let (admin, _registry) = utils::require_init(&e)?;
 
         let mut requests = storage::requests_map(&e);
-        let mut req = requests.get(request_id).ok_or(MultiSigError::RequestNotFound)?;
+        let mut req = requests
+            .get(request_id)
+            .ok_or(MultiSigError::RequestNotFound)?;
 
         if req.status != RequestStatus::Pending && req.status != RequestStatus::Approved {
             return Err(MultiSigError::RequestNotPending);
@@ -301,7 +324,9 @@ impl MultiSigTransferContract {
     // ----------------------------
     pub fn get_request(e: Env, request_id: u64) -> Result<TransferRequest, MultiSigError> {
         let requests = storage::requests_map(&e);
-        requests.get(request_id).ok_or(MultiSigError::RequestNotFound)
+        requests
+            .get(request_id)
+            .ok_or(MultiSigError::RequestNotFound)
     }
 
     pub fn get_asset_history(e: Env, asset_id: BytesN<32>) -> Vec<u64> {
@@ -309,7 +334,7 @@ impl MultiSigTransferContract {
         hist.get(asset_id).unwrap_or(Vec::new(&e))
     }
 
-    pub fn get_pending_transfers_for_approver(e: Env, approver: Address) -> Vec<u64> {
+    pub fn get_pending_transfers_approver(e: Env, approver: Address) -> Vec<u64> {
         // gas-friendly simple scan approach. If scale grows, add reverse-index.
         let requests = storage::requests_map(&e);
         let mut result = Vec::new(&e);
@@ -328,7 +353,10 @@ impl MultiSigTransferContract {
         result
     }
 
-    pub fn get_required_approvers_for_category(e: Env, category: BytesN<32>) -> Result<Vec<Address>, MultiSigError> {
+    pub fn get_required_approvers_category(
+        e: Env,
+        category: BytesN<32>,
+    ) -> Result<Vec<Address>, MultiSigError> {
         let rule = rules::get_rule(&e, &category)?;
         Ok(rule.approvers)
     }

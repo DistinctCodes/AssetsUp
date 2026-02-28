@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, BytesN, String, Vec, contracttype};
+use soroban_sdk::{contracttype, Address, BytesN, String, Vec};
 
 use crate::types::{AssetStatus, CustomAttribute};
 

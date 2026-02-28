@@ -1,4 +1,4 @@
-use soroban_sdk::{Env, contracterror, panic_with_error};
+use soroban_sdk::{contracterror, panic_with_error, Env};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -52,23 +52,14 @@ pub enum Error {
     InvalidPurchaseValue = 37,
     InvalidMetadataUri = 38,
     InvalidOwnerAddress = 39,
-    // Leasing errors
-    LeaseAlreadyExists = 40,
-    LeaseNotFound = 41,
+
+    LeaseNotFound = 40,
+    LeaseAlreadyExists = 41,
     AssetAlreadyLeased = 42,
-    LeaseNotActive = 43,
+    InvalidLeaseStatus = 43,
     LeaseAlreadyStarted = 44,
-    InvalidLeasePeriod = 45,
-    InvalidRentAmount = 46,
-    LeaseNotExpired = 47,
-    // Insurance errors
-    PolicyAlreadyExists = 48,
-    PolicyNotFound = 49,
-    PolicyNotActive = 50,
-    PolicyNotExpired = 51,
-    ClaimAlreadyExists = 52,
-    ClaimNotFound = 53,
-    InvalidClaimStatus = 54,
+    LeaseNotExpired = 45,
+    InvalidTimestamps = 46,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {

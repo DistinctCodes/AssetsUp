@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, BytesN, String, Vec};
+use soroban_sdk::{contracttype, Address, Symbol, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,7 +25,7 @@ pub struct Transaction {
     pub id: u64,
     pub tx_type: TransactionType,
     pub target: Address,
-    pub function_name: String,
+    pub function_name: Symbol,
     pub parameters: Vec<soroban_sdk::Val>,
     pub initiator: Address,
     pub created_at: u64,
@@ -90,17 +90,17 @@ pub struct OwnershipProposal {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
-    Owners,              // Vec<Address>
+    Owners, // Vec<Address>
     OwnerProfile(Address),
-    Threshold,           // u32
-    NextTxId,            // u64
+    Threshold, // u32
+    NextTxId,  // u64
     Transaction(u64),
     Confirmation(u64, Address), // bool
-    DailyLimit,          // u128
-    DailySpent(u64),     // day_timestamp -> u128
-    Frozen,              // bool
-    NextProposalId,      // u64
+    DailyLimit,                 // u128
+    DailySpent(u64),            // day_timestamp -> u128
+    Frozen,                     // bool
+    NextProposalId,             // u64
     Proposal(u64),
     ProposalConfirmation(u64, Address),
-    Admin,               // Address (for initialization)
+    Admin, // Address (for initialization)
 }

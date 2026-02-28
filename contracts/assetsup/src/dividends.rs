@@ -1,14 +1,10 @@
 use crate::error::Error;
-use crate::types::{ContractEvent, OwnershipRecord, TokenDataKey, TokenizedAsset};
-use soroban_sdk::{Address, BigInt, Env};
+use crate::types::{OwnershipRecord, TokenDataKey, TokenizedAsset};
+use soroban_sdk::{Address, Env, Vec};
 
 /// Distribute dividends proportionally to all token holders
-pub fn distribute_dividends(
-    env: &Env,
-    asset_id: u64,
-    total_amount: BigInt,
-) -> Result<(), Error> {
-    if total_amount <= BigInt::from_i128(env, 0) {
+pub fn distribute_dividends(env: &Env, asset_id: u64, total_amount: i128) -> Result<(), Error> {
+    if total_amount <= 0 {
         return Err(Error::InvalidDividendAmount);
     }
 
@@ -16,10 +12,7 @@ pub fn distribute_dividends(
 
     // Get tokenized asset
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     if !tokenized_asset.revenue_sharing_enabled {
         return Err(Error::InvalidDividendAmount);
@@ -27,107 +20,74 @@ pub fn distribute_dividends(
 
     // Get all token holders
     let holders_key = TokenDataKey::TokenHoldersList(asset_id);
-    let holders = store
-        .get(&holders_key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let holders: Vec<Address> = store.get(&holders_key).ok_or(Error::AssetNotTokenized)?;
 
     // Distribute proportionally to each holder
     for holder in holders.iter() {
         let holder_key = TokenDataKey::TokenHolder(asset_id, holder.clone());
-        let mut ownership: OwnershipRecord = store
-            .get(&holder_key)
-            .ok_or(Error::HolderNotFound)?
-            .ok_or(Error::HolderNotFound)?;
+        let mut ownership: OwnershipRecord = store.get(&holder_key).ok_or(Error::HolderNotFound)?;
 
         // Calculate proportional dividend: (balance / total_supply) * total_amount
-        let proportion = (&ownership.balance * &total_amount) / &tokenized_asset.total_supply;
+        let proportion = (ownership.balance * total_amount) / tokenized_asset.total_supply;
 
         // Add to unclaimed dividends
-        ownership.unclaimed_dividends = &ownership.unclaimed_dividends + &proportion;
+        ownership.unclaimed_dividends += proportion;
 
         store.set(&holder_key, &ownership);
     }
 
-    // Emit event
+    // Emit event: (asset_id, total_amount, holder_count)
     env.events().publish(
         ("dividend", "distributed"),
-        ContractEvent::DividendDistributed {
-            asset_id,
-            total_amount,
-            holder_count: holders.len() as u32,
-        },
+        (asset_id, total_amount, holders.len()),
     );
 
     Ok(())
 }
 
 /// Claim unclaimed dividends
-pub fn claim_dividends(
-    env: &Env,
-    asset_id: u64,
-    holder: Address,
-) -> Result<BigInt, Error> {
+pub fn claim_dividends(env: &Env, asset_id: u64, holder: Address) -> Result<i128, Error> {
     let store = env.storage().persistent();
 
     // Get tokenized asset
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let _: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Get holder's ownership record
     let holder_key = TokenDataKey::TokenHolder(asset_id, holder.clone());
-    let mut ownership: OwnershipRecord = store
-        .get(&holder_key)
-        .ok_or(Error::HolderNotFound)?
-        .ok_or(Error::HolderNotFound)?;
+    let mut ownership: OwnershipRecord = store.get(&holder_key).ok_or(Error::HolderNotFound)?;
 
     // Get unclaimed amount
-    let unclaimed = ownership.unclaimed_dividends.clone();
+    let unclaimed = ownership.unclaimed_dividends;
 
-    if unclaimed <= BigInt::from_i128(env, 0) {
+    if unclaimed <= 0 {
         return Err(Error::NoDividendsToClaim);
     }
 
     // Clear unclaimed dividends
-    ownership.unclaimed_dividends = BigInt::from_i128(env, 0);
+    ownership.unclaimed_dividends = 0;
     store.set(&holder_key, &ownership);
 
-    // Emit event
-    env.events().publish(
-        ("dividend", "claimed"),
-        ContractEvent::DividendClaimed {
-            asset_id,
-            holder,
-            amount: unclaimed.clone(),
-        },
-    );
+    // Emit event: (asset_id, holder, amount)
+    env.events()
+        .publish(("dividend", "claimed"), (asset_id, holder, unclaimed));
 
     Ok(unclaimed)
 }
 
 /// Get unclaimed dividends for a holder
-pub fn get_unclaimed_dividends(
-    env: &Env,
-    asset_id: u64,
-    holder: Address,
-) -> Result<BigInt, Error> {
+pub fn get_unclaimed_dividends(env: &Env, asset_id: u64, holder: Address) -> Result<i128, Error> {
     let store = env.storage().persistent();
 
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let _: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Get holder's ownership record
     let holder_key = TokenDataKey::TokenHolder(asset_id, holder);
-    match store.get(&holder_key) {
-        Some(Some(ownership)) => Ok(ownership.unclaimed_dividends),
-        _ => Ok(BigInt::from_i128(env, 0)),
+    match store.get::<_, OwnershipRecord>(&holder_key) {
+        Some(ownership) => Ok(ownership.unclaimed_dividends),
+        None => Ok(0),
     }
 }
 
@@ -136,10 +96,7 @@ pub fn enable_revenue_sharing(env: &Env, asset_id: u64) -> Result<(), Error> {
     let store = env.storage().persistent();
 
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let mut tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let mut tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     tokenized_asset.revenue_sharing_enabled = true;
     store.set(&key, &tokenized_asset);
@@ -152,10 +109,7 @@ pub fn disable_revenue_sharing(env: &Env, asset_id: u64) -> Result<(), Error> {
     let store = env.storage().persistent();
 
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let mut tokenized_asset: TokenizedAsset = store
-        .get(&key)
-        .ok_or(Error::AssetNotTokenized)?
-        .ok_or(Error::AssetNotTokenized)?;
+    let mut tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     tokenized_asset.revenue_sharing_enabled = false;
     store.set(&key, &tokenized_asset);
