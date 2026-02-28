@@ -1,47 +1,18 @@
-"use client";
+import { clsx } from 'clsx';
+import { AssetCondition } from '@/lib/query/types/asset';
 
-import { AssetCondition } from "@/lib/query/types/asset";
-
-const conditionConfig = {
-  [AssetCondition.NEW]: {
-    label: "New",
-    className: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  },
-  [AssetCondition.GOOD]: {
-    label: "Good",
-    className: "bg-green-100 text-green-800 border-green-200",
-  },
-  [AssetCondition.FAIR]: {
-    label: "Fair",
-    className: "bg-blue-100 text-blue-800 border-blue-200",
-  },
-  [AssetCondition.POOR]: {
-    label: "Poor",
-    className: "bg-orange-100 text-orange-800 border-orange-200",
-  },
-  [AssetCondition.DAMAGED]: {
-    label: "Damaged",
-    className: "bg-red-100 text-red-800 border-red-200",
-  },
+const conditionConfig: Record<AssetCondition, { label: string; className: string }> = {
+  [AssetCondition.NEW]: { label: 'New', className: 'bg-emerald-100 text-emerald-700' },
+  [AssetCondition.GOOD]: { label: 'Good', className: 'bg-green-100 text-green-700' },
+  [AssetCondition.FAIR]: { label: 'Fair', className: 'bg-yellow-100 text-yellow-700' },
+  [AssetCondition.POOR]: { label: 'Poor', className: 'bg-orange-100 text-orange-700' },
+  [AssetCondition.DAMAGED]: { label: 'Damaged', className: 'bg-red-100 text-red-700' },
 };
 
-interface ConditionBadgeProps {
-  condition: AssetCondition;
-}
-
-export function ConditionBadge({ condition }: ConditionBadgeProps) {
-  const config = conditionConfig[condition];
-  
-  if (!config) {
-    return (
-      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border">
-        {condition}
-      </span>
-    );
-  }
-
+export function ConditionBadge({ condition }: { condition: AssetCondition }) {
+  const config = conditionConfig[condition] ?? { label: condition, className: 'bg-gray-100 text-gray-500' };
   return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${config.className}`}>
+    <span className={clsx('inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium', config.className)}>
       {config.label}
     </span>
   );

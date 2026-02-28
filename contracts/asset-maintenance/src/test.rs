@@ -8,7 +8,7 @@ use soroban_sdk::{vec, Address, Env, String};
 #[test]
 fn test_init_and_provider_registration() {
     let env = Env::default();
-    let contract_id = env.register(AssetMaintenanceContract, ());
+    let contract_id = env.register_contract(None, AssetMaintenanceContract);
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -35,11 +35,11 @@ fn test_init_and_provider_registration() {
 
     let fetched = client.get_provider_details(&provider_addr).unwrap();
     assert_eq!(fetched.name, String::from_str(&env, "Service Corp"));
-    assert!(fetched.is_active);
+    assert_eq!(fetched.is_active, true);
 
     client.deactivate_provider(&provider_addr);
     let deactivated = client.get_provider_details(&provider_addr).unwrap();
-    assert!(!deactivated.is_active);
+    assert_eq!(deactivated.is_active, false);
 }
 
 #[test]
@@ -47,7 +47,7 @@ fn test_maintenance_lifecycle() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register(AssetMaintenanceContract, ());
+    let contract_id = env.register_contract(None, AssetMaintenanceContract);
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -112,7 +112,7 @@ fn test_warranty_and_claims() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register(AssetMaintenanceContract, ());
+    let contract_id = env.register_contract(None, AssetMaintenanceContract);
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -147,7 +147,7 @@ fn test_alerts_and_stats() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register(AssetMaintenanceContract, ());
+    let contract_id = env.register_contract(None, AssetMaintenanceContract);
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -172,11 +172,11 @@ fn test_alerts_and_stats() {
 
     client.acknowledge_maintenance_alert(&asset_id, &0, &admin);
     let acknowledged_alerts = client.get_alerts(&asset_id);
-    assert!(acknowledged_alerts.get(0).unwrap().acknowledged);
+    assert_eq!(acknowledged_alerts.get(0).unwrap().acknowledged, true);
 
     // Test stats
     let stats = client.get_asset_stats(&asset_id);
     assert_eq!(stats.service_count, 0); // No service yet
 
-    assert!(!client.is_maintenance_cost_excessive(&asset_id, &1000));
+    assert_eq!(client.is_maintenance_cost_excessive(&asset_id, &1000), false);
 }
