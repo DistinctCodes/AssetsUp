@@ -1,5 +1,7 @@
 use crate::asset::Asset;
-use crate::insurance::{ClaimStatus, ClaimType, InsuranceClaim, InsurancePolicy, PolicyStatus, PolicyType};
+use crate::insurance::{
+    ClaimStatus, ClaimType, InsuranceClaim, InsurancePolicy, PolicyStatus, PolicyType,
+};
 use crate::types::{AssetStatus, AssetType, CustomAttribute, TokenMetadata};
 use crate::{AssetUpContract, AssetUpContractClient};
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String, Vec};

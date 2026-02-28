@@ -2,25 +2,20 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { User } from '../users/user.entity';
 
-@Entity('asset_notes')
-export class AssetNote {
+@Entity('departments')
+export class Department {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  assetId: string;
+  @Column({ unique: true })
+  name: string;
 
-  @Column('text')
-  content: string;
-
-  @ManyToOne(() => User, { eager: true })
-  createdBy: User;
+  @Column({ nullable: true })
+  description: string | null;
 
   @CreateDateColumn()
   createdAt: Date;
