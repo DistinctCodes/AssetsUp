@@ -3,10 +3,13 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DepartmentsService } from './departments.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../users/user.entity';
 
 @ApiTags('Departments')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('departments')
 export class DepartmentsController {
   constructor(private readonly service: DepartmentsService) {}
@@ -31,6 +34,7 @@ export class DepartmentsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a department' })
+  @Roles(UserRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }

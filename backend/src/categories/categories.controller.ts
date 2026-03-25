@@ -3,10 +3,13 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../users/user.entity';
 
 @ApiTags('Categories')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly service: CategoriesService) {}
@@ -31,6 +34,7 @@ export class CategoriesController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a category' })
+  @Roles(UserRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
