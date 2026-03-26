@@ -23,12 +23,14 @@ import { CreateMaintenanceDto } from './dto/create-maintenance.dto';
 import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User } from '../users/user.entity';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { User, UserRole } from '../users/user.entity';
 
 @ApiTags('Assets')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('assets')
 export class AssetsController {
   constructor(private readonly service: AssetsService) {}
@@ -72,6 +74,7 @@ export class AssetsController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete an asset' })
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }

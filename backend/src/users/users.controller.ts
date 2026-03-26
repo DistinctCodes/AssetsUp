@@ -4,12 +4,14 @@ import { UsersService } from './users.service';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User } from './user.entity';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { User, UserRole } from './user.entity';
 
 @ApiTags('Users')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -41,6 +43,7 @@ export class UsersController {
 
   @Patch(':id/role')
   @ApiOperation({ summary: 'Update a user role' })
+  @Roles(UserRole.ADMIN)
   updateRole(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
     return this.usersService.updateRole(id, dto.role);
   }
