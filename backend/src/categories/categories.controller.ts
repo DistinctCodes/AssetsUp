@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, UseGuards, Patch } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Categories')
@@ -27,6 +28,12 @@ export class CategoriesController {
   @ApiOperation({ summary: 'Create a new category' })
   create(@Body() dto: CreateCategoryDto) {
     return this.service.create(dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a category' })
+  update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+    return this.service.update(id, dto);
   }
 
   @Delete(':id')

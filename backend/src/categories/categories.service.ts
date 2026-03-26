@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 
 export interface CategoryWithCount extends Category {
   assetCount: number;
@@ -33,13 +38,29 @@ export class CategoriesService {
   }
 
   async create(dto: CreateCategoryDto): Promise<Category> {
-    const existing = await this.repo.findOne({ where: { name: dto.name } });
-    if (existing) throw new ConflictException('A category with this name already exists');
+    await this.ensureNameUnique(dto.name);
     return this.repo.save(this.repo.create(dto));
+  }
+
+  async update(id: string, dto: UpdateCategoryDto): Promise<Category> {
+    const category = await this.findOne(id);
+    if (dto.name && dto.name !== category.name) {
+      await this.ensureNameUnique(dto.name);
+    }
+
+    Object.assign(category, dto);
+    return this.repo.save(category);
   }
 
   async remove(id: string): Promise<void> {
     const cat = await this.findOne(id);
     await this.repo.remove(cat);
+  }
+
+  private async ensureNameUnique(name: string): Promise<void> {
+    const existing = await this.repo.findOne({ where: { name } });
+    if (existing) {
+      throw new ConflictException('A category with this name already exists');
+    }
   }
 }
