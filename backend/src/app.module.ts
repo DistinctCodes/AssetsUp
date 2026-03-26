@@ -7,6 +7,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { LocationsModule } from './locations/locations.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AppService } from './app.service';
       }),
       inject: [ConfigService],
     }),
+    LocationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, RolesGuard],
