@@ -8,6 +8,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LocationsModule } from './locations/locations.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { LocationsModule } from './locations/locations.module';
       inject: [ConfigService],
     }),
     LocationsModule,
+    SchedulerModule,
   ],
   controllers: [AppController],
   providers: [AppService, RolesGuard],
