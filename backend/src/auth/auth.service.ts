@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -10,6 +11,8 @@ import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { User } from '../users/user.entity';
+import { MailService } from '../mail/mail.service';
+import { PasswordResetService } from './services/password-reset.service';
 
 export interface AuthTokens {
   accessToken: string;
@@ -22,6 +25,8 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
+    private readonly passwordResetService: PasswordResetService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ user: User; tokens: AuthTokens }> {
@@ -79,6 +84,35 @@ export class AuthService {
 
   async logout(userId: string): Promise<void> {
     await this.usersService.updateRefreshToken(userId, null);
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email.toLowerCase());
+    if (!user) {
+      return;
+    }
+
+    const rawToken = await this.passwordResetService.issueToken(user.id);
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000').replace(/\/$/, '');
+    const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
+
+    await this.mailService.sendMail({
+      to: user.email,
+      subject: 'Reset your AssetsUp password',
+      text: `Use the link below to reset your password:\n${resetUrl}\n\nIf you did not request this, ignore this message.`,
+      html: `<p>Use the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const tokenRecord = await this.passwordResetService.findValidToken(token);
+    if (!tokenRecord) {
+      throw new BadRequestException('Invalid or expired password reset token');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await this.usersService.updatePassword(tokenRecord.userId, hashedPassword);
+    await this.passwordResetService.markUsed(tokenRecord.id);
   }
 
   private async signTokens(user: User): Promise<AuthTokens> {
