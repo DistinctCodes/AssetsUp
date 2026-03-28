@@ -37,8 +37,8 @@ export class AssetsController {
 
   @Get()
   @ApiOperation({ summary: 'List all assets with optional filters and pagination' })
-  findAll(@Query() filters: AssetFiltersDto) {
-    return this.service.findAll(filters);
+  findAll(@Query() filters: AssetFiltersDto, @CurrentUser() user: User) {
+    return this.service.findAll(filters, user);
   }
 
   @Get(':id')
@@ -73,10 +73,17 @@ export class AssetsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete an asset' })
+  @ApiOperation({ summary: 'Soft-delete an asset' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.service.remove(id, user);
+  }
+
+  @Post(':id/restore')
+  @ApiOperation({ summary: 'Restore a soft-deleted asset (ADMIN only)' })
+  @Roles(UserRole.ADMIN)
+  restore(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.service.restore(id, user);
   }
 
   @Get(':id/history')

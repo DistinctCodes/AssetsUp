@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -17,6 +17,7 @@ import { CreateMaintenanceDto } from './dto/create-maintenance.dto';
 import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { AssetStatus, AssetHistoryAction, StellarStatus } from './enums';
+import { UserRole } from '../users/user.entity';
 import { DepartmentsService } from '../departments/departments.service';
 import { CategoriesService } from '../categories/categories.service';
 import { UsersService } from '../users/users.service';
@@ -45,8 +46,12 @@ export class AssetsService {
     private readonly stellarService: StellarService,
   ) {}
 
-  async findAll(filters: AssetFiltersDto): Promise<{ data: Asset[]; total: number; page: number; limit: number }> {
-    const { search, status, condition, categoryId, departmentId, page = 1, limit = 20 } = filters;
+  async findAll(filters: AssetFiltersDto, currentUser?: User): Promise<{ data: Asset[]; total: number; page: number; limit: number }> {
+    const { search, status, condition, categoryId, departmentId, page = 1, limit = 20, includeDeleted = false } = filters;
+
+    if (includeDeleted && currentUser?.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only admins can view deleted assets');
+    }
 
     const qb = this.assetsRepo
       .createQueryBuilder('asset')
@@ -56,9 +61,15 @@ export class AssetsService {
       .leftJoinAndSelect('asset.createdBy', 'createdBy')
       .leftJoinAndSelect('asset.updatedBy', 'updatedBy');
 
+    if (includeDeleted) {
+      qb.withDeleted();
+    }
+
     if (search) {
       qb.andWhere(
-        '(asset.name ILIKE :search OR asset.assetId ILIKE :search OR asset.serialNumber ILIKE :search OR asset.manufacturer ILIKE :search OR asset.model ILIKE :search)',
+        `(asset.name ILIKE :search OR asset.assetId ILIKE :search OR asset.serialNumber ILIKE :search
+         OR asset.location ILIKE :search OR asset.notes ILIKE :search
+         OR category.name ILIKE :search OR department.name ILIKE :search)`,
         { search: `%${search}%` },
       );
     }
@@ -220,9 +231,24 @@ export class AssetsService {
     return this.findOne(id);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, currentUser: User): Promise<void> {
+    await this.findOne(id);
+    await this.assetsRepo.softDelete(id);
+    await this.logHistory(
+      { id } as Asset,
+      AssetHistoryAction.DELETED,
+      'Asset soft-deleted',
+      null,
+      null,
+      currentUser,
+    );
+  }
+
+  async restore(id: string, currentUser: User): Promise<Asset> {
+    await this.assetsRepo.restore(id);
     const asset = await this.findOne(id);
-    await this.assetsRepo.remove(asset);
+    await this.logHistory(asset, AssetHistoryAction.RESTORED, 'Asset restored', null, null, currentUser);
+    return asset;
   }
 
   async getHistory(assetId: string): Promise<AssetHistory[]> {
