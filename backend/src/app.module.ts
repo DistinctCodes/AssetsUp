@@ -4,10 +4,17 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { RolesGuard } from './auth/guards/roles.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { AssetsModule } from './assets/assets.module';
+import { DepartmentsModule } from './departments/departments.module';
+import { CategoriesModule } from './categories/categories.module';
+import { ReportsModule } from './reports/reports.module';
 import { LocationsModule } from './locations/locations.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { InvitationsModule } from './invitations/invitations.module';
 
 @Module({
   imports: [
@@ -31,13 +38,21 @@ import { LocationsModule } from './locations/locations.module';
         password: configService.get('DB_PASSWORD', 'password'),
         database: configService.get('DB_DATABASE', 'manage_assets'),
         autoLoadEntities: true,
-        synchronize: true,
+        synchronize: configService.get('NODE_ENV') === 'development',
       }),
       inject: [ConfigService],
     }),
+    AuthModule,
+    UsersModule,
+    AssetsModule,
+    DepartmentsModule,
+    CategoriesModule,
+    ReportsModule,
     LocationsModule,
+    ApiKeysModule,
+    InvitationsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, RolesGuard],
+  providers: [AppService],
 })
 export class AppModule {}

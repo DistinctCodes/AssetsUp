@@ -40,6 +40,10 @@ export class UsersService {
     return user;
   }
 
+  async findByIdOrNull(id: string): Promise<User | null> {
+    return this.usersRepo.findOne({ where: { id } });
+  }
+
   async create(data: Partial<User>): Promise<User> {
     const user = this.usersRepo.create(data);
     return this.usersRepo.save(user);
