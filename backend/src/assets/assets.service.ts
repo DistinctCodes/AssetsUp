@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PaginatedResponse } from '../common/dto/paginated-response.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -45,7 +46,7 @@ export class AssetsService {
     private readonly stellarService: StellarService,
   ) {}
 
-  async findAll(filters: AssetFiltersDto): Promise<{ data: Asset[]; total: number; page: number; limit: number }> {
+  async findAll(filters: AssetFiltersDto): Promise<PaginatedResponse<Asset>> {
     const { search, status, condition, categoryId, departmentId, page = 1, limit = 20 } = filters;
 
     const qb = this.assetsRepo
@@ -72,7 +73,7 @@ export class AssetsService {
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
+    return PaginatedResponse.of(data, total, page, limit);
   }
 
   async findOne(id: string): Promise<Asset> {

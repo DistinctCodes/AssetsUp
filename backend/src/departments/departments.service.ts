@@ -8,6 +8,8 @@ import { Repository } from 'typeorm';
 import { Department } from './department.entity';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { PaginatedResponse } from '../common/dto/paginated-response.dto';
 
 export interface DepartmentWithCount extends Department {
   assetCount: number;
@@ -20,15 +22,20 @@ export class DepartmentsService {
     private readonly repo: Repository<Department>,
   ) {}
 
-  async findAll(): Promise<DepartmentWithCount[]> {
-    const rows: (Department & { assetCount: string })[] = await this.repo.query(`
-      SELECT d.*, COALESCE(COUNT(a.id), 0)::int AS "assetCount"
+  async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<DepartmentWithCount>> {
+    const { page = 1, limit = 20 } = query;
+    const offset = (page - 1) * limit;
+    const rows: (Department & { assetCount: string; total: string })[] = await this.repo.query(`
+      SELECT d.*, COALESCE(COUNT(a.id), 0)::int AS "assetCount", COUNT(*) OVER() AS total
       FROM departments d
       LEFT JOIN assets a ON a."departmentId" = d.id
       GROUP BY d.id
       ORDER BY d.name ASC
-    `);
-    return rows.map((r) => ({ ...r, assetCount: Number(r.assetCount) }));
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+    const total = rows.length > 0 ? Number(rows[0].total) : 0;
+    const data = rows.map((r) => ({ ...r, assetCount: Number(r.assetCount) }));
+    return PaginatedResponse.of(data, total, page, limit);
   }
 
   async findOne(id: string): Promise<Department> {

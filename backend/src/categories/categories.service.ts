@@ -8,6 +8,8 @@ import { Repository } from 'typeorm';
 import { Category } from './category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { PaginatedResponse } from '../common/dto/paginated-response.dto';
 
 export interface CategoryWithCount extends Category {
   assetCount: number;
@@ -20,15 +22,20 @@ export class CategoriesService {
     private readonly repo: Repository<Category>,
   ) {}
 
-  async findAll(): Promise<CategoryWithCount[]> {
-    const rows: (Category & { assetCount: string })[] = await this.repo.query(`
-      SELECT c.*, COALESCE(COUNT(a.id), 0)::int AS "assetCount"
+  async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<CategoryWithCount>> {
+    const { page = 1, limit = 20 } = query;
+    const offset = (page - 1) * limit;
+    const rows: (Category & { assetCount: string; total: string })[] = await this.repo.query(`
+      SELECT c.*, COALESCE(COUNT(a.id), 0)::int AS "assetCount", COUNT(*) OVER() AS total
       FROM asset_categories c
       LEFT JOIN assets a ON a."categoryId" = c.id
       GROUP BY c.id
       ORDER BY c.name ASC
-    `);
-    return rows.map((r) => ({ ...r, assetCount: Number(r.assetCount) }));
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+    const total = rows.length > 0 ? Number(rows[0].total) : 0;
+    const data = rows.map((r) => ({ ...r, assetCount: Number(r.assetCount) }));
+    return PaginatedResponse.of(data, total, page, limit);
   }
 
   async findOne(id: string): Promise<Category> {

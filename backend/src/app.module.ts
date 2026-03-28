@@ -3,23 +3,29 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { UserThrottlerGuard } from './auth/guards/user-throttler.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LocationsModule } from './locations/locations.module';
+import { AssetsModule } from './assets/assets.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { DepartmentsModule } from './departments/departments.module';
+import { CategoriesModule } from './categories/categories.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
+import { AuditLogInterceptor } from './audit-log/audit-log.interceptor';
+import { BorrowingModule } from './borrowing/borrowing.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 10,
-      },
+      { name: 'global', ttl: 60000, limit: 10 },
+      { name: 'per-user', ttl: 60000, limit: 60 },
     ]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -36,8 +42,21 @@ import { LocationsModule } from './locations/locations.module';
       inject: [ConfigService],
     }),
     LocationsModule,
+    AssetsModule,
+    AuthModule,
+    UsersModule,
+    DepartmentsModule,
+    CategoriesModule,
+    AuditLogModule,
+    BorrowingModule,
   ],
   controllers: [AppController],
-  providers: [AppService, RolesGuard],
+  providers: [
+    AppService,
+    RolesGuard,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: UserThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
+  ],
 })
 export class AppModule {}
