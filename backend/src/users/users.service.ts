@@ -61,6 +61,11 @@ export class UsersService {
     return this.usersRepo.save(user);
   }
 
+  async updatePassword(id: string, hashedPassword: string): Promise<void> {
+    await this.findById(id);
+    await this.usersRepo.update(id, { password: hashedPassword });
+  }
+
   async updateRefreshToken(id: string, token: string | null): Promise<void> {
     await this.usersRepo.update(id, { refreshToken: token });
   }

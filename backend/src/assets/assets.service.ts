@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -22,6 +22,8 @@ import { CategoriesService } from '../categories/categories.service';
 import { UsersService } from '../users/users.service';
 import { StellarService } from '../stellar/stellar.service';
 import { User } from '../users/user.entity';
+import { StorageService } from '../storage/storage.service';
+import { Express } from 'express';
 
 @Injectable()
 export class AssetsService {
@@ -43,6 +45,7 @@ export class AssetsService {
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly stellarService: StellarService,
+    private readonly storageService: StorageService,
   ) {}
 
   async findAll(filters: AssetFiltersDto): Promise<{ data: Asset[]; total: number; page: number; limit: number }> {
@@ -345,6 +348,34 @@ export class AssetsService {
       `Document added: ${dto.name}`,
       null,
       { name: dto.name, url: dto.url },
+      currentUser,
+    );
+    return saved;
+  }
+
+  async uploadDocument(assetId: string, file: Express.Multer.File, currentUser: User): Promise<AssetDocument> {
+    await this.findOne(assetId);
+
+    if (!this.storageService.isEnabled) {
+      throw new BadRequestException('Object storage is not configured');
+    }
+
+    const upload = await this.storageService.uploadFile(file, `assets/${assetId}/documents`);
+    const doc = this.documentsRepo.create({
+      assetId,
+      name: file.originalname,
+      url: upload.url,
+      type: file.mimetype ?? 'application/octet-stream',
+      size: file.size ?? null,
+      uploadedBy: currentUser,
+    });
+    const saved = await this.documentsRepo.save(doc);
+    await this.logHistory(
+      { id: assetId } as Asset,
+      AssetHistoryAction.DOCUMENT_UPLOADED,
+      `Document uploaded: ${file.originalname}`,
+      null,
+      { name: file.originalname, url: upload.url },
       currentUser,
     );
     return saved;
