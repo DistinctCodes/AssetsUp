@@ -9,12 +9,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LocationsModule } from './locations/locations.module';
-import { AuthModule } from './auth/auth.module';
-import { AssetsModule } from './assets/assets.module';
-import { UsersModule } from './users/users.module';
-import { DepartmentsModule } from './departments/departments.module';
-import { CategoriesModule } from './categories/categories.module';
-import { ReportsModule } from './reports/reports.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 
 @Module({
   imports: [
@@ -72,10 +67,7 @@ import { ReportsModule } from './reports/reports.module';
     AssetsModule,
     ReportsModule,
     LocationsModule,
-    HealthModule,
-    AuthModule,
-    QueueModule,
-    NotificationsModule,
+    SchedulerModule,
   ],
   controllers: [AppController],
   providers: [AppService, RolesGuard],
