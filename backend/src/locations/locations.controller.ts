@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -15,6 +16,7 @@ import { CombinedAuthGuard } from '../auth/guards/combined-auth.guard';
 import { LocationsService } from './locations.service';
 import { CreateLocationDto } from './dto/create-location.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @ApiTags('Locations')
 @ApiBearerAuth('JWT-auth')
@@ -25,8 +27,8 @@ export class LocationsController {
 
   @Get()
   @ApiOperation({ summary: 'List all tracked locations' })
-  findAll() {
-    return this.locationsService.findAll();
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.locationsService.findAll(query);
   }
 
   @Get(':id')

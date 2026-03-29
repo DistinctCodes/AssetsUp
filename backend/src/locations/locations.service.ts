@@ -8,6 +8,8 @@ import { Repository } from 'typeorm';
 import { Location } from './location.entity';
 import { CreateLocationDto } from './dto/create-location.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { PaginatedResponse } from '../common/dto/paginated-response.dto';
 
 @Injectable()
 export class LocationsService {
@@ -16,8 +18,10 @@ export class LocationsService {
     private readonly repo: Repository<Location>,
   ) {}
 
-  findAll(): Promise<Location[]> {
-    return this.repo.find({ order: { name: 'ASC' } });
+  async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<Location>> {
+    const { page = 1, limit = 20 } = query;
+    const [data, total] = await this.repo.findAndCount({ order: { name: 'ASC' }, skip: (page - 1) * limit, take: limit });
+    return PaginatedResponse.of(data, total, page, limit);
   }
 
   async findOne(id: string): Promise<Location> {
