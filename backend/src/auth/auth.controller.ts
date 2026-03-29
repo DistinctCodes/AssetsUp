@@ -134,7 +134,50 @@ export class AuthController {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
+      twoFactorEnabled: user.twoFactorEnabled,
       createdAt: user.createdAt,
     };
+  }
+
+  // ── 2FA endpoints ────────────────────────────────────────────────
+
+  @Post('2fa/setup')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Generate TOTP secret and QR code for 2FA setup' })
+  @ApiResponse({ status: 201, description: 'Returns otpauthUrl and qrCodeDataUrl' })
+  twoFactorSetup(@CurrentUser() user: User) {
+    return this.authService.twoFactorSetup(user.id);
+  }
+
+  @Post('2fa/enable')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Enable 2FA after verifying TOTP code' })
+  @ApiResponse({ status: 200, description: '2FA enabled' })
+  @ApiResponse({ status: 401, description: 'Invalid TOTP code' })
+  twoFactorEnable(@CurrentUser() user: User, @Body() dto: TwoFactorCodeDto) {
+    return this.authService.twoFactorEnable(user.id, dto.code);
+  }
+
+  @Post('2fa/disable')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Disable 2FA after verifying TOTP code' })
+  @ApiResponse({ status: 200, description: '2FA disabled' })
+  @ApiResponse({ status: 401, description: 'Invalid TOTP code' })
+  twoFactorDisable(@CurrentUser() user: User, @Body() dto: TwoFactorCodeDto) {
+    return this.authService.twoFactorDisable(user.id, dto.code);
+  }
+
+  @Post('2fa/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Complete login by verifying TOTP code against temp token' })
+  @ApiResponse({ status: 200, description: 'Returns full access and refresh tokens' })
+  @ApiResponse({ status: 401, description: 'Invalid code or token' })
+  twoFactorVerify(@Body() dto: TwoFactorVerifyDto) {
+    return this.authService.twoFactorVerify(dto.tempToken, dto.code);
   }
 }
