@@ -2,9 +2,12 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Inject,
+  CACHE_MANAGER,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Cache } from 'cache-manager';
 import { Department } from './department.entity';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
@@ -15,10 +18,25 @@ export interface DepartmentWithCount extends Department {
 
 @Injectable()
 export class DepartmentsService {
+  private readonly listCacheKey = 'GET:/api/departments';
+
   constructor(
     @InjectRepository(Department)
     private readonly repo: Repository<Department>,
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
   ) {}
+
+  private cacheDetailKey(id: string): string {
+    return `GET:/api/departments/${id}`;
+  }
+
+  private async invalidateCache(id?: string): Promise<void> {
+    await this.cacheManager.del(this.listCacheKey);
+    if (id) {
+      await this.cacheManager.del(this.cacheDetailKey(id));
+    }
+  }
 
   async findAll(): Promise<DepartmentWithCount[]> {
     const rows: (Department & { assetCount: string })[] = await this.repo.query(`
@@ -39,7 +57,9 @@ export class DepartmentsService {
 
   async create(dto: CreateDepartmentDto): Promise<Department> {
     await this.ensureNameUnique(dto.name);
-    return this.repo.save(this.repo.create(dto));
+    const saved = await this.repo.save(this.repo.create(dto));
+    await this.invalidateCache(saved.id);
+    return saved;
   }
 
   async update(id: string, dto: UpdateDepartmentDto): Promise<Department> {
@@ -49,12 +69,15 @@ export class DepartmentsService {
     }
 
     Object.assign(dept, dto);
-    return this.repo.save(dept);
+    const saved = await this.repo.save(dept);
+    await this.invalidateCache(id);
+    return saved;
   }
 
   async remove(id: string): Promise<void> {
     const dept = await this.findOne(id);
     await this.repo.remove(dept);
+    await this.invalidateCache(id);
   }
 
   private async ensureNameUnique(name: string): Promise<void> {
