@@ -22,7 +22,10 @@ import { DepartmentsService } from '../departments/departments.service';
 import { CategoriesService } from '../categories/categories.service';
 import { UsersService } from '../users/users.service';
 import { StellarService } from '../stellar/stellar.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { User } from '../users/user.entity';
+import { StorageService } from '../storage/storage.service';
+import { Express } from 'express';
 
 @Injectable()
 export class AssetsService {
@@ -44,6 +47,7 @@ export class AssetsService {
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly stellarService: StellarService,
+    private readonly storageService: StorageService,
   ) {}
 
   async findAll(filters: AssetFiltersDto, currentUser?: User): Promise<{ data: Asset[]; total: number; page: number; limit: number }> {
@@ -136,6 +140,7 @@ export class AssetsService {
     const saved = await this.assetsRepo.save(asset);
 
     await this.logHistory(saved, AssetHistoryAction.CREATED, 'Asset registered', null, null, currentUser);
+    this.notificationsService.emit('asset:created', { assetId: saved.id, assetCode: saved.assetId });
 
     // Derive on-chain ID deterministically and mark PENDING (only if Stellar enabled)
     if (this.stellarService.isEnabled) {
@@ -183,6 +188,7 @@ export class AssetsService {
 
     await this.assetsRepo.save(asset);
     await this.logHistory(asset, AssetHistoryAction.UPDATED, 'Asset updated', before as unknown as Record<string, unknown>, dto as unknown as Record<string, unknown>, currentUser);
+    this.notificationsService.emit('asset:updated', { assetId: id });
 
     return this.findOne(id);
   }
@@ -203,6 +209,7 @@ export class AssetsService {
       { status: dto.status },
       currentUser,
     );
+    this.notificationsService.emit('asset:status_changed', { assetId: id, from: prevStatus, to: dto.status });
 
     return this.findOne(id);
   }
@@ -227,6 +234,7 @@ export class AssetsService {
       { departmentId: asset.department.name },
       currentUser,
     );
+    this.notificationsService.emit('asset:transferred', { assetId: id, from: prevDept, to: asset.department.name });
 
     return this.findOne(id);
   }
@@ -325,6 +333,7 @@ export class AssetsService {
       { type: dto.type, scheduledDate: dto.scheduledDate },
       currentUser,
     );
+    this.notificationsService.emit('maintenance:scheduled', { assetId, maintenanceId: saved.id, type: dto.type });
     return saved;
   }
 
@@ -371,6 +380,34 @@ export class AssetsService {
       `Document added: ${dto.name}`,
       null,
       { name: dto.name, url: dto.url },
+      currentUser,
+    );
+    return saved;
+  }
+
+  async uploadDocument(assetId: string, file: Express.Multer.File, currentUser: User): Promise<AssetDocument> {
+    await this.findOne(assetId);
+
+    if (!this.storageService.isEnabled) {
+      throw new BadRequestException('Object storage is not configured');
+    }
+
+    const upload = await this.storageService.uploadFile(file, `assets/${assetId}/documents`);
+    const doc = this.documentsRepo.create({
+      assetId,
+      name: file.originalname,
+      url: upload.url,
+      type: file.mimetype ?? 'application/octet-stream',
+      size: file.size ?? null,
+      uploadedBy: currentUser,
+    });
+    const saved = await this.documentsRepo.save(doc);
+    await this.logHistory(
+      { id: assetId } as Asset,
+      AssetHistoryAction.DOCUMENT_UPLOADED,
+      `Document uploaded: ${file.originalname}`,
+      null,
+      { name: file.originalname, url: upload.url },
       currentUser,
     );
     return saved;
