@@ -16,6 +16,7 @@ import { CreateNoteDto } from './dto/create-note.dto';
 import { CreateMaintenanceDto } from './dto/create-maintenance.dto';
 import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { DuplicateAssetDto } from './dto/duplicate-asset.dto';
 import { AssetStatus, AssetHistoryAction, StellarStatus } from './enums';
 import { UserRole } from '../users/user.entity';
 import { DepartmentsService } from '../departments/departments.service';
@@ -70,6 +71,12 @@ export class AssetsService {
     }
 
     if (search) {
+      // Multi-column ILIKE search — covers name, assetId, serialNumber, location, notes,
+      // category.name, department.name (case-insensitive, partial match).
+      //
+      // GIN index recommendations for production (run in a migration):
+      //   CREATE INDEX CONCURRENTLY idx_assets_name_gin ON assets USING gin(to_tsvector('english', name));
+      //   CREATE INDEX CONCURRENTLY idx_assets_serial_gin ON assets USING gin(to_tsvector('english', coalesce("serialNumber", '')));
       qb.andWhere(
         `(asset.name ILIKE :search OR asset.assetId ILIKE :search OR asset.serialNumber ILIKE :search
          OR asset.location ILIKE :search OR asset.notes ILIKE :search
@@ -82,7 +89,14 @@ export class AssetsService {
     if (categoryId) qb.andWhere('category.id = :categoryId', { categoryId });
     if (departmentId) qb.andWhere('department.id = :departmentId', { departmentId });
 
-    qb.orderBy('asset.createdAt', 'DESC')
+    // Order by relevance (exact name match first) when searching; otherwise by creation date
+    if (search) {
+      qb.orderBy(`CASE WHEN asset.name ILIKE :exactSearch THEN 0 ELSE 1 END`, 'ASC', 'NULLS LAST')
+        .addOrderBy('asset.createdAt', 'DESC');
+      qb.setParameter('exactSearch', search);
+    } else {
+      qb.orderBy('asset.createdAt', 'DESC');
+    }
       .skip((page - 1) * limit)
       .take(limit);
 
