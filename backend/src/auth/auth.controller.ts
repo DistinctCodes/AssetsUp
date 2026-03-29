@@ -25,12 +25,15 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../users/user.entity';
+import { AcceptInvitationDto } from '../invitations/dto/accept-invitation.dto';
+import { InvitationsService } from '../invitations/invitations.service';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly invitationsService: InvitationsService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
@@ -121,6 +124,12 @@ export class AuthController {
   @ApiOperation({ summary: 'Sign out and invalidate tokens' })
   async logout(@CurrentUser() user: User) {
     await this.authService.logout(user.id);
+  }
+
+  @Post('accept-invitation')
+  @ApiOperation({ summary: 'Accept an invitation and create an account' })
+  async acceptInvitation(@Body() dto: AcceptInvitationDto) {
+    return this.invitationsService.acceptInvitation(dto);
   }
 
   @Get('me')

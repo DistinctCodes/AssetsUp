@@ -25,8 +25,7 @@ import { CreateNoteDto } from './dto/create-note.dto';
 import { CreateMaintenanceDto } from './dto/create-maintenance.dto';
 import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
-import { DuplicateAssetDto } from './dto/duplicate-asset.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CombinedAuthGuard } from '../auth/guards/combined-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -37,7 +36,7 @@ import { Express } from 'express';
 
 @ApiTags('Assets')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(CombinedAuthGuard, RolesGuard)
 @Controller('assets')
 export class AssetsController {
   constructor(private readonly service: AssetsService) {}

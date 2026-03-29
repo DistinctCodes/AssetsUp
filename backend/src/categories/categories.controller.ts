@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CombinedAuthGuard } from '../auth/guards/combined-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/user.entity';
@@ -11,7 +11,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @ApiTags('Categories')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(CombinedAuthGuard, RolesGuard)
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly service: CategoriesService) {}

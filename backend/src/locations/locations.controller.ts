@@ -12,7 +12,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CombinedAuthGuard } from '../auth/guards/combined-auth.guard';
 import { LocationsService } from './locations.service';
 import { CreateLocationDto } from './dto/create-location.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
@@ -20,7 +20,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @ApiTags('Locations')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(CombinedAuthGuard)
 @Controller('locations')
 export class LocationsController {
   constructor(private readonly locationsService: LocationsService) {}

@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DepartmentsService } from './departments.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CombinedAuthGuard } from '../auth/guards/combined-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/user.entity';
@@ -11,7 +11,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @ApiTags('Departments')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(CombinedAuthGuard, RolesGuard)
 @Controller('departments')
 export class DepartmentsController {
   constructor(private readonly service: DepartmentsService) {}

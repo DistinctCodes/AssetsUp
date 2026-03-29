@@ -4,21 +4,18 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { RolesGuard } from './auth/guards/roles.guard';
-import { UserThrottlerGuard } from './auth/guards/user-throttler.guard';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { LocationsModule } from './locations/locations.module';
-import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { AssetsModule } from './assets/assets.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { CategoriesModule } from './categories/categories.module';
-import { AuditLogModule } from './audit-log/audit-log.module';
-import { AuditLogInterceptor } from './audit-log/audit-log.interceptor';
-import { BorrowingModule } from './borrowing/borrowing.module';
+import { ReportsModule } from './reports/reports.module';
+import { LocationsModule } from './locations/locations.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { InvitationsModule } from './invitations/invitations.module';
 
 @Module({
   imports: [
@@ -38,32 +35,21 @@ import { BorrowingModule } from './borrowing/borrowing.module';
         password: configService.get('DB_PASSWORD', 'password'),
         database: configService.get('DB_DATABASE', 'manage_assets'),
         autoLoadEntities: true,
-        synchronize: true,
+        synchronize: configService.get('NODE_ENV') === 'development',
       }),
       inject: [ConfigService],
     }),
     AuthModule,
     UsersModule,
+    AssetsModule,
     DepartmentsModule,
     CategoriesModule,
-    AssetsModule,
     ReportsModule,
     LocationsModule,
-    AssetsModule,
-    AuthModule,
-    UsersModule,
-    DepartmentsModule,
-    CategoriesModule,
-    AuditLogModule,
-    BorrowingModule,
+    ApiKeysModule,
+    InvitationsModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    RolesGuard,
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
-    { provide: APP_GUARD, useClass: UserThrottlerGuard },
-    { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
-  ],
+  providers: [AppService],
 })
 export class AppModule {}
