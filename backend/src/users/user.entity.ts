@@ -35,6 +35,12 @@ export class User {
   @Column({ nullable: true, select: false })
   refreshToken: string | null;
 
+  @Column({ nullable: true, select: false })
+  twoFactorSecret: string | null;
+
+  @Column({ default: false })
+  twoFactorEnabled: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 

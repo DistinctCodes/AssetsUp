@@ -65,6 +65,11 @@ export class UsersService {
     return this.usersRepo.save(user);
   }
 
+  async updatePassword(id: string, hashedPassword: string): Promise<void> {
+    await this.findById(id);
+    await this.usersRepo.update(id, { password: hashedPassword });
+  }
+
   async updateRefreshToken(id: string, token: string | null): Promise<void> {
     await this.usersRepo.update(id, { refreshToken: token });
   }
@@ -75,5 +80,24 @@ export class UsersService {
       .addSelect('user.refreshToken')
       .where('user.id = :id', { id })
       .getOne();
+  }
+
+  async findByIdWithTwoFactor(id: string): Promise<User | null> {
+    return this.usersRepo
+      .createQueryBuilder('user')
+      .addSelect('user.twoFactorSecret')
+      .where('user.id = :id', { id })
+      .getOne();
+  }
+
+  async updateTwoFactor(
+    id: string,
+    secret: string | null,
+    enabled: boolean,
+  ): Promise<void> {
+    await this.usersRepo.update(id, {
+      twoFactorSecret: secret,
+      twoFactorEnabled: enabled,
+    });
   }
 }

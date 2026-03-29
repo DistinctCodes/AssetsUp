@@ -20,6 +20,8 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../users/user.entity';
@@ -97,6 +99,24 @@ export class AuthController {
     return tokens;
   }
 
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a password reset link to an email' })
+  @ApiResponse({ status: 200, description: 'Password reset email accepted' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(dto.email);
+    return { message: 'If an account exists for that email, a reset link has been sent.' };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using a token' })
+  @ApiResponse({ status: 200, description: 'Password updated' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
+    return { message: 'Password has been reset successfully.' };
+  }
+
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard)
@@ -123,7 +143,50 @@ export class AuthController {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
+      twoFactorEnabled: user.twoFactorEnabled,
       createdAt: user.createdAt,
     };
+  }
+
+  // ── 2FA endpoints ────────────────────────────────────────────────
+
+  @Post('2fa/setup')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Generate TOTP secret and QR code for 2FA setup' })
+  @ApiResponse({ status: 201, description: 'Returns otpauthUrl and qrCodeDataUrl' })
+  twoFactorSetup(@CurrentUser() user: User) {
+    return this.authService.twoFactorSetup(user.id);
+  }
+
+  @Post('2fa/enable')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Enable 2FA after verifying TOTP code' })
+  @ApiResponse({ status: 200, description: '2FA enabled' })
+  @ApiResponse({ status: 401, description: 'Invalid TOTP code' })
+  twoFactorEnable(@CurrentUser() user: User, @Body() dto: TwoFactorCodeDto) {
+    return this.authService.twoFactorEnable(user.id, dto.code);
+  }
+
+  @Post('2fa/disable')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Disable 2FA after verifying TOTP code' })
+  @ApiResponse({ status: 200, description: '2FA disabled' })
+  @ApiResponse({ status: 401, description: 'Invalid TOTP code' })
+  twoFactorDisable(@CurrentUser() user: User, @Body() dto: TwoFactorCodeDto) {
+    return this.authService.twoFactorDisable(user.id, dto.code);
+  }
+
+  @Post('2fa/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Complete login by verifying TOTP code against temp token' })
+  @ApiResponse({ status: 200, description: 'Returns full access and refresh tokens' })
+  @ApiResponse({ status: 401, description: 'Invalid code or token' })
+  twoFactorVerify(@Body() dto: TwoFactorVerifyDto) {
+    return this.authService.twoFactorVerify(dto.tempToken, dto.code);
   }
 }

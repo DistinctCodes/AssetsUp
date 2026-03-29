@@ -244,4 +244,30 @@ export class ReportsService {
       completedDate: row.completedDate,
     }));
   }
+
+  async exportAssets(filters: AssetFiltersDto): Promise<Asset[]> {
+    const { search, status, condition, categoryId, departmentId } = filters;
+    const qb = this.assetsRepo
+      .createQueryBuilder('asset')
+      .leftJoinAndSelect('asset.category', 'category')
+      .leftJoinAndSelect('asset.department', 'department')
+      .leftJoinAndSelect('asset.assignedTo', 'assignedTo')
+      .leftJoinAndSelect('asset.createdBy', 'createdBy')
+      .leftJoinAndSelect('asset.updatedBy', 'updatedBy');
+
+    if (search) {
+      qb.andWhere(
+        '(asset.name ILIKE :search OR asset.assetId ILIKE :search OR asset.serialNumber ILIKE :search OR asset.manufacturer ILIKE :search OR asset.model ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+    if (status) qb.andWhere('asset.status = :status', { status });
+    if (condition) qb.andWhere('asset.condition = :condition', { condition });
+    if (categoryId) qb.andWhere('category.id = :categoryId', { categoryId });
+    if (departmentId) qb.andWhere('department.id = :departmentId', { departmentId });
+
+    qb.orderBy('asset.createdAt', 'DESC');
+
+    return qb.getMany();
+  }
 }
