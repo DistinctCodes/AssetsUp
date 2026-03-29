@@ -11,7 +11,7 @@ import { DepartmentsModule } from '../departments/departments.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { UsersModule } from '../users/users.module';
 import { StellarModule } from '../stellar/stellar.module';
-import { NotificationsModule } from '../notifications/notifications.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -20,7 +20,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     CategoriesModule,
     UsersModule,
     StellarModule,
-    NotificationsModule,
+    StorageModule,
   ],
   controllers: [AssetsController],
   providers: [AssetsService],

@@ -20,7 +20,8 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { TwoFactorCodeDto, TwoFactorVerifyDto } from './dto/two-factor.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../users/user.entity';
@@ -93,6 +94,24 @@ export class AuthController {
 
     const tokens = await this.authService.refresh(payload.sub, refreshToken);
     return tokens;
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a password reset link to an email' })
+  @ApiResponse({ status: 200, description: 'Password reset email accepted' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(dto.email);
+    return { message: 'If an account exists for that email, a reset link has been sent.' };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using a token' })
+  @ApiResponse({ status: 200, description: 'Password updated' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
+    return { message: 'Password has been reset successfully.' };
   }
 
   @Post('logout')

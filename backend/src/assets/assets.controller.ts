@@ -8,8 +8,11 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
@@ -27,6 +30,9 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { User, UserRole } from '../users/user.entity';
+import { FileInterceptor } from '@nestjs/platform-express';
+import * as multer from 'multer';
+import { Express } from 'express';
 
 @ApiTags('Assets')
 @ApiBearerAuth('JWT-auth')
@@ -138,10 +144,45 @@ export class AssetsController {
     return this.service.getDocuments(id);
   }
 
+const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+
+const documentUploadOptions = {
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_DOCUMENT_SIZE },
+  fileFilter(_: unknown, file: Express.Multer.File, callback: multer.FileFilterCallback) {
+    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      return callback(new BadRequestException('Unsupported file type'), false);
+    }
+    callback(null, true);
+  },
+};
+
   @Post(':id/documents')
   @ApiOperation({ summary: 'Attach a document (URL) to an asset' })
   addDocument(@Param('id') id: string, @Body() dto: CreateDocumentDto, @CurrentUser() user: User) {
     return this.service.addDocument(id, dto, user);
+  }
+
+  @Post(':id/documents/upload')
+  @UseInterceptors(FileInterceptor('file', documentUploadOptions))
+  @ApiOperation({ summary: 'Upload a document to storage' })
+  uploadDocument(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: User,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+    return this.service.uploadDocument(id, file, user);
   }
 
   @Delete(':id/documents/:documentId')
