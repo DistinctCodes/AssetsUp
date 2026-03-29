@@ -72,4 +72,23 @@ export class UsersService {
       .where('user.id = :id', { id })
       .getOne();
   }
+
+  async findByIdWithTwoFactor(id: string): Promise<User | null> {
+    return this.usersRepo
+      .createQueryBuilder('user')
+      .addSelect('user.twoFactorSecret')
+      .where('user.id = :id', { id })
+      .getOne();
+  }
+
+  async updateTwoFactor(
+    id: string,
+    secret: string | null,
+    enabled: boolean,
+  ): Promise<void> {
+    await this.usersRepo.update(id, {
+      twoFactorSecret: secret,
+      twoFactorEnabled: enabled,
+    });
+  }
 }

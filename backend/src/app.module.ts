@@ -8,6 +8,10 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LocationsModule } from './locations/locations.module';
+import { HealthModule } from './health/health.module';
+import { AuthModule } from './auth/auth.module';
+import { QueueModule } from './queue/queue.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -36,6 +40,10 @@ import { LocationsModule } from './locations/locations.module';
       inject: [ConfigService],
     }),
     LocationsModule,
+    HealthModule,
+    AuthModule,
+    QueueModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, RolesGuard],
