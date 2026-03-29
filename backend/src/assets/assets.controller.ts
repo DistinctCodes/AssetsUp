@@ -25,6 +25,7 @@ import { CreateNoteDto } from './dto/create-note.dto';
 import { CreateMaintenanceDto } from './dto/create-maintenance.dto';
 import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { DuplicateAssetDto } from './dto/duplicate-asset.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -75,6 +76,13 @@ export class AssetsController {
   @ApiOperation({ summary: 'Transfer asset to a different department or user' })
   transfer(@Param('id') id: string, @Body() dto: TransferAssetDto, @CurrentUser() user: User) {
     return this.service.transfer(id, dto, user);
+  }
+
+  @Post(':id/duplicate')
+  @ApiOperation({ summary: 'Duplicate an asset (MANAGER/ADMIN only)' })
+  @Roles(UserRole.MANAGER, UserRole.ADMIN)
+  duplicate(@Param('id') id: string, @Body() dto: DuplicateAssetDto, @CurrentUser() user: User) {
+    return this.service.duplicate(id, dto, user);
   }
 
   @Delete(':id')

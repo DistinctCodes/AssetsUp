@@ -16,6 +16,7 @@ import { CreateNoteDto } from './dto/create-note.dto';
 import { CreateMaintenanceDto } from './dto/create-maintenance.dto';
 import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { DuplicateAssetDto } from './dto/duplicate-asset.dto';
 import { AssetStatus, AssetHistoryAction, StellarStatus } from './enums';
 import { DepartmentsService } from '../departments/departments.service';
 import { CategoriesService } from '../categories/categories.service';
@@ -245,6 +246,53 @@ export class AssetsService {
     this.notificationsService.emit('asset:transferred', { assetId: id, from: prevDept, to: asset.department.name });
 
     return this.findOne(id);
+  }
+
+  async duplicate(id: string, dto: DuplicateAssetDto, currentUser: User): Promise<Asset[]> {
+    const source = await this.findOne(id);
+    const quantity = dto.quantity ?? 1;
+    const results: Asset[] = [];
+
+    for (let i = 0; i < quantity; i++) {
+      const newAssetId = await this.generateAssetId();
+      const copy = this.assetsRepo.create({
+        assetId: newAssetId,
+        name: dto.name ?? source.name,
+        description: source.description,
+        category: source.category,
+        department: source.department,
+        assignedTo: null,
+        serialNumber: quantity === 1 && dto.serialNumber ? dto.serialNumber : null,
+        purchaseDate: source.purchaseDate,
+        purchasePrice: source.purchasePrice,
+        currentValue: source.currentValue,
+        warrantyExpiration: source.warrantyExpiration,
+        status: AssetStatus.ACTIVE,
+        condition: source.condition,
+        location: source.location,
+        manufacturer: source.manufacturer,
+        model: source.model,
+        tags: source.tags,
+        notes: source.notes,
+        customFields: source.customFields,
+        imageUrls: source.imageUrls,
+        createdBy: currentUser,
+        updatedBy: currentUser,
+      });
+
+      const saved = await this.assetsRepo.save(copy);
+      await this.logHistory(
+        saved,
+        AssetHistoryAction.CREATED,
+        `Duplicated from ${source.assetId}`,
+        null,
+        null,
+        currentUser,
+      );
+      results.push(await this.findOne(saved.id));
+    }
+
+    return results;
   }
 
   async remove(id: string): Promise<void> {
