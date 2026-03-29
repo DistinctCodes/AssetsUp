@@ -17,12 +17,16 @@ export class DepartmentsController {
   constructor(private readonly service: DepartmentsService) {}
 
   @Get()
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(300)
   @ApiOperation({ summary: 'List all departments' })
   findAll(@Query() query: PaginationQueryDto) {
     return this.service.findAll(query);
   }
 
   @Get(':id')
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(300)
   @ApiOperation({ summary: 'Get a department by ID' })
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);

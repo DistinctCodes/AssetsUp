@@ -17,12 +17,16 @@ export class CategoriesController {
   constructor(private readonly service: CategoriesService) {}
 
   @Get()
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(300)
   @ApiOperation({ summary: 'List all asset categories' })
   findAll(@Query() query: PaginationQueryDto) {
     return this.service.findAll(query);
   }
 
   @Get(':id')
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(300)
   @ApiOperation({ summary: 'Get a category by ID' })
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);

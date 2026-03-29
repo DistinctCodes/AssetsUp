@@ -1,5 +1,6 @@
 // src/app.module.ts
 import { Module } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -41,6 +42,12 @@ import { BorrowingModule } from './borrowing/borrowing.module';
       }),
       inject: [ConfigService],
     }),
+    AuthModule,
+    UsersModule,
+    DepartmentsModule,
+    CategoriesModule,
+    AssetsModule,
+    ReportsModule,
     LocationsModule,
     AssetsModule,
     AuthModule,

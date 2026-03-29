@@ -17,12 +17,16 @@ import { CreateNoteDto } from './dto/create-note.dto';
 import { CreateMaintenanceDto } from './dto/create-maintenance.dto';
 import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { DuplicateAssetDto } from './dto/duplicate-asset.dto';
 import { AssetStatus, AssetHistoryAction, StellarStatus } from './enums';
 import { DepartmentsService } from '../departments/departments.service';
 import { CategoriesService } from '../categories/categories.service';
 import { UsersService } from '../users/users.service';
 import { StellarService } from '../stellar/stellar.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { User } from '../users/user.entity';
+import { StorageService } from '../storage/storage.service';
+import { Express } from 'express';
 
 @Injectable()
 export class AssetsService {
@@ -44,6 +48,7 @@ export class AssetsService {
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly stellarService: StellarService,
+    private readonly storageService: StorageService,
   ) {}
 
   async findAll(filters: AssetFiltersDto): Promise<PaginatedResponse<Asset>> {
@@ -58,8 +63,20 @@ export class AssetsService {
       .leftJoinAndSelect('asset.updatedBy', 'updatedBy');
 
     if (search) {
+      // Multi-column ILIKE search — covers name, assetId, serialNumber, location, notes,
+      // category.name, department.name (case-insensitive, partial match).
+      //
+      // GIN index recommendations for production (run in a migration):
+      //   CREATE INDEX CONCURRENTLY idx_assets_name_gin ON assets USING gin(to_tsvector('english', name));
+      //   CREATE INDEX CONCURRENTLY idx_assets_serial_gin ON assets USING gin(to_tsvector('english', coalesce("serialNumber", '')));
       qb.andWhere(
-        '(asset.name ILIKE :search OR asset.assetId ILIKE :search OR asset.serialNumber ILIKE :search OR asset.manufacturer ILIKE :search OR asset.model ILIKE :search)',
+        `(asset.name ILIKE :search
+         OR asset.assetId ILIKE :search
+         OR asset.serialNumber ILIKE :search
+         OR asset.location ILIKE :search
+         OR asset.notes ILIKE :search
+         OR category.name ILIKE :search
+         OR department.name ILIKE :search)`,
         { search: `%${search}%` },
       );
     }
@@ -68,7 +85,14 @@ export class AssetsService {
     if (categoryId) qb.andWhere('category.id = :categoryId', { categoryId });
     if (departmentId) qb.andWhere('department.id = :departmentId', { departmentId });
 
-    qb.orderBy('asset.createdAt', 'DESC')
+    // Order by relevance (exact name match first) when searching; otherwise by creation date
+    if (search) {
+      qb.orderBy(`CASE WHEN asset.name ILIKE :exactSearch THEN 0 ELSE 1 END`, 'ASC', 'NULLS LAST')
+        .addOrderBy('asset.createdAt', 'DESC');
+      qb.setParameter('exactSearch', search);
+    } else {
+      qb.orderBy('asset.createdAt', 'DESC');
+    }
       .skip((page - 1) * limit)
       .take(limit);
 
@@ -126,6 +150,7 @@ export class AssetsService {
     const saved = await this.assetsRepo.save(asset);
 
     await this.logHistory(saved, AssetHistoryAction.CREATED, 'Asset registered', null, null, currentUser);
+    this.notificationsService.emit('asset:created', { assetId: saved.id, assetCode: saved.assetId });
 
     // Derive on-chain ID deterministically and mark PENDING (only if Stellar enabled)
     if (this.stellarService.isEnabled) {
@@ -173,6 +198,7 @@ export class AssetsService {
 
     await this.assetsRepo.save(asset);
     await this.logHistory(asset, AssetHistoryAction.UPDATED, 'Asset updated', before as unknown as Record<string, unknown>, dto as unknown as Record<string, unknown>, currentUser);
+    this.notificationsService.emit('asset:updated', { assetId: id });
 
     return this.findOne(id);
   }
@@ -193,6 +219,7 @@ export class AssetsService {
       { status: dto.status },
       currentUser,
     );
+    this.notificationsService.emit('asset:status_changed', { assetId: id, from: prevStatus, to: dto.status });
 
     return this.findOne(id);
   }
@@ -217,8 +244,56 @@ export class AssetsService {
       { departmentId: asset.department.name },
       currentUser,
     );
+    this.notificationsService.emit('asset:transferred', { assetId: id, from: prevDept, to: asset.department.name });
 
     return this.findOne(id);
+  }
+
+  async duplicate(id: string, dto: DuplicateAssetDto, currentUser: User): Promise<Asset[]> {
+    const source = await this.findOne(id);
+    const quantity = dto.quantity ?? 1;
+    const results: Asset[] = [];
+
+    for (let i = 0; i < quantity; i++) {
+      const newAssetId = await this.generateAssetId();
+      const copy = this.assetsRepo.create({
+        assetId: newAssetId,
+        name: dto.name ?? source.name,
+        description: source.description,
+        category: source.category,
+        department: source.department,
+        assignedTo: null,
+        serialNumber: quantity === 1 && dto.serialNumber ? dto.serialNumber : null,
+        purchaseDate: source.purchaseDate,
+        purchasePrice: source.purchasePrice,
+        currentValue: source.currentValue,
+        warrantyExpiration: source.warrantyExpiration,
+        status: AssetStatus.ACTIVE,
+        condition: source.condition,
+        location: source.location,
+        manufacturer: source.manufacturer,
+        model: source.model,
+        tags: source.tags,
+        notes: source.notes,
+        customFields: source.customFields,
+        imageUrls: source.imageUrls,
+        createdBy: currentUser,
+        updatedBy: currentUser,
+      });
+
+      const saved = await this.assetsRepo.save(copy);
+      await this.logHistory(
+        saved,
+        AssetHistoryAction.CREATED,
+        `Duplicated from ${source.assetId}`,
+        null,
+        null,
+        currentUser,
+      );
+      results.push(await this.findOne(saved.id));
+    }
+
+    return results;
   }
 
   async remove(id: string): Promise<void> {
@@ -300,6 +375,7 @@ export class AssetsService {
       { type: dto.type, scheduledDate: dto.scheduledDate },
       currentUser,
     );
+    this.notificationsService.emit('maintenance:scheduled', { assetId, maintenanceId: saved.id, type: dto.type });
     return saved;
   }
 
@@ -346,6 +422,34 @@ export class AssetsService {
       `Document added: ${dto.name}`,
       null,
       { name: dto.name, url: dto.url },
+      currentUser,
+    );
+    return saved;
+  }
+
+  async uploadDocument(assetId: string, file: Express.Multer.File, currentUser: User): Promise<AssetDocument> {
+    await this.findOne(assetId);
+
+    if (!this.storageService.isEnabled) {
+      throw new BadRequestException('Object storage is not configured');
+    }
+
+    const upload = await this.storageService.uploadFile(file, `assets/${assetId}/documents`);
+    const doc = this.documentsRepo.create({
+      assetId,
+      name: file.originalname,
+      url: upload.url,
+      type: file.mimetype ?? 'application/octet-stream',
+      size: file.size ?? null,
+      uploadedBy: currentUser,
+    });
+    const saved = await this.documentsRepo.save(doc);
+    await this.logHistory(
+      { id: assetId } as Asset,
+      AssetHistoryAction.DOCUMENT_UPLOADED,
+      `Document uploaded: ${file.originalname}`,
+      null,
+      { name: file.originalname, url: upload.url },
       currentUser,
     );
     return saved;

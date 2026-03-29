@@ -2,9 +2,12 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Inject,
+  CACHE_MANAGER,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Cache } from 'cache-manager';
 import { Category } from './category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -17,9 +20,13 @@ export interface CategoryWithCount extends Category {
 
 @Injectable()
 export class CategoriesService {
+  private readonly listCacheKey = 'GET:/api/categories';
+
   constructor(
     @InjectRepository(Category)
     private readonly repo: Repository<Category>,
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
   ) {}
 
   async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<CategoryWithCount>> {
@@ -46,7 +53,9 @@ export class CategoriesService {
 
   async create(dto: CreateCategoryDto): Promise<Category> {
     await this.ensureNameUnique(dto.name);
-    return this.repo.save(this.repo.create(dto));
+    const saved = await this.repo.save(this.repo.create(dto));
+    await this.invalidateCache(saved.id);
+    return saved;
   }
 
   async update(id: string, dto: UpdateCategoryDto): Promise<Category> {
@@ -56,12 +65,15 @@ export class CategoriesService {
     }
 
     Object.assign(category, dto);
-    return this.repo.save(category);
+    const saved = await this.repo.save(category);
+    await this.invalidateCache(id);
+    return saved;
   }
 
   async remove(id: string): Promise<void> {
     const cat = await this.findOne(id);
     await this.repo.remove(cat);
+    await this.invalidateCache(id);
   }
 
   private async ensureNameUnique(name: string): Promise<void> {
