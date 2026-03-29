@@ -5,46 +5,25 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { RolesGuard } from './auth/guards/roles.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { AssetsModule } from './assets/assets.module';
+import { DepartmentsModule } from './departments/departments.module';
+import { CategoriesModule } from './categories/categories.module';
+import { ReportsModule } from './reports/reports.module';
 import { LocationsModule } from './locations/locations.module';
-import { SchedulerModule } from './scheduler/scheduler.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { InvitationsModule } from './invitations/invitations.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-    CacheModule.registerAsync({
-      imports: [ConfigModule],
-      isGlobal: true,
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => {
-        const redisHost = configService.get<string>('REDIS_HOST');
-        const redisPort = Number(configService.get('REDIS_PORT'));
-        const baseOptions = { ttl: 300 };
-        if (redisHost && redisPort) {
-          const redisModule = await import('cache-manager-redis-store');
-          const redisStore = redisModule.redisStore ?? redisModule.default;
-          if (redisStore) {
-            return {
-              ...baseOptions,
-              store: redisStore,
-              host: redisHost,
-              port: redisPort,
-            };
-          }
-        }
-        return baseOptions;
-      },
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 10,
-      },
+      { name: 'global', ttl: 60000, limit: 10 },
+      { name: 'per-user', ttl: 60000, limit: 60 },
     ]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -56,20 +35,21 @@ import { SchedulerModule } from './scheduler/scheduler.module';
         password: configService.get('DB_PASSWORD', 'password'),
         database: configService.get('DB_DATABASE', 'manage_assets'),
         autoLoadEntities: true,
-        synchronize: true,
+        synchronize: configService.get('NODE_ENV') === 'development',
       }),
       inject: [ConfigService],
     }),
     AuthModule,
     UsersModule,
+    AssetsModule,
     DepartmentsModule,
     CategoriesModule,
-    AssetsModule,
     ReportsModule,
     LocationsModule,
-    SchedulerModule,
+    ApiKeysModule,
+    InvitationsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, RolesGuard],
+  providers: [AppService],
 })
 export class AppModule {}

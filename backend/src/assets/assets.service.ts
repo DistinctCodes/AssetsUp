@@ -101,7 +101,7 @@ export class AssetsService {
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
+    return PaginatedResponse.of(data, total, page, limit);
   }
 
   async findOne(id: string): Promise<Asset> {
