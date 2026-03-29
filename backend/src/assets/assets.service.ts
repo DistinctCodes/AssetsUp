@@ -1,5 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PaginatedResponse } from '../common/dto/paginated-response.dto';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -19,6 +18,7 @@ import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { DuplicateAssetDto } from './dto/duplicate-asset.dto';
 import { AssetStatus, AssetHistoryAction, StellarStatus } from './enums';
+import { UserRole } from '../users/user.entity';
 import { DepartmentsService } from '../departments/departments.service';
 import { CategoriesService } from '../categories/categories.service';
 import { UsersService } from '../users/users.service';
@@ -51,8 +51,12 @@ export class AssetsService {
     private readonly storageService: StorageService,
   ) {}
 
-  async findAll(filters: AssetFiltersDto): Promise<PaginatedResponse<Asset>> {
-    const { search, status, condition, categoryId, departmentId, page = 1, limit = 20 } = filters;
+  async findAll(filters: AssetFiltersDto, currentUser?: User): Promise<{ data: Asset[]; total: number; page: number; limit: number }> {
+    const { search, status, condition, categoryId, departmentId, page = 1, limit = 20, includeDeleted = false } = filters;
+
+    if (includeDeleted && currentUser?.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only admins can view deleted assets');
+    }
 
     const qb = this.assetsRepo
       .createQueryBuilder('asset')
@@ -62,6 +66,10 @@ export class AssetsService {
       .leftJoinAndSelect('asset.createdBy', 'createdBy')
       .leftJoinAndSelect('asset.updatedBy', 'updatedBy');
 
+    if (includeDeleted) {
+      qb.withDeleted();
+    }
+
     if (search) {
       // Multi-column ILIKE search — covers name, assetId, serialNumber, location, notes,
       // category.name, department.name (case-insensitive, partial match).
@@ -70,13 +78,9 @@ export class AssetsService {
       //   CREATE INDEX CONCURRENTLY idx_assets_name_gin ON assets USING gin(to_tsvector('english', name));
       //   CREATE INDEX CONCURRENTLY idx_assets_serial_gin ON assets USING gin(to_tsvector('english', coalesce("serialNumber", '')));
       qb.andWhere(
-        `(asset.name ILIKE :search
-         OR asset.assetId ILIKE :search
-         OR asset.serialNumber ILIKE :search
-         OR asset.location ILIKE :search
-         OR asset.notes ILIKE :search
-         OR category.name ILIKE :search
-         OR department.name ILIKE :search)`,
+        `(asset.name ILIKE :search OR asset.assetId ILIKE :search OR asset.serialNumber ILIKE :search
+         OR asset.location ILIKE :search OR asset.notes ILIKE :search
+         OR category.name ILIKE :search OR department.name ILIKE :search)`,
         { search: `%${search}%` },
       );
     }
@@ -249,56 +253,24 @@ export class AssetsService {
     return this.findOne(id);
   }
 
-  async duplicate(id: string, dto: DuplicateAssetDto, currentUser: User): Promise<Asset[]> {
-    const source = await this.findOne(id);
-    const quantity = dto.quantity ?? 1;
-    const results: Asset[] = [];
-
-    for (let i = 0; i < quantity; i++) {
-      const newAssetId = await this.generateAssetId();
-      const copy = this.assetsRepo.create({
-        assetId: newAssetId,
-        name: dto.name ?? source.name,
-        description: source.description,
-        category: source.category,
-        department: source.department,
-        assignedTo: null,
-        serialNumber: quantity === 1 && dto.serialNumber ? dto.serialNumber : null,
-        purchaseDate: source.purchaseDate,
-        purchasePrice: source.purchasePrice,
-        currentValue: source.currentValue,
-        warrantyExpiration: source.warrantyExpiration,
-        status: AssetStatus.ACTIVE,
-        condition: source.condition,
-        location: source.location,
-        manufacturer: source.manufacturer,
-        model: source.model,
-        tags: source.tags,
-        notes: source.notes,
-        customFields: source.customFields,
-        imageUrls: source.imageUrls,
-        createdBy: currentUser,
-        updatedBy: currentUser,
-      });
-
-      const saved = await this.assetsRepo.save(copy);
-      await this.logHistory(
-        saved,
-        AssetHistoryAction.CREATED,
-        `Duplicated from ${source.assetId}`,
-        null,
-        null,
-        currentUser,
-      );
-      results.push(await this.findOne(saved.id));
-    }
-
-    return results;
+  async remove(id: string, currentUser: User): Promise<void> {
+    await this.findOne(id);
+    await this.assetsRepo.softDelete(id);
+    await this.logHistory(
+      { id } as Asset,
+      AssetHistoryAction.DELETED,
+      'Asset soft-deleted',
+      null,
+      null,
+      currentUser,
+    );
   }
 
-  async remove(id: string): Promise<void> {
+  async restore(id: string, currentUser: User): Promise<Asset> {
+    await this.assetsRepo.restore(id);
     const asset = await this.findOne(id);
-    await this.assetsRepo.remove(asset);
+    await this.logHistory(asset, AssetHistoryAction.RESTORED, 'Asset restored', null, null, currentUser);
+    return asset;
   }
 
   async getHistory(assetId: string): Promise<AssetHistory[]> {

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsEnum, IsString, IsNumber, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsEnum, IsString, IsNumber, Min, IsBoolean } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { AssetStatus, AssetCondition } from '../enums';
 
 export class AssetFiltersDto {
@@ -42,4 +42,10 @@ export class AssetFiltersDto {
   @IsOptional()
   @Type(() => Number)
   limit?: number = 20;
+
+  @ApiPropertyOptional({ default: false, description: 'Include soft-deleted assets (ADMIN only)' })
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  includeDeleted?: boolean = false;
 }

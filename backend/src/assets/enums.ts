@@ -21,6 +21,8 @@ export enum AssetHistoryAction {
   MAINTENANCE = 'MAINTENANCE',
   NOTE_ADDED = 'NOTE_ADDED',
   DOCUMENT_UPLOADED = 'DOCUMENT_UPLOADED',
+  DELETED = 'DELETED',
+  RESTORED = 'RESTORED',
 }
 
 export enum StellarStatus {
