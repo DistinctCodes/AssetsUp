@@ -1,7 +1,9 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { CombinedAuthGuard } from '../auth/guards/combined-auth.guard';
+import { AssetFiltersDto } from '../assets/dto/asset-filters.dto';
+import { Response } from 'express';
 
 @ApiTags('Reports')
 @ApiBearerAuth('JWT-auth')
@@ -35,5 +37,25 @@ export class ReportsController {
     @Query('to') to?: string,
   ) {
     return this.service.getMaintenanceHistory(from, to);
+  }
+
+  @Get('assets/export/excel')
+  @ApiOperation({ summary: 'Export assets to Excel file' })
+  async exportExcel(
+    @Query() filters: AssetFiltersDto,
+    @Res() res: Response,
+  ) {
+    const workbook = await this.service.exportToExcel(filters);
+    
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="assets-export.xlsx"',
+    );
+    
+    return workbook.pipe(res);
   }
 }

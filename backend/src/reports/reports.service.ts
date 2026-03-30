@@ -4,6 +4,9 @@ import { Repository } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
 import { AssetCondition, AssetStatus } from '../assets/enums';
 import { Maintenance, MaintenanceStatus } from '../assets/maintenance.entity';
+import { AssetFiltersDto } from '../assets/dto/asset-filters.dto';
+import * as ExcelJS from 'exceljs';
+import { Readable } from 'stream';
 
 @Injectable()
 export class ReportsService {
@@ -269,5 +272,100 @@ export class ReportsService {
     qb.orderBy('asset.createdAt', 'DESC');
 
     return qb.getMany();
+  }
+
+  async exportToExcel(filters: AssetFiltersDto): Promise<Readable> {
+    const assets = await this.exportAssets(filters);
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'AssetsUp';
+    workbook.lastModifiedBy = 'AssetsUp System';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+
+    const worksheet = workbook.addWorksheet('Assets');
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'Asset ID', key: 'assetId', width: 15 },
+      { header: 'Name', key: 'name', width: 30 },
+      { header: 'Category', key: 'category', width: 20 },
+      { header: 'Department', key: 'department', width: 20 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Condition', key: 'condition', width: 15 },
+      { header: 'Location', key: 'location', width: 20 },
+      { header: 'Assigned To', key: 'assignedTo', width: 25 },
+      { header: 'Purchase Date', key: 'purchaseDate', width: 15 },
+      { header: 'Purchase Price', key: 'purchasePrice', width: 15 },
+      { header: 'Serial Number', key: 'serialNumber', width: 20 },
+    ];
+
+    // Style header row
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+    // Add data rows with alternate shading
+    assets.forEach((asset, index) => {
+      const row = worksheet.addRow({
+        assetId: asset.assetId,
+        name: asset.name,
+        category: asset.category?.name || 'Uncategorized',
+        department: asset.department?.name || 'Unassigned',
+        status: asset.status,
+        condition: asset.condition,
+        location: asset.location || 'N/A',
+        assignedTo: asset.assignedTo 
+          ? `${asset.assignedTo.firstName} ${asset.assignedTo.lastName}`.trim()
+          : 'Unassigned',
+        purchaseDate: asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : 'N/A',
+        purchasePrice: asset.purchasePrice ? `₮${asset.purchasePrice}` : '₮0',
+        serialNumber: asset.serialNumber || 'N/A',
+      });
+
+      // Alternate row shading (light gray for even rows)
+      if ((index + 1) % 2 === 0) {
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF5F5F5' },
+          };
+        });
+      }
+    });
+
+    // Enable auto-filter on header row
+    worksheet.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: 11 },
+    };
+
+    // Auto-size columns based on content
+    worksheet.columns.forEach((column) => {
+      if (column.key) {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const columnLength = cell.value ? cell.value.toString().length : 10;
+          if (columnLength > maxLength) {
+            maxLength = columnLength;
+          }
+        });
+        column.width = Math.min(Math.max(maxLength + 2, 10), 50);
+      }
+    });
+
+    // Convert workbook to stream
+    const stream = new Readable();
+    const buffer = await workbook.xlsx.writeBuffer();
+    stream.push(buffer);
+    stream.push(null);
+    
+    return stream;
   }
 }
