@@ -7,6 +7,7 @@ import { Maintenance, MaintenanceStatus } from '../assets/maintenance.entity';
 import { AssetFiltersDto } from '../assets/dto/asset-filters.dto';
 import * as ExcelJS from 'exceljs';
 import { Readable } from 'stream';
+import * as PDFDocument from 'pdfkit';
 
 @Injectable()
 export class ReportsService {
@@ -365,6 +366,158 @@ export class ReportsService {
     const buffer = await workbook.xlsx.writeBuffer();
     stream.push(buffer);
     stream.push(null);
+    
+    return stream;
+  }
+
+  async exportToPdf(filters: AssetFiltersDto): Promise<Readable> {
+    const assets = await this.exportAssets(filters);
+
+    // Create a PassThrough stream for pdfkit
+    const doc = new PDFDocument({ margin: 40 });
+    const stream = new Readable();
+    
+    // Pipe pdf document to our stream
+    doc.pipe(stream as any);
+
+    // Title
+    doc.fontSize(20).text('Assets Report', { align: 'center' });
+    doc.moveDown(0.5);
+
+    // Generated date
+    doc.fontSize(12).text(`Generated: ${new Date().toLocaleString()}`, { align: 'left' });
+    doc.moveDown(0.5);
+
+    // Filter summary
+    doc.fontSize(12).text('Applied Filters:', { underline: true });
+    const filterParts: string[] = [];
+    if (filters.search) filterParts.push(`Search: "${filters.search}"`);
+    if (filters.status) filterParts.push(`Status: ${filters.status}`);
+    if (filters.condition) filterParts.push(`Condition: ${filters.condition}`);
+    if (filters.categoryId) filterParts.push(`Category ID: ${filters.categoryId}`);
+    if (filters.departmentId) filterParts.push(`Department ID: ${filters.departmentId}`);
+    
+    if (filterParts.length > 0) {
+      doc.fontSize(10).text(filterParts.join(' | '), { align: 'left' });
+    } else {
+      doc.fontSize(10).text('None - showing all assets', { align: 'left' });
+    }
+    doc.moveDown(0.5);
+
+    // Total count
+    doc.fontSize(12).text(`Total Assets: ${assets.length}`, { align: 'right' });
+    doc.moveDown(1);
+
+    // Table headers
+    const tableTop = doc.y;
+    const tableLeft = 40;
+    const colWidths = [60, 120, 80, 80, 70, 90];
+    const rowHeight = 20;
+    
+    // Header row background
+    doc.rect(tableLeft, tableTop - 5, colWidths.reduce((a, b) => a + b, 0), rowHeight + 5)
+       .fill('#E0E0E0');
+    
+    // Headers
+    doc.fontSize(10).font('Helvetica-Bold');
+    const headers = ['Asset ID', 'Name', 'Category', 'Department', 'Status', 'Location'];
+    let x = tableLeft + 5;
+    headers.forEach((header, i) => {
+      doc.text(header, x, tableTop, { width: colWidths[i] - 10, align: 'left' });
+      x += colWidths[i];
+    });
+    
+    // Draw header borders
+    doc.lineWidth(1);
+    doc.moveTo(tableLeft, tableTop - 5)
+       .lineTo(tableLeft + colWidths.reduce((a, b) => a + b, 0), tableTop - 5)
+       .stroke();
+    doc.moveTo(tableLeft, tableTop + rowHeight)
+       .lineTo(tableLeft + colWidths.reduce((a, b) => a + b, 0), tableTop + rowHeight)
+       .stroke();
+
+    // Data rows
+    doc.font('Helvetica');
+    let y = tableTop + rowHeight + 5;
+    
+    assets.forEach((asset, index) => {
+      // Check if we need a new page
+      if (y + rowHeight > doc.page.height - 60) {
+        // Add page number to current page
+        const pageCount = doc.bufferedPageRange().count;
+        doc.fontSize(8).fill('#666')
+           .text(
+             `Page ${pageCount}`,
+             doc.page.width - 100,
+             doc.page.height - 30,
+             { align: 'right' }
+           );
+        
+        // Add new page
+        doc.addPage();
+        y = 60; // Reset y position for new page
+        
+        // Re-draw headers on new page
+        doc.rect(tableLeft, y - 5, colWidths.reduce((a, b) => a + b, 0), rowHeight + 5)
+           .fill('#E0E0E0');
+        doc.fontSize(10).font('Helvetica-Bold');
+        x = tableLeft + 5;
+        headers.forEach((header, i) => {
+          doc.text(header, x, y, { width: colWidths[i] - 10, align: 'left' });
+          x += colWidths[i];
+        });
+        doc.moveTo(tableLeft, y - 5)
+           .lineTo(tableLeft + colWidths.reduce((a, b) => a + b, 0), y - 5)
+           .stroke();
+        doc.moveTo(tableLeft, y + rowHeight)
+           .lineTo(tableLeft + colWidths.reduce((a, b) => a + b, 0), y + rowHeight)
+           .stroke();
+        y += rowHeight + 5;
+        doc.font('Helvetica');
+      }
+
+      // Alternate row shading
+      if ((index + 1) % 2 === 0) {
+        doc.rect(tableLeft, y, colWidths.reduce((a, b) => a + b, 0), rowHeight)
+           .fill('#F5F5F5');
+      }
+
+      // Row data
+      doc.fontSize(9).fill('#000');
+      x = tableLeft + 5;
+      const rowData = [
+        asset.assetId,
+        asset.name.length > 25 ? asset.name.substring(0, 25) + '...' : asset.name,
+        asset.category?.name || 'Uncategorized',
+        asset.department?.name || 'Unassigned',
+        asset.status,
+        asset.location || 'N/A',
+      ];
+      
+      rowData.forEach((data, i) => {
+        doc.text(data.toString(), x, y + 3, { width: colWidths[i] - 10, align: 'left' });
+        x += colWidths[i];
+      });
+
+      // Draw row border
+      doc.moveTo(tableLeft, y)
+         .lineTo(tableLeft + colWidths.reduce((a, b) => a + b, 0), y)
+         .stroke();
+
+      y += rowHeight;
+    });
+
+    // Final page number
+    const pageCount = doc.bufferedPageRange().count;
+    doc.fontSize(8).fill('#666')
+       .text(
+         `Page ${pageCount}`,
+         doc.page.width - 100,
+         doc.page.height - 30,
+         { align: 'right' }
+       );
+
+    doc.end();
     
     return stream;
   }

@@ -58,4 +58,21 @@ export class ReportsController {
     
     return workbook.pipe(res);
   }
+
+  @Get('assets/export/pdf')
+  @ApiOperation({ summary: 'Export assets to PDF file' })
+  async exportPdf(
+    @Query() filters: AssetFiltersDto,
+    @Res() res: Response,
+  ) {
+    const pdfStream = await this.service.exportToPdf(filters);
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="assets-report.pdf"',
+    );
+    
+    return pdfStream.pipe(res);
+  }
 }
