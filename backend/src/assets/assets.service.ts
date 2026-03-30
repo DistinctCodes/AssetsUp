@@ -1,7 +1,10 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import * as QRCode from 'qrcode';
+import * as bwipjs from 'bwip-js';
+import * as Papa from 'papaparse';
 import { Asset } from './asset.entity';
 import { AssetHistory } from './asset-history.entity';
 import { AssetNote } from './asset-note.entity';
@@ -97,8 +100,8 @@ export class AssetsService {
     } else {
       qb.orderBy('asset.createdAt', 'DESC');
     }
-      .skip((page - 1) * limit)
-      .take(limit);
+
+    qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
     return PaginatedResponse.of(data, total, page, limit);
@@ -152,6 +155,13 @@ export class AssetsService {
     });
 
     const saved = await this.assetsRepo.save(asset);
+
+    // Auto-generate QR code and barcode on creation
+    const [qrCode, barcode] = await Promise.all([
+      QRCode.toDataURL(`${this.configService.get('FRONTEND_URL', 'http://localhost:3000')}/assets/${saved.id}`),
+      this.generateBarcodeBase64(saved.assetId),
+    ]);
+    await this.assetsRepo.update(saved.id, { qrCode, barcode });
 
     await this.logHistory(saved, AssetHistoryAction.CREATED, 'Asset registered', null, null, currentUser);
     this.notificationsService.emit('asset:created', { assetId: saved.id, assetCode: saved.assetId });
@@ -431,6 +441,182 @@ export class AssetsService {
     const doc = await this.documentsRepo.findOne({ where: { id: documentId, assetId } });
     if (!doc) throw new NotFoundException('Document not found');
     await this.documentsRepo.remove(doc);
+  }
+
+  // ── QR Code ───────────────────────────────────────────────────
+
+  async getQrCodeBuffer(id: string): Promise<Buffer> {
+    const asset = await this.findOne(id);
+    const url = `${this.configService.get('FRONTEND_URL', 'http://localhost:3000')}/assets/${asset.id}`;
+    return QRCode.toBuffer(url);
+  }
+
+  async regenerateQrCode(id: string): Promise<{ qrCode: string }> {
+    const asset = await this.findOne(id);
+    const url = `${this.configService.get('FRONTEND_URL', 'http://localhost:3000')}/assets/${asset.id}`;
+    const qrCode = await QRCode.toDataURL(url);
+    await this.assetsRepo.update(id, { qrCode });
+    return { qrCode };
+  }
+
+  // ── Barcode ───────────────────────────────────────────────────
+
+  async getBarcodeBuffer(id: string): Promise<Buffer> {
+    const asset = await this.findOne(id);
+    return bwipjs.toBuffer({ bcid: 'code128', text: asset.assetId, scale: 3, height: 10 });
+  }
+
+  async regenerateBarcode(id: string): Promise<{ barcode: string }> {
+    const asset = await this.findOne(id);
+    const barcode = await this.generateBarcodeBase64(asset.assetId);
+    await this.assetsRepo.update(id, { barcode });
+    return { barcode };
+  }
+
+  private async generateBarcodeBase64(assetId: string): Promise<string> {
+    const buf = await bwipjs.toBuffer({ bcid: 'code128', text: assetId, scale: 3, height: 10 });
+    return `data:image/png;base64,${buf.toString('base64')}`;
+  }
+
+  // ── Depreciation ──────────────────────────────────────────────
+
+  getDepreciation(
+    asset: Asset,
+    method: 'straight-line' | 'declining-balance' = 'straight-line',
+    usefulLifeYears = 5,
+    salvageValue?: number,
+  ) {
+    if (!asset.purchasePrice || !asset.purchaseDate) {
+      throw new BadRequestException('Asset must have purchasePrice and purchaseDate');
+    }
+
+    const price = Number(asset.purchasePrice);
+    const sv = salvageValue ?? price * 0.1;
+    const now = new Date();
+    const purchase = new Date(asset.purchaseDate);
+    const totalMonths = (now.getFullYear() - purchase.getFullYear()) * 12 + (now.getMonth() - purchase.getMonth());
+    const ageYears = Math.floor(totalMonths / 12);
+    const ageMonths = totalMonths % 12;
+
+    let annualDepreciation: number;
+    let accumulatedDepreciation: number;
+
+    if (method === 'declining-balance') {
+      const rate = 2 / usefulLifeYears;
+      let bookValue = price;
+      let accumulated = 0;
+      for (let y = 0; y < Math.min(ageYears, usefulLifeYears); y++) {
+        const dep = bookValue * rate;
+        accumulated += dep;
+        bookValue -= dep;
+      }
+      annualDepreciation = bookValue * rate;
+      accumulatedDepreciation = accumulated;
+    } else {
+      annualDepreciation = (price - sv) / usefulLifeYears;
+      accumulatedDepreciation = Math.min(annualDepreciation * (totalMonths / 12), price - sv);
+    }
+
+    const currentBookValue = Math.max(price - accumulatedDepreciation, sv);
+    const depreciationPercent = Number(((accumulatedDepreciation / price) * 100).toFixed(2));
+
+    return {
+      method,
+      purchasePrice: price,
+      usefulLifeYears,
+      salvageValue: sv,
+      currentAge: { years: ageYears, months: ageMonths },
+      annualDepreciation: Number(annualDepreciation.toFixed(2)),
+      accumulatedDepreciation: Number(accumulatedDepreciation.toFixed(2)),
+      currentBookValue: Number(currentBookValue.toFixed(2)),
+      depreciationPercent,
+    };
+  }
+
+  // ── CSV Import ────────────────────────────────────────────────
+
+  async importCsv(
+    file: Express.Multer.File,
+    currentUser: User,
+  ): Promise<{ imported: number; skipped: number; errors: { row: number; reason: string }[] }> {
+    const MAX_ROWS = 1000;
+    const text = file.buffer.toString('utf-8');
+    const { data: rows } = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: true });
+
+    if (rows.length > MAX_ROWS) {
+      throw new BadRequestException(`CSV exceeds maximum of ${MAX_ROWS} rows`);
+    }
+
+    // Pre-load all categories and departments for case-insensitive matching
+    const [allCategories, allDepartments] = await Promise.all([
+      this.categoriesService['repo'].find(),
+      this.departmentsService['repo'].find(),
+    ]);
+    const catMap = new Map(allCategories.map((c) => [c.name.toLowerCase(), c]));
+    const deptMap = new Map(allDepartments.map((d) => [d.name.toLowerCase(), d]));
+
+    let imported = 0;
+    let skipped = 0;
+    const errors: { row: number; reason: string }[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const rowNum = i + 2; // 1-based + header
+      const row = rows[i];
+
+      const category = catMap.get((row.categoryName ?? '').trim().toLowerCase());
+      if (!category) {
+        skipped++;
+        errors.push({ row: rowNum, reason: `Category "${row.categoryName}" not found` });
+        continue;
+      }
+
+      const department = deptMap.get((row.departmentName ?? '').trim().toLowerCase());
+      if (!department) {
+        skipped++;
+        errors.push({ row: rowNum, reason: `Department "${row.departmentName}" not found` });
+        continue;
+      }
+
+      if (!row.name?.trim()) {
+        skipped++;
+        errors.push({ row: rowNum, reason: 'Missing required field: name' });
+        continue;
+      }
+
+      try {
+        const assetId = await this.generateAssetId();
+        const [qrCode, barcode] = await Promise.all([
+          QRCode.toDataURL(`${this.configService.get('FRONTEND_URL', 'http://localhost:3000')}/assets/${assetId}`),
+          this.generateBarcodeBase64(assetId),
+        ]);
+
+        const asset = this.assetsRepo.create({
+          assetId,
+          name: row.name.trim(),
+          category,
+          department,
+          serialNumber: row.serialNumber?.trim() || null,
+          location: row.location?.trim() || null,
+          condition: (row.condition?.trim() as any) || 'NEW',
+          purchaseDate: row.purchaseDate ? new Date(row.purchaseDate) : null,
+          purchasePrice: row.purchasePrice ? Number(row.purchasePrice) : null,
+          status: AssetStatus.ACTIVE,
+          qrCode,
+          barcode,
+          createdBy: currentUser,
+          updatedBy: currentUser,
+        });
+
+        const saved = await this.assetsRepo.save(asset);
+        await this.logHistory(saved, AssetHistoryAction.CREATED, 'Asset imported via CSV', null, null, currentUser);
+        imported++;
+      } catch (err) {
+        skipped++;
+        errors.push({ row: rowNum, reason: (err as Error).message });
+      }
+    }
+
+    return { imported, skipped, errors };
   }
 
   private async registerOnChain(asset: Asset): Promise<void> {

@@ -13,8 +13,10 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AssetsService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
@@ -57,6 +59,24 @@ export class AssetsController {
   @ApiOperation({ summary: 'Register a new asset' })
   create(@Body() dto: CreateAssetDto, @CurrentUser() user: User) {
     return this.service.create(dto, user);
+  }
+
+  @Post('import/csv')
+  @ApiOperation({ summary: 'Bulk import assets from a CSV file (ADMIN/MANAGER only)' })
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @UseInterceptors(FileInterceptor('file', {
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter(_: unknown, file: Express.Multer.File, cb: multer.FileFilterCallback) {
+      if (!file.originalname.toLowerCase().endsWith('.csv') && file.mimetype !== 'text/csv') {
+        return cb(null, false);
+      }
+      cb(null, true);
+    },
+  }))
+  importCsv(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: User) {
+    if (!file) throw new BadRequestException('CSV file is required');
+    return this.service.importCsv(file, user);
   }
 
   @Patch(':id')
@@ -103,6 +123,60 @@ export class AssetsController {
   @ApiOperation({ summary: 'Get asset change history' })
   getHistory(@Param('id') id: string) {
     return this.service.getHistory(id);
+  }
+
+  // ── QR Code ───────────────────────────────────────────────────
+
+  @Get(':id/qrcode')
+  @ApiOperation({ summary: 'Get QR code PNG image for an asset' })
+  async getQrCode(@Param('id') id: string, @Res() res: Response) {
+    const buffer = await this.service.getQrCodeBuffer(id);
+    res.setHeader('Content-Type', 'image/png');
+    res.send(buffer);
+  }
+
+  @Post(':id/qrcode/regenerate')
+  @ApiOperation({ summary: 'Regenerate and save QR code for an asset' })
+  regenerateQrCode(@Param('id') id: string) {
+    return this.service.regenerateQrCode(id);
+  }
+
+  // ── Barcode ───────────────────────────────────────────────────
+
+  @Get(':id/barcode')
+  @ApiOperation({ summary: 'Get barcode PNG image for an asset' })
+  async getBarcode(@Param('id') id: string, @Res() res: Response) {
+    const buffer = await this.service.getBarcodeBuffer(id);
+    res.setHeader('Content-Type', 'image/png');
+    res.send(buffer);
+  }
+
+  @Post(':id/barcode/regenerate')
+  @ApiOperation({ summary: 'Regenerate and save barcode for an asset' })
+  regenerateBarcode(@Param('id') id: string) {
+    return this.service.regenerateBarcode(id);
+  }
+
+  // ── Depreciation ──────────────────────────────────────────────
+
+  @Get(':id/depreciation')
+  @ApiOperation({ summary: 'Calculate asset depreciation' })
+  @ApiQuery({ name: 'method', required: false, enum: ['straight-line', 'declining-balance'] })
+  @ApiQuery({ name: 'usefulLifeYears', required: false, type: Number })
+  @ApiQuery({ name: 'salvageValue', required: false, type: Number })
+  async getDepreciation(
+    @Param('id') id: string,
+    @Query('method') method: 'straight-line' | 'declining-balance' = 'straight-line',
+    @Query('usefulLifeYears') usefulLifeYears?: string,
+    @Query('salvageValue') salvageValue?: string,
+  ) {
+    const asset = await this.service.findOne(id);
+    return this.service.getDepreciation(
+      asset,
+      method,
+      usefulLifeYears ? Number(usefulLifeYears) : 5,
+      salvageValue !== undefined ? Number(salvageValue) : undefined,
+    );
   }
 
   // ── Notes ─────────────────────────────────────────────────────
