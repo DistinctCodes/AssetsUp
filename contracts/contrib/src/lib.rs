@@ -126,6 +126,58 @@ impl ContribContract {
             .unwrap_or_default()
     }
 
+    pub fn transfer_asset(env: Env, asset_id: BytesN<32>, new_owner: Address) {
+        let store = env.storage().persistent();
+
+        let asset_key = DataKey::Asset(asset_id.clone());
+        let mut asset: Asset = store
+            .get(&asset_key)
+            .expect("asset not found");
+
+        if asset.status == AssetStatus::Retired {
+            panic!("cannot transfer a retired asset");
+        }
+
+        let old_owner = asset.owner.clone();
+        old_owner.require_auth();
+
+        let old_owner_key = DataKey::OwnerAssets(old_owner.clone());
+        let old_owner_assets: Vec<BytesN<32>> = store
+            .get(&old_owner_key)
+            .unwrap_or_else(|| Vec::new(&env));
+        let mut removed = false;
+        let mut updated_list = Vec::new(&env);
+        for i in 0..old_owner_assets.len() {
+            let id = old_owner_assets.get(i).unwrap();
+            if id == asset_id && !removed {
+                removed = true;
+            } else {
+                updated_list.push_back(id);
+            }
+        }
+        if updated_list.is_empty() {
+            store.remove(&old_owner_key);
+        } else {
+            store.set(&old_owner_key, &updated_list);
+        }
+
+        let new_owner_key = DataKey::OwnerAssets(new_owner.clone());
+        let mut new_owner_assets: Vec<BytesN<32>> = store
+            .get(&new_owner_key)
+            .unwrap_or_else(|| Vec::new(&env));
+        new_owner_assets.push_back(asset_id.clone());
+        store.set(&new_owner_key, &new_owner_assets);
+
+        asset.owner = new_owner.clone();
+        asset.last_transfer_timestamp = env.ledger().timestamp();
+        store.set(&asset_key, &asset);
+
+        env.events().publish(
+            (Symbol::new(&env, "asset"), Symbol::new(&env, "transferred")),
+            (asset_id, old_owner, new_owner),
+        );
+    }
+
     pub fn get_asset(env: Env, id: BytesN<32>) -> Option<Asset> {
         env.storage().persistent().get(&DataKey::Asset(id))
     }
