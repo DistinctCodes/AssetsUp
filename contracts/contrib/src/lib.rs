@@ -68,8 +68,8 @@ impl ContribContract {
         let is_authorized: bool = env
             .storage()
             .persistent()
-            .get(&DataKey::AuthorizedRegistrar(registrar.clone()))
-            .unwrap_or(false);
+            .get(&DataKey::AuthorizedRegistrar(registrar))
+            .unwrap_or_default();
         if !is_authorized {
             panic!("registrar is not authorized");
         }
@@ -84,11 +84,13 @@ impl ContribContract {
         store.set(&asset_key, &asset_data);
 
         let owner_key = DataKey::OwnerAssets(asset_data.owner.clone());
-        let mut owner_assets: Vec<BytesN<32>> = store.get(&owner_key).unwrap_or_else(|| Vec::new(&env));
+        let mut owner_assets: Vec<BytesN<32>> = store
+            .get(&owner_key)
+            .unwrap_or_else(|| Vec::new(&env));
         owner_assets.push_back(asset_data.id.clone());
         store.set(&owner_key, &owner_assets);
 
-        let total_count: u64 = store.get(&DataKey::TotalCount).unwrap_or(0);
+        let total_count: u64 = store.get(&DataKey::TotalCount).unwrap_or_default();
         store.set(&DataKey::TotalCount, &(total_count + 1));
 
         env.events().publish(
@@ -114,14 +116,14 @@ impl ContribContract {
         env.storage()
             .persistent()
             .get(&DataKey::AuthorizedRegistrar(address))
-            .unwrap_or(false)
+            .unwrap_or_default()
     }
 
     pub fn get_total_count(env: Env) -> u64 {
         env.storage()
             .persistent()
             .get(&DataKey::TotalCount)
-            .unwrap_or(0)
+            .unwrap_or_default()
     }
 
     pub fn get_asset(env: Env, id: BytesN<32>) -> Option<Asset> {

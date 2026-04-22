@@ -1,5 +1,5 @@
 use crate::{Asset, AssetStatus, ContribContract, ContribContractClient};
-use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String, Vec};
+use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String};
 
 fn create_env() -> Env {
     Env::default()
