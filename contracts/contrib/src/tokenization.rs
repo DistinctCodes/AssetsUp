@@ -22,11 +22,39 @@ pub struct TokenMetadata {
     pub accredited_investor_required: bool,
 }
 
+pub fn ownership_percentage(env: &Env, asset_id: String, owner: Address) -> i128 {
+    let record: Option<OwnershipRecord> = env.storage().get(&format!("ownership:{}:{}", asset_id, owner));
+    if record.is_none() {
+        return 0;
+    }
+    let rec = record.unwrap();
+
+    let total_supply: i128 = env.storage().get(&format!("tokenized_asset:{}:supply", asset_id)).unwrap_or(0);
+    if total_supply == 0 {
+        return 0;
+    }
+
+    // Basis points: 10000 = 100%
+    (rec.balance * 10000) / total_supply
+}
+
+
+use soroban_sdk::{Env, Address};
+
 #[derive(Clone)]
 pub struct OwnershipRecord {
     pub owner: Address,
-    pub percentage: i128, // 100% initially
+    pub balance: i128,
+    pub locked_balance: i128,
+    pub acquisition_timestamp: u64,
+    pub voting_power: i128,
+    pub unclaimed_dividends: i128,
 }
+
+pub fn get_ownership_record(env: &Env, asset_id: String, owner: Address) -> Option<OwnershipRecord> {
+    env.storage().get(&format!("ownership:{}:{}", asset_id, owner))
+}
+
 
 pub fn tokenize_asset(
     env: &Env,
@@ -87,4 +115,22 @@ fn require_owner(env: &Env) {
     if caller != owner {
         panic!("Only owner can tokenize asset");
     }
+}
+
+pub fn get_all_holders(env: &Env, asset_id: String) -> Vec<Address> {
+    let mut holders: Vec<Address> = Vec::new(env);
+
+    // Assuming we store a list of holders under "holders:<asset_id>"
+    let stored: Option<Vec<Address>> = env.storage().get(&format!("holders:{}", asset_id));
+    if let Some(list) = stored {
+        for addr in list.iter() {
+            let record: Option<OwnershipRecord> = env.storage().get(&format!("ownership:{}:{}", asset_id, addr));
+            if let Some(r) = record {
+                if r.balance > 0 {
+                    holders.push(addr.clone());
+                }
+            }
+        }
+    }
+    holders
 }
