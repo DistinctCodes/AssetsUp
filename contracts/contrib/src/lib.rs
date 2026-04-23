@@ -86,9 +86,8 @@ impl ContribContract {
         store.set(&asset_key, &asset_data);
 
         let owner_key = DataKey::OwnerAssets(asset_data.owner.clone());
-        let mut owner_assets: Vec<BytesN<32>> = store
-            .get(&owner_key)
-            .unwrap_or_else(|| Vec::new(&env));
+        let mut owner_assets: Vec<BytesN<32>> =
+            store.get(&owner_key).unwrap_or_else(|| Vec::new(&env));
         owner_assets.push_back(asset_data.id.clone());
         store.set(&owner_key, &owner_assets);
 

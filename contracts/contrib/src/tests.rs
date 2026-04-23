@@ -1,5 +1,5 @@
 use crate::{Asset, AssetStatus, ContribContract, ContribContractClient};
-use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String};
+use soroban_sdk::{testutils::Address as _, testutils::Events as _, Address, BytesN, Env, String};
 
 fn create_env() -> Env {
     Env::default()
@@ -30,7 +30,7 @@ fn generate_asset_id(env: &Env, seed: u32) -> BytesN<32> {
     BytesN::from_array(env, &bytes)
 }
 
-fn setup_contract(env: &Env) -> (ContribContractClient, Address) {
+fn setup_contract(env: &Env) -> (ContribContractClient<'_>, Address) {
     let admin = Address::generate(env);
     let contract_id = env.register(ContribContract, ());
     let client = ContribContractClient::new(env, &contract_id);
@@ -129,7 +129,7 @@ fn test_register_asset_emits_event() {
 #[test]
 fn test_add_authorized_registrar() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, _admin) = setup_contract(&env);
     let new_registrar = Address::generate(&env);
 
     assert!(!client.is_authorized_registrar(&new_registrar));
@@ -143,7 +143,7 @@ fn test_add_authorized_registrar() {
 #[test]
 fn test_authorized_registrar_can_register() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, _admin) = setup_contract(&env);
     let new_registrar = Address::generate(&env);
     let owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
