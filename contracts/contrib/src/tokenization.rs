@@ -1,5 +1,66 @@
 use soroban_sdk::{Env, Address, panic};
 
+pub fn transfer_tokens(
+    env: &Env,
+    asset_id: String,
+    from: Address,
+    to: Address,
+    amount: i128,
+) {
+    // Require auth from `from`
+    from.require_auth();
+
+    // Validations
+    if amount <= 0 {
+        panic!("Transfer amount must be greater than zero");
+    }
+
+    // Ensure asset is tokenized
+    let tokenized: bool = env.storage().get(&format!("tokenized:{}", asset_id)).unwrap_or(false);
+    if !tokenized {
+        panic!("Asset not tokenized");
+    }
+
+    // Fetch sender record
+    let mut from_record: OwnershipRecord = env
+        .storage()
+        .get(&format!("ownership:{}:{}", asset_id, from))
+        .unwrap_or_else(|| panic!("Sender has no ownership record"));
+
+    let transferable = from_record.balance - from_record.locked_balance;
+    if transferable < amount {
+        panic!("Insufficient transferable balance");
+    }
+
+    // Transfer restriction validation (whitelist/blacklist)
+    validate_transfer_restrictions(env, &asset_id, &from, &to);
+
+    // Deduct from sender
+    from_record.balance -= amount;
+    env.storage().set(&format!("ownership:{}:{}", asset_id, from), &from_record);
+
+    // Fetch or create recipient record
+    let mut to_record: OwnershipRecord = env
+        .storage()
+        .get(&format!("ownership:{}:{}", asset_id, to))
+        .unwrap_or(OwnershipRecord {
+            owner: to.clone(),
+            balance: 0,
+            locked_balance: 0,
+            acquisition_timestamp: env.ledger().timestamp(),
+            voting_power: 0,
+            unclaimed_dividends: 0,
+        });
+
+    to_record.balance += amount;
+    env.storage().set(&format!("ownership:{}:{}", asset_id, to), &to_record);
+
+    // Emit event
+    env.events().publish(
+        (["token", "transferred"],
+
+use soroban_sdk::{Env, Address, panic};
+
 #[derive(Clone)]
 pub struct TokenizedAsset {
     pub asset_id: String,
@@ -133,4 +194,85 @@ pub fn get_all_holders(env: &Env, asset_id: String) -> Vec<Address> {
         }
     }
     holders
+}
+
+
+fn validate_transfer_restrictions(env: &Env, asset_id: &String, from: &Address, to: &Address) {
+    // Example: check whitelist/blacklist stored in contract
+    let blacklist: Option<Vec<Address>> = env.storage().get(&format!("blacklist:{}", asset_id));
+    if let Some(list) = blacklist {
+        if list.contains(to) {
+            panic!("Recipient is blacklisted");
+        }
+    }
+
+    let whitelist: Option<Vec<Address>> = env.storage().get(&format!("whitelist:{}", asset_id));
+    if let Some(list) = whitelist {
+        if !list.contains(to) {
+            panic!("Recipient not whitelisted");
+        }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::testutils::{Env as TestEnv};
+
+    #[test]
+    fn test_insufficient_balance() {
+        let env = TestEnv::default();
+        let asset_id = "asset1".to_string();
+        let from = Address::random(&env);
+        let to = Address::random(&env);
+
+        // Setup ownership record with low balance
+        let record = OwnershipRecord {
+            owner: from.clone(),
+            balance: 50,
+            locked_balance: 0,
+            acquisition_timestamp: env.ledger().timestamp(),
+            voting_power: 0,
+            unclaimed_dividends: 0,
+        };
+        env.storage().set(&format!("ownership:{}:{}", asset_id, from), &record);
+        env.storage().set(&format!("tokenized:{}", asset_id), &true);
+
+        // Attempt transfer more than balance
+        let result = std::panic::catch_unwind(|| {
+            transfer_tokens(&env, asset_id.clone(), from.clone(), to.clone(), 100);
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_successful_transfer() {
+        let env = TestEnv::default();
+        let asset_id = "asset2".to_string();
+        let from = Address::random(&env);
+        let to = Address::random(&env);
+
+        // Setup ownership record with sufficient balance
+        let record = OwnershipRecord {
+            owner: from.clone(),
+            balance: 200,
+            locked_balance: 0,
+            acquisition_timestamp: env.ledger().timestamp(),
+            voting_power: 0,
+            unclaimed_dividends: 0,
+        };
+        env.storage().set(&format!("ownership:{}:{}", asset_id, from), &record);
+        env.storage().set(&format!("tokenized:{}", asset_id), &true);
+
+        // Transfer
+        transfer_tokens(&env, asset_id.clone(), from.clone(), to.clone(), 100);
+
+        // Verify balances
+        let from_after: OwnershipRecord = env.storage().get(&format!("ownership:{}:{}", asset_id, from)).unwrap();
+        let to_after: OwnershipRecord = env.storage().get(&format!("ownership:{}:{}", asset_id, to)).unwrap();
+
+        assert_eq!(from_after.balance, 100);
+        assert_eq!(to_after.balance, 100);
+    }
 }
