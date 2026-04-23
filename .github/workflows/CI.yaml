@@ -96,6 +96,30 @@ jobs:
       - name: Build all crates
         run: cargo build --all --verbose
 
+  build-wasm:
+    name: Build WASM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('contracts/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+            ${{ runner.os }}-cargo-
+      - name: Build contrib contract to WASM
+        run: cargo build --package contrib --target wasm32-unknown-unknown --release --verbose
+
   # ─────────────────────────────────────────────
   # BACKEND — NestJS
   # ─────────────────────────────────────────────
