@@ -1,3 +1,4 @@
+mod asset_registry_tests;
 
 mod tokenization;
 mod voting;
