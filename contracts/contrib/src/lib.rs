@@ -67,7 +67,7 @@ impl ContribContract {
     pub fn register_asset(env: Env, registrar: Address, asset_data: Asset) {
         registrar.require_auth();
 
-        let is_authorized = env
+        let is_authorized: bool = env
             .storage()
             .persistent()
             .get(&DataKey::AuthorizedRegistrar(registrar))
@@ -86,13 +86,13 @@ impl ContribContract {
         store.set(&asset_key, &asset_data);
 
         let owner_key = DataKey::OwnerAssets(asset_data.owner.clone());
-        let mut owner_assets = store
-            .get::<Vec<BytesN<32>>>(&owner_key)
+        let mut owner_assets: Vec<BytesN<32>> = store
+            .get(&owner_key)
             .unwrap_or_else(|| Vec::new(&env));
         owner_assets.push_back(asset_data.id.clone());
         store.set(&owner_key, &owner_assets);
 
-        let total_count = store.get(&DataKey::TotalCount).unwrap_or_default();
+        let total_count: u64 = store.get(&DataKey::TotalCount).unwrap_or_default();
         store.set(&DataKey::TotalCount, &(total_count + 1));
 
         env.events().publish(
@@ -102,7 +102,7 @@ impl ContribContract {
     }
 
     pub fn add_authorized_registrar(env: Env, registrar: Address) {
-        let admin = env
+        let admin: Address = env
             .storage()
             .persistent()
             .get(&DataKey::Admin)
