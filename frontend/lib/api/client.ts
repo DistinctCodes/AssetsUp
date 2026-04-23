@@ -1,50 +1,27 @@
-import { RegisterInput, LoginInput, AuthResponse } from '../query/types';
+import { api } from '../api';
+import type { AuthResponse, LoginInput, RegisterInput } from '../query/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-
-/**
- * API Client for making HTTP requests
- * Handles authentication endpoints with proper error handling
- */
-class ApiClient {
-  private async request<T>(
-    endpoint: string,
-    options?: RequestInit
-  ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
-    
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        message: 'An error occurred',
-        statusCode: response.status,
-      }));
-      throw error;
-    }
-
-    return response.json();
-  }
-
-  async register(data: RegisterInput): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async login(data: LoginInput): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
+// Generic request method for fetch-style calls used in existing query hooks
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? 'GET').toLowerCase() as
+    | 'get'
+    | 'post'
+    | 'put'
+    | 'patch'
+    | 'delete';
+  const body = init?.body ? JSON.parse(init.body as string) : undefined;
+  const response = await api[method]<T>(path, body);
+  return response.data;
 }
 
-export const apiClient = new ApiClient();
+export const apiClient = {
+  request,
+
+  register: (data: RegisterInput): Promise<AuthResponse> =>
+    api.post<AuthResponse>('/auth/register', data).then((r) => r.data),
+
+  login: (data: LoginInput): Promise<AuthResponse> =>
+    api.post<AuthResponse>('/auth/login', data).then((r) => r.data),
+
+  logout: () => api.post('/auth/logout'),
+};

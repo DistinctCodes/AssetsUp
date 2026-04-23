@@ -1,4 +1,4 @@
-use soroban_sdk::{Env, contracterror, panic_with_error};
+use soroban_sdk::{contracterror, panic_with_error, Env};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -6,20 +6,60 @@ use soroban_sdk::{Env, contracterror, panic_with_error};
 pub enum Error {
     AlreadyInitialized = 1,
     AdminNotFound = 2,
-    // Asset exist
     AssetAlreadyExists = 3,
-    //Asset not found
     AssetNotFound = 4,
-    // Branch already exists
     BranchAlreadyExists = 5,
-    // Branch not found
     BranchNotFound = 6,
-    // Subscription already exist
     SubscriptionAlreadyExists = 7,
-    // User not authorized
     Unauthorized = 8,
-    // Payment is not valid
     InvalidPayment = 9,
+    // Tokenization errors
+    AssetAlreadyTokenized = 10,
+    AssetNotTokenized = 11,
+    InvalidTokenSupply = 12,
+    InvalidTokenDecimals = 13,
+    InsufficientBalance = 14,
+    InsufficientLockedTokens = 15,
+    TokensAreLocked = 16,
+    TransferRestrictionFailed = 17,
+    NotWhitelisted = 18,
+    AccreditedInvestorRequired = 19,
+    GeographicRestriction = 20,
+    // Voting errors
+    InsufficientVotingPower = 21,
+    AlreadyVoted = 22,
+    ProposalNotFound = 23,
+    InvalidProposal = 24,
+    VotingPeriodEnded = 25,
+    // Dividend errors
+    NoDividendsToClaim = 26,
+    InvalidDividendAmount = 27,
+    // Detokenization errors
+    DetokenizationNotApproved = 28,
+    DetokenizationAlreadyProposed = 29,
+    // Valuation errors
+    InvalidValuation = 30,
+    // Holder enumeration errors
+    HolderNotFound = 31,
+    // Math errors
+    MathOverflow = 32,
+    MathUnderflow = 33,
+    // Contract state errors
+    ContractPaused = 34,
+    ContractNotInitialized = 35,
+    // Validation errors
+    InvalidAssetName = 36,
+    InvalidPurchaseValue = 37,
+    InvalidMetadataUri = 38,
+    InvalidOwnerAddress = 39,
+
+    LeaseNotFound = 40,
+    LeaseAlreadyExists = 41,
+    AssetAlreadyLeased = 42,
+    InvalidLeaseStatus = 43,
+    LeaseAlreadyStarted = 44,
+    LeaseNotExpired = 45,
+    InvalidTimestamps = 46,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
