@@ -135,4 +135,16 @@ export const assetApiClient = {
 
   createNote: (assetId: string, data: CreateNoteInput): Promise<AssetNote> =>
     api.post<AssetNote>(`/assets/${assetId}/notes`, data).then((r) => r.data),
+
+  deleteNote: (assetId: string, noteId: string): Promise<void> =>
+    api.delete(`/assets/${assetId}/notes/${noteId}`).then(() => undefined),
+
+  updateMaintenanceStatus: (
+    assetId: string,
+    maintenanceId: string,
+    status: string,
+  ): Promise<MaintenanceRecord> =>
+    api
+      .patch<MaintenanceRecord>(`/assets/${assetId}/maintenance/${maintenanceId}`, { status })
+      .then((r) => r.data),
 };

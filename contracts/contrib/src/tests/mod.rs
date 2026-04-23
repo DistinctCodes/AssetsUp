@@ -1,3 +1,9 @@
+mod asset_registry_tests;
+
+mod tokenization;
+mod voting;
+mod dividends;
+mod detokenization;
 use crate::{Asset, AssetStatus, ContribContract, ContribContractClient};
 use soroban_sdk::{testutils::Address as _, testutils::Events as _, Address, BytesN, Env, String};
 
