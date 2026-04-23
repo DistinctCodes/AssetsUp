@@ -216,3 +216,34 @@ export function useCreateNote(
     ...options,
   });
 }
+
+export function useDeleteNote(
+  assetId: string,
+  options?: UseMutationOptions<void, ApiError, string>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, ApiError, string>({
+    mutationFn: (noteId) => assetApiClient.deleteNote(assetId, noteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.notes(assetId) });
+    },
+    ...options,
+  });
+}
+
+export function useUpdateMaintenanceStatus(
+  assetId: string,
+  options?: UseMutationOptions<MaintenanceRecord, ApiError, { maintenanceId: string; status: string }>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<MaintenanceRecord, ApiError, { maintenanceId: string; status: string }>({
+    mutationFn: ({ maintenanceId, status }) =>
+      assetApiClient.updateMaintenanceStatus(assetId, maintenanceId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.maintenance(assetId) });
+    },
+    ...options,
+  });
+}
