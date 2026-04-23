@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, String, Symbol, Vec};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, Address, BytesN, Env, String, Symbol, Vec,
+};
 
 #[cfg(test)]
 mod tests;
@@ -84,9 +86,8 @@ impl ContribContract {
         store.set(&asset_key, &asset_data);
 
         let owner_key = DataKey::OwnerAssets(asset_data.owner.clone());
-        let mut owner_assets: Vec<BytesN<32>> = store
-            .get(&owner_key)
-            .unwrap_or_else(|| Vec::new(&env));
+        let mut owner_assets: Vec<BytesN<32>> =
+            store.get(&owner_key).unwrap_or_else(|| Vec::new(&env));
         owner_assets.push_back(asset_data.id.clone());
         store.set(&owner_key, &owner_assets);
 
@@ -130,9 +131,7 @@ impl ContribContract {
         let store = env.storage().persistent();
 
         let asset_key = DataKey::Asset(asset_id.clone());
-        let mut asset: Asset = store
-            .get(&asset_key)
-            .expect("asset not found");
+        let mut asset: Asset = store.get(&asset_key).expect("asset not found");
 
         if asset.status == AssetStatus::Retired {
             panic!("cannot transfer a retired asset");
@@ -142,9 +141,8 @@ impl ContribContract {
         old_owner.require_auth();
 
         let old_owner_key = DataKey::OwnerAssets(old_owner.clone());
-        let old_owner_assets: Vec<BytesN<32>> = store
-            .get(&old_owner_key)
-            .unwrap_or_else(|| Vec::new(&env));
+        let old_owner_assets: Vec<BytesN<32>> =
+            store.get(&old_owner_key).unwrap_or_else(|| Vec::new(&env));
         let mut removed = false;
         let mut updated_list = Vec::new(&env);
         for i in 0..old_owner_assets.len() {
@@ -162,9 +160,8 @@ impl ContribContract {
         }
 
         let new_owner_key = DataKey::OwnerAssets(new_owner.clone());
-        let mut new_owner_assets: Vec<BytesN<32>> = store
-            .get(&new_owner_key)
-            .unwrap_or_else(|| Vec::new(&env));
+        let mut new_owner_assets: Vec<BytesN<32>> =
+            store.get(&new_owner_key).unwrap_or_else(|| Vec::new(&env));
         new_owner_assets.push_back(asset_id.clone());
         store.set(&new_owner_key, &new_owner_assets);
 

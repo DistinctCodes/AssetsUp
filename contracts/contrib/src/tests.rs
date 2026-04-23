@@ -1,5 +1,7 @@
 use crate::{Asset, AssetStatus, ContribContract, ContribContractClient, DataKey};
-use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String, Vec};
+use soroban_sdk::{
+    testutils::Address as _, testutils::Events as _, Address, BytesN, Env, String, Vec,
+};
 
 fn create_env() -> Env {
     Env::default()
@@ -30,20 +32,20 @@ fn generate_asset_id(env: &Env, seed: u32) -> BytesN<32> {
     BytesN::from_array(env, &bytes)
 }
 
-fn setup_contract(env: &Env) -> (ContribContractClient, Address) {
+fn setup_contract(env: &Env) -> (ContribContractClient<'_>, Address, soroban_sdk::Address) {
     let admin = Address::generate(env);
     let contract_id = env.register(ContribContract, ());
     let client = ContribContractClient::new(env, &contract_id);
 
     env.mock_all_auths();
     client.initialize(&admin);
-    (client, admin)
+    (client, admin, contract_id)
 }
 
 #[test]
 fn test_register_asset_success() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, admin, _) = setup_contract(&env);
     let owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
     let asset = create_test_asset(&env, &owner, asset_id.clone());
@@ -62,7 +64,7 @@ fn test_register_asset_success() {
 #[should_panic]
 fn test_register_asset_duplicate_id() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, admin, _) = setup_contract(&env);
     let owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
     let asset = create_test_asset(&env, &owner, asset_id.clone());
@@ -77,7 +79,7 @@ fn test_register_asset_duplicate_id() {
 #[should_panic]
 fn test_register_asset_unauthorized_registrar() {
     let env = create_env();
-    let (client, _admin) = setup_contract(&env);
+    let (client, _admin, _) = setup_contract(&env);
     let unauthorized = Address::generate(&env);
     let owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
@@ -90,7 +92,7 @@ fn test_register_asset_unauthorized_registrar() {
 #[test]
 fn test_register_asset_increments_total_count() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, admin, _) = setup_contract(&env);
 
     assert_eq!(client.get_total_count(), 0);
 
@@ -109,7 +111,7 @@ fn test_register_asset_increments_total_count() {
 #[test]
 fn test_register_asset_emits_event() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, admin, _) = setup_contract(&env);
     let owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
     let asset = create_test_asset(&env, &owner, asset_id.clone());
@@ -129,7 +131,7 @@ fn test_register_asset_emits_event() {
 #[test]
 fn test_add_authorized_registrar() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, _admin, _) = setup_contract(&env);
     let new_registrar = Address::generate(&env);
 
     assert!(!client.is_authorized_registrar(&new_registrar));
@@ -141,7 +143,7 @@ fn test_add_authorized_registrar() {
 }
 
 fn register_test_asset(
-    client: &ContribContractClient,
+    client: &ContribContractClient<'_>,
     env: &Env,
     admin: &Address,
     owner: &Address,
@@ -154,7 +156,7 @@ fn register_test_asset(
 #[test]
 fn test_transfer_asset_success() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, admin, _) = setup_contract(&env);
     let owner = Address::generate(&env);
     let new_owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
@@ -172,7 +174,7 @@ fn test_transfer_asset_success() {
 #[test]
 fn test_transfer_asset_updates_owner_registry() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, admin, contract_id) = setup_contract(&env);
     let owner = Address::generate(&env);
     let new_owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
@@ -180,22 +182,27 @@ fn test_transfer_asset_updates_owner_registry() {
     env.mock_all_auths();
     register_test_asset(&client, &env, &admin, &owner, asset_id.clone());
 
-    let owner_assets: Vec<BytesN<32>> = env
-        .storage()
-        .persistent()
-        .get(&DataKey::OwnerAssets(owner.clone()))
-        .unwrap();
+    let owner_assets: Vec<BytesN<32>> = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .get(&DataKey::OwnerAssets(owner.clone()))
+            .unwrap()
+    });
     assert_eq!(owner_assets.len(), 1);
 
     client.transfer_asset(&asset_id, &new_owner);
 
-    assert!(!env.storage().persistent().has(&DataKey::OwnerAssets(owner)));
+    let has_old_owner: bool = env.as_contract(&contract_id, || {
+        env.storage().persistent().has(&DataKey::OwnerAssets(owner))
+    });
+    assert!(!has_old_owner);
 
-    let new_owner_assets: Vec<BytesN<32>> = env
-        .storage()
-        .persistent()
-        .get(&DataKey::OwnerAssets(new_owner))
-        .unwrap();
+    let new_owner_assets: Vec<BytesN<32>> = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .get(&DataKey::OwnerAssets(new_owner))
+            .unwrap()
+    });
     assert_eq!(new_owner_assets.len(), 1);
     assert_eq!(new_owner_assets.get(0).unwrap(), asset_id);
 }
@@ -203,7 +210,7 @@ fn test_transfer_asset_updates_owner_registry() {
 #[test]
 fn test_transfer_asset_multiple_assets_per_owner() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, admin, contract_id) = setup_contract(&env);
     let owner = Address::generate(&env);
     let new_owner = Address::generate(&env);
     let asset_id1 = generate_asset_id(&env, 1);
@@ -215,19 +222,21 @@ fn test_transfer_asset_multiple_assets_per_owner() {
 
     client.transfer_asset(&asset_id1, &new_owner);
 
-    let owner_assets: Vec<BytesN<32>> = env
-        .storage()
-        .persistent()
-        .get(&DataKey::OwnerAssets(owner))
-        .unwrap();
+    let owner_assets: Vec<BytesN<32>> = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .get(&DataKey::OwnerAssets(owner))
+            .unwrap()
+    });
     assert_eq!(owner_assets.len(), 1);
     assert_eq!(owner_assets.get(0).unwrap(), asset_id2);
 
-    let new_owner_assets: Vec<BytesN<32>> = env
-        .storage()
-        .persistent()
-        .get(&DataKey::OwnerAssets(new_owner))
-        .unwrap();
+    let new_owner_assets: Vec<BytesN<32>> = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .get(&DataKey::OwnerAssets(new_owner))
+            .unwrap()
+    });
     assert_eq!(new_owner_assets.len(), 1);
     assert_eq!(new_owner_assets.get(0).unwrap(), asset_id1);
 }
@@ -236,7 +245,7 @@ fn test_transfer_asset_multiple_assets_per_owner() {
 #[should_panic(expected = "asset not found")]
 fn test_transfer_asset_not_found() {
     let env = create_env();
-    let (client, _admin) = setup_contract(&env);
+    let (client, _admin, _) = setup_contract(&env);
     let new_owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 99);
 
@@ -248,7 +257,7 @@ fn test_transfer_asset_not_found() {
 #[should_panic(expected = "cannot transfer a retired asset")]
 fn test_transfer_asset_retired() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, admin, _) = setup_contract(&env);
     let owner = Address::generate(&env);
     let new_owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
@@ -264,29 +273,33 @@ fn test_transfer_asset_retired() {
 #[test]
 fn test_transfer_asset_emits_event() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, admin, _) = setup_contract(&env);
     let owner = Address::generate(&env);
     let new_owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
+    let asset = create_test_asset(&env, &owner, asset_id.clone());
 
     env.mock_all_auths();
-    register_test_asset(&client, &env, &admin, &owner, asset_id.clone());
+    client.register_asset(&admin, &asset);
 
     let initial_events = env.events().all().len();
 
+    env.mock_all_auths();
     client.transfer_asset(&asset_id, &new_owner);
 
     let final_events = env.events().all().len();
     assert!(
         final_events > initial_events,
-        "Expected asset transferred event to be emitted"
+        "Expected asset transferred event to be emitted, initial={}, final={}",
+        initial_events,
+        final_events
     );
 }
 
 #[test]
 fn test_authorized_registrar_can_register() {
     let env = create_env();
-    let (client, admin) = setup_contract(&env);
+    let (client, _admin, _) = setup_contract(&env);
     let new_registrar = Address::generate(&env);
     let owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
