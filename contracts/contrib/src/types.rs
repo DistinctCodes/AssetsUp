@@ -51,6 +51,12 @@ pub enum TokenDataKey {
     ProposalYesVotes(u64),
     /// Accumulated no votes for a proposal
     ProposalNoVotes(u64),
+    /// Detokenization proposal by asset ID
+    DetokenizationProposal(u64),
+    /// Transfer restriction by asset ID
+    TransferRestriction(u64),
+    /// Whitelist for an asset
+    Whitelist(u64),
 }
 
 /// Represents a tokenized asset on-chain
@@ -120,4 +126,32 @@ pub struct Proposal {
     pub deadline: u64,
     pub min_threshold: i128,
     pub status: ProposalStatus,
+}
+
+/// Detokenization status
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DetokenizationStatus {
+    Active,
+    Executed,
+    Rejected,
+}
+
+/// Detokenization proposal
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DetokenizationProposal {
+    pub proposal_id: u64,
+    pub asset_id: u64,
+    pub proposer: Address,
+    pub deadline: u64,
+    pub status: DetokenizationStatus,
+}
+
+/// Transfer restriction
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferRestriction {
+    pub require_accredited: bool,
+    pub geographic_allowed: Vec<String>,
 }

@@ -28,6 +28,13 @@ pub enum Error {
     InvalidPurchaseValue = 19,
     InvalidMetadataUri = 20,
     InvalidOwnerAddress = 21,
+    // Detokenization errors
+    DetokenizationNotApproved = 28,
+    DetokenizationAlreadyProposed = 29,
+    DetokenizationAlreadyExecuted = 30,
+    // Transfer restriction errors
+    TransferRestrictionFailed = 31,
+    AccreditedInvestorRequired = 32,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
