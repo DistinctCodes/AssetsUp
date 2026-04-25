@@ -11,6 +11,9 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const asset_entity_1 = require("./asset.entity");
 const asset_history_entity_1 = require("./asset-history.entity");
+const asset_note_entity_1 = require("./asset-note.entity");
+const maintenance_entity_1 = require("./maintenance.entity");
+const asset_document_entity_1 = require("./asset-document.entity");
 const assets_service_1 = require("./assets.service");
 const assets_controller_1 = require("./assets.controller");
 let AssetsModule = class AssetsModule {
@@ -18,7 +21,7 @@ let AssetsModule = class AssetsModule {
 exports.AssetsModule = AssetsModule;
 exports.AssetsModule = AssetsModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([asset_entity_1.Asset, asset_history_entity_1.AssetHistory])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([asset_entity_1.Asset, asset_history_entity_1.AssetHistory, asset_note_entity_1.AssetNote, maintenance_entity_1.Maintenance, asset_document_entity_1.AssetDocument])],
         providers: [assets_service_1.AssetsService],
         controllers: [assets_controller_1.AssetsController],
         exports: [assets_service_1.AssetsService],
