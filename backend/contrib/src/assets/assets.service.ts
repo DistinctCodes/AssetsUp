@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Asset } from './asset.entity';
 import { AssetHistory } from './asset-history.entity';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { AssetFiltersDto } from './dto/asset-filters.dto';
 import { AssetHistoryAction } from './enums';
 
 @Injectable()
@@ -14,6 +15,44 @@ export class AssetsService {
     @InjectRepository(AssetHistory)
     private readonly historyRepo: Repository<AssetHistory>,
   ) {}
+
+  async findAll(filters: AssetFiltersDto): Promise<{ data: Asset[]; total: number; page: number; limit: number }> {
+    const { search, status, condition, categoryId, departmentId, page = 1, limit = 20 } = filters;
+    const qb = this.assetRepo.createQueryBuilder('asset')
+      .leftJoinAndSelect('asset.history', 'history')
+      .where('asset.deletedAt IS NULL');
+
+    if (search) {
+      const term = `%${search}%`;
+      qb.andWhere(
+        `(asset.name ILIKE :term OR asset.assetId ILIKE :term OR asset.serialNumber ILIKE :term OR asset.manufacturer ILIKE :term OR asset.model ILIKE :term)`,
+        { term },
+      );
+    }
+
+    if (status) {
+      qb.andWhere('asset.status = :status', { status });
+    }
+
+    if (condition) {
+      qb.andWhere('asset.condition = :condition', { condition });
+    }
+
+    if (categoryId) {
+      qb.andWhere('asset.categoryId = :categoryId', { categoryId });
+    }
+
+    if (departmentId) {
+      qb.andWhere('asset.departmentId = :departmentId', { departmentId });
+    }
+
+    const [data, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data, total, page, limit };
+  }
 
   async findOne(id: string): Promise<Asset> {
     const asset = await this.assetRepo.findOne({

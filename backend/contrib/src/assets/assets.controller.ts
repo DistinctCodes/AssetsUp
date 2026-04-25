@@ -6,12 +6,14 @@ import {
   Post,
   Param,
   Body,
+  Query,
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { AssetFiltersDto } from './dto/asset-filters.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -21,6 +23,13 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @Controller('assets')
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'List assets with filters and pagination' })
+  @ApiResponse({ status: 200, description: 'Returns paginated assets' })
+  async findAll(@Query() filters: AssetFiltersDto) {
+    return this.assetsService.findAll(filters);
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a single asset by ID with all relations' })
