@@ -1,17 +1,16 @@
-export declare class UpdateAssetDto {
-    name?: string;
+export declare class CreateAssetDto {
+    name: string;
+    categoryId: string;
+    departmentId: string;
     description?: string;
     serialNumber?: string;
-    categoryId?: string;
-    departmentId?: string;
-    location?: string;
-    value?: number;
+    purchaseDate?: string;
     purchasePrice?: number;
     currentValue?: number;
-    purchaseDate?: string;
     warrantyExpiration?: string;
     status?: string;
     condition?: string;
+    location?: string;
     assignedToId?: string;
     manufacturer?: string;
     model?: string;

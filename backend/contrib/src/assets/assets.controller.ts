@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
+import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { AssetFiltersDto } from './dto/asset-filters.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,6 +24,16 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @Controller('assets')
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new asset' })
+  @ApiResponse({ status: 201, description: 'Asset created' })
+  async create(
+    @Body() dto: CreateAssetDto,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.assetsService.create(dto, userId);
+  }
 
   @Get()
   @ApiOperation({ summary: 'List assets with filters and pagination' })

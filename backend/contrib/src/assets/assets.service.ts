@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Asset } from './asset.entity';
 import { AssetHistory } from './asset-history.entity';
+import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { AssetFiltersDto } from './dto/asset-filters.dto';
 import { AssetHistoryAction } from './enums';
@@ -15,6 +16,42 @@ export class AssetsService {
     @InjectRepository(AssetHistory)
     private readonly historyRepo: Repository<AssetHistory>,
   ) {}
+
+  private async generateAssetId(): Promise<string> {
+    const result = await this.assetRepo
+      .createQueryBuilder('asset')
+      .select("MAX(CAST(SUBSTRING(asset.assetId, 5) AS INTEGER))", 'max')
+      .where("asset.assetId LIKE 'AST-%'")
+      .getRawOne<{ max: string | null }>();
+
+    const max = result?.max ? parseInt(result.max, 10) : 1000;
+    return `AST-${max + 1}`;
+  }
+
+  async create(dto: CreateAssetDto, createdBy: string): Promise<Asset> {
+    const assetId = await this.generateAssetId();
+
+    const asset = this.assetRepo.create({
+      ...dto,
+      assetId,
+      createdBy,
+    });
+
+    const saved = await this.assetRepo.save(asset);
+
+    const history = this.historyRepo.create({
+      asset: saved,
+      action: AssetHistoryAction.CREATED,
+      changes: null,
+      performedBy: createdBy,
+    });
+    await this.historyRepo.save(history);
+
+    return this.assetRepo.findOneOrFail({
+      where: { id: saved.id },
+      relations: ['history'],
+    });
+  }
 
   async findAll(filters: AssetFiltersDto): Promise<{ data: Asset[]; total: number; page: number; limit: number }> {
     const { search, status, condition, categoryId, departmentId, page = 1, limit = 20 } = filters;

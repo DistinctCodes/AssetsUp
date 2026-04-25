@@ -24,6 +24,35 @@ let AssetsService = class AssetsService {
         this.assetRepo = assetRepo;
         this.historyRepo = historyRepo;
     }
+    async generateAssetId() {
+        const result = await this.assetRepo
+            .createQueryBuilder('asset')
+            .select("MAX(CAST(SUBSTRING(asset.assetId, 5) AS INTEGER))", 'max')
+            .where("asset.assetId LIKE 'AST-%'")
+            .getRawOne();
+        const max = result?.max ? parseInt(result.max, 10) : 1000;
+        return `AST-${max + 1}`;
+    }
+    async create(dto, createdBy) {
+        const assetId = await this.generateAssetId();
+        const asset = this.assetRepo.create({
+            ...dto,
+            assetId,
+            createdBy,
+        });
+        const saved = await this.assetRepo.save(asset);
+        const history = this.historyRepo.create({
+            asset: saved,
+            action: enums_1.AssetHistoryAction.CREATED,
+            changes: null,
+            performedBy: createdBy,
+        });
+        await this.historyRepo.save(history);
+        return this.assetRepo.findOneOrFail({
+            where: { id: saved.id },
+            relations: ['history'],
+        });
+    }
     async findAll(filters) {
         const { search, status, condition, categoryId, departmentId, page = 1, limit = 20 } = filters;
         const qb = this.assetRepo.createQueryBuilder('asset')

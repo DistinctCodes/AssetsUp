@@ -47,14 +47,32 @@ export class Asset {
   @Column({ type: 'decimal', precision: 18, scale: 2, nullable: true })
   value: number | null;
 
+  @Column({ type: 'decimal', precision: 18, scale: 2, nullable: true })
+  purchasePrice: number | null;
+
+  @Column({ type: 'decimal', precision: 18, scale: 2, nullable: true })
+  currentValue: number | null;
+
   @Column({ nullable: true })
   purchaseDate: Date | null;
+
+  @Column({ nullable: true })
+  warrantyExpiration: Date | null;
 
   @Column({ type: 'enum', enum: ['ACTIVE', 'INACTIVE', 'MAINTENANCE', 'RETIRED'], default: 'ACTIVE' })
   status: string;
 
   @Column({ nullable: true })
-  assignedTo: string | null;
+  assignedToId: string | null;
+
+  @Column({ type: 'simple-array', nullable: true })
+  tags: string[] | null;
+
+  @Column({ type: 'text', nullable: true })
+  notes: string | null;
+
+  @Column({ nullable: true })
+  createdBy: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

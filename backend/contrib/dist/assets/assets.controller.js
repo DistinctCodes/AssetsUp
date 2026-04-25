@@ -16,6 +16,7 @@ exports.AssetsController = void 0;
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const assets_service_1 = require("./assets.service");
+const create_asset_dto_1 = require("./dto/create-asset.dto");
 const update_asset_dto_1 = require("./dto/update-asset.dto");
 const asset_filters_dto_1 = require("./dto/asset-filters.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
@@ -23,6 +24,9 @@ const current_user_decorator_1 = require("../auth/decorators/current-user.decora
 let AssetsController = class AssetsController {
     constructor(assetsService) {
         this.assetsService = assetsService;
+    }
+    async create(dto, userId) {
+        return this.assetsService.create(dto, userId);
     }
     async findAll(filters) {
         return this.assetsService.findAll(filters);
@@ -41,6 +45,16 @@ let AssetsController = class AssetsController {
     }
 };
 exports.AssetsController = AssetsController;
+__decorate([
+    (0, common_1.Post)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Create a new asset' }),
+    (0, swagger_1.ApiResponse)({ status: 201, description: 'Asset created' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)('userId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [create_asset_dto_1.CreateAssetDto, String]),
+    __metadata("design:returntype", Promise)
+], AssetsController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({ summary: 'List assets with filters and pagination' }),

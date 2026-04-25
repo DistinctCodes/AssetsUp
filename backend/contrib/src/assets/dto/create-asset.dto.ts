@@ -1,9 +1,17 @@
-import { IsOptional, IsString, IsNumber, IsDateString, IsEnum, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsDateString, IsEnum, IsArray, IsNotEmpty } from 'class-validator';
 
-export class UpdateAssetDto {
-  @IsOptional()
+export class CreateAssetDto {
+  @IsNotEmpty()
   @IsString()
-  name?: string;
+  name: string;
+
+  @IsNotEmpty()
+  @IsString()
+  categoryId: string;
+
+  @IsNotEmpty()
+  @IsString()
+  departmentId: string;
 
   @IsOptional()
   @IsString()
@@ -14,20 +22,8 @@ export class UpdateAssetDto {
   serialNumber?: string;
 
   @IsOptional()
-  @IsString()
-  categoryId?: string;
-
-  @IsOptional()
-  @IsString()
-  departmentId?: string;
-
-  @IsOptional()
-  @IsString()
-  location?: string;
-
-  @IsOptional()
-  @IsNumber()
-  value?: number;
+  @IsDateString()
+  purchaseDate?: string;
 
   @IsOptional()
   @IsNumber()
@@ -36,10 +32,6 @@ export class UpdateAssetDto {
   @IsOptional()
   @IsNumber()
   currentValue?: number;
-
-  @IsOptional()
-  @IsDateString()
-  purchaseDate?: string;
 
   @IsOptional()
   @IsDateString()
@@ -52,6 +44,10 @@ export class UpdateAssetDto {
   @IsOptional()
   @IsEnum(['NEW', 'GOOD', 'FAIR', 'POOR', 'DAMAGED'])
   condition?: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
 
   @IsOptional()
   @IsString()

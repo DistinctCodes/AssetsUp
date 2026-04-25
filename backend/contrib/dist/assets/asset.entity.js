@@ -64,9 +64,21 @@ __decorate([
     __metadata("design:type", Number)
 ], Asset.prototype, "value", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 18, scale: 2, nullable: true }),
+    __metadata("design:type", Number)
+], Asset.prototype, "purchasePrice", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 18, scale: 2, nullable: true }),
+    __metadata("design:type", Number)
+], Asset.prototype, "currentValue", void 0);
+__decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", Date)
 ], Asset.prototype, "purchaseDate", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", Date)
+], Asset.prototype, "warrantyExpiration", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'enum', enum: ['ACTIVE', 'INACTIVE', 'MAINTENANCE', 'RETIRED'], default: 'ACTIVE' }),
     __metadata("design:type", String)
@@ -74,7 +86,19 @@ __decorate([
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
-], Asset.prototype, "assignedTo", void 0);
+], Asset.prototype, "assignedToId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'simple-array', nullable: true }),
+    __metadata("design:type", Array)
+], Asset.prototype, "tags", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Asset.prototype, "notes", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Asset.prototype, "createdBy", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

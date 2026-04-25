@@ -1,12 +1,15 @@
 import { Repository } from 'typeorm';
 import { Asset } from './asset.entity';
 import { AssetHistory } from './asset-history.entity';
+import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { AssetFiltersDto } from './dto/asset-filters.dto';
 export declare class AssetsService {
     private readonly assetRepo;
     private readonly historyRepo;
     constructor(assetRepo: Repository<Asset>, historyRepo: Repository<AssetHistory>);
+    private generateAssetId;
+    create(dto: CreateAssetDto, createdBy: string): Promise<Asset>;
     findAll(filters: AssetFiltersDto): Promise<{
         data: Asset[];
         total: number;

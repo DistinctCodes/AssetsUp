@@ -12,9 +12,15 @@ export declare class Asset {
     location: string | null;
     condition: string | null;
     value: number | null;
+    purchasePrice: number | null;
+    currentValue: number | null;
     purchaseDate: Date | null;
+    warrantyExpiration: Date | null;
     status: string;
-    assignedTo: string | null;
+    assignedToId: string | null;
+    tags: string[] | null;
+    notes: string | null;
+    createdBy: string | null;
     createdAt: Date;
     updatedAt: Date;
     deletedAt: Date | null;
