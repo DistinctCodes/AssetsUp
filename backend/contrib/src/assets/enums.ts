@@ -1,0 +1,13 @@
+export enum AssetStatus {
+  ACTIVE = 'ACTIVE',
+  ASSIGNED = 'ASSIGNED',
+  MAINTENANCE = 'MAINTENANCE',
+  RETIRED = 'RETIRED',
+}
+
+export enum AssetHistoryAction {
+  STATUS_CHANGED = 'STATUS_CHANGED',
+  TRANSFERRED = 'TRANSFERRED',
+  DELETED = 'DELETED',
+  TAGS_UPDATED = 'TAGS_UPDATED',
+}
