@@ -49,6 +49,8 @@ export interface ReportsSummary {
   byStatus: Record<string, number>;
   byCategory: { name: string; count: number }[];
   byDepartment: { name: string; count: number }[];
+  recent?: Asset[];
+  monthlyTrends?: { month: string; count: number }[];
 }
 
 export interface AssetListResponse {
