@@ -20,7 +20,7 @@ import { PasswordResetToken } from './password-reset-token.entity';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret: configService.get<string>('JWT_ACCESS_SECRET', 'secret'),
         signOptions: { expiresIn: '15m' },
       }),
       inject: [ConfigService],

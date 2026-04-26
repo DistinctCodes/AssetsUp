@@ -14,6 +14,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
 import { PasswordResetToken } from './password-reset-token.entity';
+import { User } from '../users/user.entity';
+import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
@@ -35,18 +37,28 @@ export class AuthService {
     const user = await this.usersService.create({ ...dto, password });
 
     const { accessToken, refreshToken } = await this.generateTokens(user.id, user.email);
-
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-      },
+      user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role },
     };
+  }
+
+  async login(dto: LoginDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    const passwordMatch = await bcrypt.compare(dto.password, user.password);
+    if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
+
+    const tokens = await this.generateTokens(user.id, user.email);
+    const { password, refreshToken, ...safeUser } = user as User & { password: string; refreshToken: string };
+    return { ...tokens, user: safeUser };
+  }
+
+  async logout(userId: string) {
+    await this.usersService.save({ id: userId, refreshToken: null });
+    return { message: 'Logged out successfully' };
   }
 
   async refresh(rawRefreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
@@ -65,9 +77,7 @@ export class AuthService {
     }
 
     const tokenMatches = await bcrypt.compare(rawRefreshToken, user.refreshToken);
-    if (!tokenMatches) {
-      throw new UnauthorizedException('Refresh token mismatch');
-    }
+    if (!tokenMatches) throw new UnauthorizedException('Refresh token mismatch');
 
     return this.generateTokens(user.id, user.email);
   }
@@ -94,9 +104,7 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<void> {
     const user = await this.usersService.findByEmail(email);
-    if (!user) {
-      throw new NotFoundException('User with this email does not exist');
-    }
+    if (!user) throw new NotFoundException('User with this email does not exist');
 
     const resetToken = uuidv4();
     const tokenHash = await bcrypt.hash(resetToken, 10);
@@ -122,9 +130,7 @@ export class AuthService {
       }
     }
 
-    if (!validToken) {
-      throw new BadRequestException('Invalid or expired reset token');
-    }
+    if (!validToken) throw new BadRequestException('Invalid or expired reset token');
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await this.usersService.save({ id: validToken.userId, password: hashedPassword });
