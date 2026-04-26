@@ -96,3 +96,6 @@ impl EscrowContract {
         env.storage().persistent().get(&escrow_id).unwrap()
     }
 }
+
+#[cfg(test)]
+mod test;
