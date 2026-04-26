@@ -1,16 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 
 @Injectable()
 export class HealthService {
-  constructor(private dataSource: DataSource) {}
+  constructor(
+    private health: HealthCheckService,
+    private db: TypeOrmHealthIndicator,
+  ) {}
 
   async check() {
     const timestamp = new Date();
     const uptime = process.uptime();
     let database = 'disconnected';
     try {
-      await this.dataSource.query('SELECT 1');
+      await this.db.pingCheck('database');
       database = 'connected';
     } catch (error) {
       // remain disconnected
