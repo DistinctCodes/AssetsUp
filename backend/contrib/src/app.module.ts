@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { AssetsModule } from './assets/assets.module';
-import { AuditLogModule } from './audit-log/audit-log.module';
-import { AuditLogInterceptor } from './audit-log/audit-log.interceptor';
+import { HealthModule } from './health/health.module';
+import { ReportsModule } from './reports/reports.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -24,16 +26,22 @@ import { AuditLogInterceptor } from './audit-log/audit-log.interceptor';
         synchronize: config.get('NODE_ENV') !== 'production',
       }),
     }),
+    ThrottlerModule.forRoot({
+      ttl: 60,
+      limit: 100,
+    }),
     UsersModule,
     AuthModule,
     AssetsModule,
-    AuditLogModule,
+    HealthModule,
   ],
   providers: [
     {
-      provide: APP_INTERCEPTOR,
-      useClass: AuditLogInterceptor,
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
+    ReportsModule,
+    UploadModule,
   ],
 })
 export class AppModule {}
