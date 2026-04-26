@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -8,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
 import { PasswordResetToken } from './password-reset-token.entity';
+import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -20,8 +27,29 @@ export class AuthService {
     private readonly passwordResetTokenRepository: Repository<PasswordResetToken>,
   ) {}
 
+  async register(dto: RegisterDto) {
+    const existing = await this.usersService.findByEmail(dto.email);
+    if (existing) throw new ConflictException('Email already in use');
+
+    const password = await bcrypt.hash(dto.password, 10);
+    const user = await this.usersService.create({ ...dto, password });
+
+    const { accessToken, refreshToken } = await this.generateTokens(user.id, user.email);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+      },
+    };
+  }
+
   async refresh(rawRefreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
-    // Decode token to get user id without verifying (we verify via bcrypt hash)
     let payload: { sub: string };
     try {
       payload = this.jwtService.verify(rawRefreshToken, {
@@ -75,23 +103,14 @@ export class AuthService {
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 15);
 
-    await this.passwordResetTokenRepository.save({
-      userId: user.id,
-      tokenHash,
-      expiresAt,
-    });
-
+    await this.passwordResetTokenRepository.save({ userId: user.id, tokenHash, expiresAt });
     await this.mailService.sendPasswordResetEmail(email, resetToken);
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
     const resetTokens = await this.passwordResetTokenRepository.find({
-      where: {
-        usedAt: null,
-      },
-      order: {
-        createdAt: 'DESC',
-      },
+      where: { usedAt: null },
+      order: { createdAt: 'DESC' },
     });
 
     let validToken = null;
@@ -108,14 +127,7 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await this.usersService.save({
-      id: validToken.userId,
-      password: hashedPassword,
-    });
-
-    await this.passwordResetTokenRepository.update(
-      { id: validToken.id },
-      { usedAt: new Date() }
-    );
+    await this.usersService.save({ id: validToken.userId, password: hashedPassword });
+    await this.passwordResetTokenRepository.update({ id: validToken.id }, { usedAt: new Date() });
   }
 }
