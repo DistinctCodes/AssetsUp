@@ -135,13 +135,13 @@ fn test_register_asset_emits_event() {
 #[test]
 fn test_add_authorized_registrar() {
     let env = create_env();
-    let (client, _admin) = setup_contract(&env);
+    let (client, admin) = setup_contract(&env);
     let new_registrar = Address::generate(&env);
 
     assert!(!client.is_authorized_registrar(&new_registrar));
 
     env.mock_all_auths();
-    client.add_authorized_registrar(&new_registrar);
+    client.add_authorized_registrar(&admin, &new_registrar);
 
     assert!(client.is_authorized_registrar(&new_registrar));
 }
@@ -149,16 +149,60 @@ fn test_add_authorized_registrar() {
 #[test]
 fn test_authorized_registrar_can_register() {
     let env = create_env();
-    let (client, _admin) = setup_contract(&env);
+    let (client, admin) = setup_contract(&env);
     let new_registrar = Address::generate(&env);
     let owner = Address::generate(&env);
     let asset_id = generate_asset_id(&env, 1);
     let asset = create_test_asset(&env, &owner, asset_id);
 
     env.mock_all_auths();
-    client.add_authorized_registrar(&new_registrar);
+    client.add_authorized_registrar(&admin, &new_registrar);
 
     client.register_asset(&new_registrar, &asset);
 
     assert_eq!(client.get_total_count(), 1);
+}
+
+#[test]
+fn test_get_assets_by_owner_registry() {
+    let env = create_env();
+    let (client, admin) = setup_contract(&env);
+    let owner = Address::generate(&env);
+    let asset1 = create_test_asset(&env, &owner, generate_asset_id(&env, 1));
+    let asset2 = create_test_asset(&env, &owner, generate_asset_id(&env, 2));
+
+    env.mock_all_auths();
+    client.register_asset(&admin, &asset1);
+    client.register_asset(&admin, &asset2);
+
+    let owner_assets = client.get_assets_by_owner(&owner);
+    assert_eq!(owner_assets.len(), 2);
+    assert_eq!(owner_assets.get(0).unwrap(), asset1.id);
+    assert_eq!(owner_assets.get(1).unwrap(), asset2.id);
+}
+
+#[test]
+fn test_audit_log_records_register_transfer_retire() {
+    let env = create_env();
+    let (client, admin) = setup_contract(&env);
+    let owner = Address::generate(&env);
+    let new_owner = Address::generate(&env);
+    let asset_id = generate_asset_id(&env, 1);
+    let asset = create_test_asset(&env, &owner, asset_id.clone());
+
+    env.mock_all_auths();
+    client.register_asset(&admin, &asset);
+    client.transfer_asset(&asset_id, &new_owner, &owner);
+    client.retire_asset(&asset_id, &new_owner);
+
+    let logs = client.get_audit_logs(&asset_id);
+    assert_eq!(logs.len(), 3);
+
+    let first_entry = logs.get(0).unwrap();
+    assert_eq!(first_entry.log_id, 1);
+    assert_eq!(first_entry.action, String::from_str(&env, "register"));
+
+    let last_entry = logs.get(2).unwrap();
+    assert_eq!(last_entry.log_id, 3);
+    assert_eq!(last_entry.action, String::from_str(&env, "retire"));
 }
