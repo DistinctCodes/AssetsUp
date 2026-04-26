@@ -27,30 +27,33 @@ export class UsersService {
     return user;
   }
 
-  async findByEmail(email: string): Promise<User> {
-    const user = await this.usersRepo
+  async findByEmail(email: string): Promise<User | null> {
+    return this.usersRepo
       .createQueryBuilder('user')
       .addSelect('user.password')
+      .addSelect('user.refreshToken')
       .where('user.email = :email', { email })
       .getOne();
-    if (!user) throw new NotFoundException(`User with email ${email} not found`);
-    return user;
+  }
+
+  findById(id: string): Promise<User | null> {
+    return this.usersRepo
+      .createQueryBuilder('user')
+      .addSelect('user.refreshToken')
+      .where('user.id = :id', { id })
+      .getOne();
   }
 
   create(data: Partial<User>): Promise<User> {
     return this.usersRepo.save(this.usersRepo.create(data));
   }
 
-  async updateRefreshToken(id: string, token: string | null): Promise<void> {
-    await this.usersRepo.update(id, { refreshToken: token });
+  save(user: Partial<User>): Promise<User> {
+    return this.usersRepo.save(user);
   }
 
-  findByIdWithRefreshToken(id: string): Promise<User> {
-    return this.usersRepo
-      .createQueryBuilder('user')
-      .addSelect('user.refreshToken')
-      .where('user.id = :id', { id })
-      .getOne();
+  async updateRefreshToken(id: string, token: string | null): Promise<void> {
+    await this.usersRepo.update(id, { refreshToken: token });
   }
 
   async updateRole(id: string, role: UserRole): Promise<User> {
