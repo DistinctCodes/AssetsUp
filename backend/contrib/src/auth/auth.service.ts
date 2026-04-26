@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,6 +16,7 @@ import { MailService } from '../mail/mail.service';
 import { PasswordResetToken } from './password-reset-token.entity';
 import { User } from '../users/user.entity';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +28,21 @@ export class AuthService {
     @InjectRepository(PasswordResetToken)
     private readonly passwordResetTokenRepository: Repository<PasswordResetToken>,
   ) {}
+
+  async register(dto: RegisterDto) {
+    const existing = await this.usersService.findByEmail(dto.email);
+    if (existing) throw new ConflictException('Email already in use');
+
+    const password = await bcrypt.hash(dto.password, 10);
+    const user = await this.usersService.create({ ...dto, password });
+
+    const { accessToken, refreshToken } = await this.generateTokens(user.id, user.email);
+    return {
+      accessToken,
+      refreshToken,
+      user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role },
+    };
+  }
 
   async login(dto: LoginDto) {
     const user = await this.usersService.findByEmail(dto.email);
@@ -55,9 +77,7 @@ export class AuthService {
     }
 
     const tokenMatches = await bcrypt.compare(rawRefreshToken, user.refreshToken);
-    if (!tokenMatches) {
-      throw new UnauthorizedException('Refresh token mismatch');
-    }
+    if (!tokenMatches) throw new UnauthorizedException('Refresh token mismatch');
 
     return this.generateTokens(user.id, user.email);
   }
@@ -84,21 +104,14 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<void> {
     const user = await this.usersService.findByEmail(email);
-    if (!user) {
-      throw new NotFoundException('User with this email does not exist');
-    }
+    if (!user) throw new NotFoundException('User with this email does not exist');
 
     const resetToken = uuidv4();
     const tokenHash = await bcrypt.hash(resetToken, 10);
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 15);
 
-    await this.passwordResetTokenRepository.save({
-      userId: user.id,
-      tokenHash,
-      expiresAt,
-    });
-
+    await this.passwordResetTokenRepository.save({ userId: user.id, tokenHash, expiresAt });
     await this.mailService.sendPasswordResetEmail(email, resetToken);
   }
 
@@ -117,13 +130,10 @@ export class AuthService {
       }
     }
 
-    if (!validToken) {
-      throw new BadRequestException('Invalid or expired reset token');
-    }
+    if (!validToken) throw new BadRequestException('Invalid or expired reset token');
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await this.usersService.save({ id: validToken.userId, password: hashedPassword });
-
     await this.passwordResetTokenRepository.update({ id: validToken.id }, { usedAt: new Date() });
   }
 }

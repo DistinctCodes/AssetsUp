@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Headers, UseGuards, UnauthorizedException 
 import { ApiOperation, ApiResponse, ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -12,6 +13,14 @@ import { User } from '../users/user.entity';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  @ApiOperation({ summary: 'Register a new user' })
+  @ApiResponse({ status: 201, description: 'User registered successfully' })
+  @ApiResponse({ status: 409, description: 'Email already in use' })
+  register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
 
   @Post('login')
   @ApiOperation({ summary: 'Login with email and password' })
@@ -47,16 +56,15 @@ export class AuthController {
     if (!authHeader?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing Bearer token');
     }
-    const refreshToken = authHeader.slice(7);
-    return this.authService.refresh(refreshToken);
+    return this.authService.refresh(authHeader.slice(7));
   }
 
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset email' })
   @ApiResponse({ status: 200, description: 'Password reset email sent' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    await this.authService.forgotPassword(forgotPasswordDto.email);
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(dto.email);
     return { message: 'Password reset email sent' };
   }
 
@@ -64,8 +72,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Reset password with token' })
   @ApiResponse({ status: 200, description: 'Password reset successful' })
   @ApiResponse({ status: 400, description: 'Invalid or expired token' })
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    await this.authService.resetPassword(resetPasswordDto.token, resetPasswordDto.newPassword);
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
     return { message: 'Password reset successful' };
   }
 }
