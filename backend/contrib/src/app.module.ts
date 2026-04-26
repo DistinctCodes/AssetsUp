@@ -7,6 +7,8 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { AssetsModule } from './assets/assets.module';
 import { HealthModule } from './health/health.module';
+import { ReportsModule } from './reports/reports.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { HealthModule } from './health/health.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    ReportsModule,
+    UploadModule,
   ],
 })
 export class AppModule {}

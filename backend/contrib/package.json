@@ -23,15 +23,22 @@
     "@nestjs/terminus": "^11.1.1",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^10.0.2",
+    "@types/nodemailer": "^8.0.0",
+    "@types/pdfkit": "^0.17.6",
+    "@types/uuid": "^10.0.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
+    "exceljs": "^4.4.0",
+    "nodemailer": "^8.0.6",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pdfkit": "^0.18.0",
     "pg": "^8.11.3",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.27"
+    "typeorm": "^0.3.27",
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
