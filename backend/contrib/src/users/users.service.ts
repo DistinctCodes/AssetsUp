@@ -7,18 +7,27 @@ import { User } from './user.entity';
 export class UsersService {
   constructor(
     @InjectRepository(User)
-    private readonly usersRepository: Repository<User>,
+    private readonly usersRepo: Repository<User>,
   ) {}
 
   findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { email } });
+    return this.usersRepo
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .addSelect('user.refreshToken')
+      .where('user.email = :email', { email })
+      .getOne();
   }
 
   findById(id: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { id } });
+    return this.usersRepo
+      .createQueryBuilder('user')
+      .addSelect('user.refreshToken')
+      .where('user.id = :id', { id })
+      .getOne();
   }
 
-  updateRefreshToken(id: string, refreshToken: string | null): Promise<void> {
-    return this.usersRepository.update(id, { refreshToken }).then(() => undefined);
+  save(user: Partial<User>): Promise<User> {
+    return this.usersRepo.save(user);
   }
 }

@@ -1,38 +1,40 @@
-use soroban_sdk::{Env, panic};
+use crate::DataKey;
+use soroban_sdk::{Address, Env};
 
-#[derive(Clone)]
-pub enum DataKey {
-    Paused,
-    // other keys...
-}
-
-pub fn pause(env: &Env) {
-    require_admin(env);
-    env.storage().set(&DataKey::Paused, &true);
+pub fn pause(env: &Env, caller: Address) {
+    caller.require_auth();
+    let admin: Address = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Admin)
+        .expect("Not initialized");
+    if caller != admin {
+        panic!("Only admin can call this function");
+    }
+    env.storage().persistent().set(&DataKey::Paused, &true);
     env.events().publish(("pause",), ());
 }
 
-pub fn unpause(env: &Env) {
-    require_admin(env);
-    env.storage().set(&DataKey::Paused, &false);
+pub fn unpause(env: &Env, caller: Address) {
+    caller.require_auth();
+    let admin: Address = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Admin)
+        .expect("Not initialized");
+    if caller != admin {
+        panic!("Only admin can call this function");
+    }
+    env.storage().persistent().set(&DataKey::Paused, &false);
     env.events().publish(("unpause",), ());
 }
 
 pub fn is_paused(env: &Env) -> bool {
-    env.storage().get(&DataKey::Paused).unwrap_or(false)
+    env.storage().persistent().get(&DataKey::Paused).unwrap_or(false)
 }
 
 pub fn require_not_paused(env: &Env) {
     if is_paused(env) {
         panic!("Contract is paused");
-    }
-}
-
-// Helper: ensure caller is admin
-fn require_admin(env: &Env) {
-    let caller = env.invoker();
-    let admin: Address = env.storage().get(&DataKey::Admin).unwrap();
-    if caller != admin {
-        panic!("Only admin can call this function");
     }
 }

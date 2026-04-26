@@ -1,14 +1,15 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
 export enum UserRole {
-  ADMIN = 'admin',
-  USER = 'user',
+  ADMIN = 'ADMIN',
+  MANAGER = 'MANAGER',
+  STAFF = 'STAFF',
 }
 
 @Entity('users')
@@ -20,18 +21,18 @@ export class User {
   email: string;
 
   @Column()
-  password: string;
-
-  @Column()
   firstName: string;
 
   @Column()
   lastName: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  @Column({ select: false })
+  password: string;
+
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.STAFF })
   role: UserRole;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, select: false })
   refreshToken: string | null;
 
   @CreateDateColumn()

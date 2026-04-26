@@ -1,7 +1,7 @@
 // frontend/app/(dashboard)/assets/[id]/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -18,6 +18,8 @@ import {
   CheckCircle,
   Upload,
   Plus,
+  Printer,
+  QrCode,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -253,6 +255,7 @@ export default function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
+  const [qrCodeDataUri, setQrCodeDataUri] = useState<string | null>(null);
 
   // Confirm dialogs
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -283,6 +286,44 @@ export default function AssetDetailPage() {
   const { mutate: addNote, isPending: addingNote } = useCreateNote(id, {
     onSuccess: () => setNoteContent(""),
   });
+
+  // Fetch QR code when asset loads
+  useEffect(() => {
+    if (!asset?.id) return;
+
+    const fetchQRCode = async () => {
+      try {
+        const response = await fetch(`/api/assets/${asset.id}/qr`);
+        if (response.ok) {
+          const blob = await response.blob();
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setQrCodeDataUri(reader.result as string);
+          };
+          reader.readAsDataURL(blob);
+        }
+      } catch (error) {
+        console.error('Failed to fetch QR code:', error);
+      }
+    };
+
+    fetchQRCode();
+  }, [asset?.id]);
+
+  // Print handler
+  const handlePrint = () => {
+    if (!asset) return;
+    
+    // Set page title to asset name
+    const originalTitle = document.title;
+    document.title = asset.name;
+    
+    // Trigger print
+    window.print();
+    
+    // Restore original title
+    document.title = originalTitle;
+  };
 
   if (isLoading) {
     return (
@@ -318,7 +359,7 @@ export default function AssetDetailPage() {
       {/* Back */}
       <button
         onClick={() => router.push("/assets")}
-        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-5 transition-colors"
+        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-5 transition-colors print:hidden"
       >
         <ArrowLeft size={16} />
         Back to Assets
@@ -342,7 +383,7 @@ export default function AssetDetailPage() {
               <ConditionBadge condition={asset.condition} />
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap print:hidden">
             <Button size="sm" variant="outline">
               <ArrowRightLeft size={14} className="mr-1.5" /> Transfer
             </Button>
@@ -360,12 +401,19 @@ export default function AssetDetailPage() {
             >
               <Trash2 size={14} className="mr-1.5" /> Delete
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handlePrint}
+            >
+              <Printer size={14} className="mr-1.5" /> Print
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto">
+      <div className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto print:hidden">
         {tabs.map(({ key, label, icon }) => (
           <button
             key={key}
@@ -388,6 +436,7 @@ export default function AssetDetailPage() {
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="text-sm font-semibold text-gray-900 mb-4">Asset Details</h2>
             <dl className="space-y-3">
+              <DetailRow label="Asset ID" value={asset.assetId} />
               <DetailRow label="Category" value={asset.category?.name} />
               <DetailRow label="Department" value={asset.department?.name} />
               <DetailRow
@@ -448,11 +497,25 @@ export default function AssetDetailPage() {
             </dl>
           </div>
 
+          {/* QR Code - visible in print */}
+          {qrCodeDataUri && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5 print:border-0 print:p-0">
+              <h2 className="text-sm font-semibold text-gray-900 mb-4 print:hidden">QR Code</h2>
+              <div className="flex justify-center print:justify-start">
+                <img
+                  src={qrCodeDataUri}
+                  alt={`QR Code for ${asset.name}`}
+                  className="w-32 h-32 print:w-40 print:h-40"
+                />
+              </div>
+            </div>
+          )}
+
           {(asset.tags?.length || asset.notes) && (
             <div className="bg-white rounded-xl border border-gray-200 p-5 lg:col-span-2">
               {asset.tags && asset.tags.length > 0 && (
                 <div className="mb-4">
-                  <h2 className="text-sm font-semibold text-gray-900 mb-2">Tags</h2>
+                  <h2 className="text-sm font-semibold text-gray-900 mb-2 print:hidden">Tags</h2>
                   <div className="flex flex-wrap gap-1.5">
                     {asset.tags.map((tag) => (
                       <span
@@ -467,7 +530,7 @@ export default function AssetDetailPage() {
               )}
               {asset.notes && (
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900 mb-2">Notes</h2>
+                  <h2 className="text-sm font-semibold text-gray-900 mb-2 print:hidden">Notes</h2>
                   <p className="text-sm text-gray-600 whitespace-pre-wrap">{asset.notes}</p>
                 </div>
               )}
