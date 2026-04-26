@@ -1,135 +1,107 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useLoginMutation } from "@/lib/query/mutations/auth";
-import { useAuthStore } from "@/store/auth.store";
-import { Button } from "@/components/ui/button";
+import { Suspense } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useAuthStore } from '@/store/auth.store';
 
-// Zod schema for login validation
-const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
+const schema = z.object({
+  email: z.string().email('Enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
+type FormValues = z.infer<typeof schema>;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const { setAuth } = useAuthStore();
-  const [apiError, setApiError] = useState("");
+  const searchParams = useSearchParams();
+  const { login, isLoading } = useAuthStore();
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
     setError,
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  });
+    formState: { errors },
+  } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
-  const loginMutation = useLoginMutation({
-    onSuccess: (data) => {
-      setAuth(data.token, data.user);
-      router.push("/dashboard");
-    },
-    onError: (error: any) => {
-      if (error.statusCode === 401) {
-        setApiError("Invalid email or password");
-      } else if (error.errors) {
-        // Handle field-specific errors from API
-        Object.entries(error.errors).forEach(([field, messages]) => {
-          setError(field as keyof LoginFormData, {
-            message: Array.isArray(messages) ? messages[0] : messages,
-          });
-        });
-      } else {
-        setApiError(error.message || "Login failed");
-      }
-    },
-  });
-
-  const onSubmit = (data: LoginFormData) => {
-    setApiError("");
-    loginMutation.mutate(data);
+  const onSubmit = async (values: FormValues) => {
+    try {
+      await login(values);
+      const redirect = searchParams.get('redirect') || '/dashboard';
+      router.push(redirect);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Something went wrong. Please try again.';
+      setError('root', { message });
+    }
   };
 
   return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Sign in to your account</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          Or{" "}
-          <a href="/signup" className="font-medium text-blue-600 hover:text-blue-500">
-            create a new account
-          </a>
-        </p>
-      </div>
+    <>
+      <h2 className="text-xl font-semibold text-gray-900 mb-1">Welcome back</h2>
+      <p className="text-sm text-gray-500 mb-6">Sign in to your account to continue</p>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Email Field */}
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            Email address
-          </label>
-          <div className="mt-1">
-            <input
-              {...register("email")}
-              type="email"
-              autoComplete="email"
-              className={`block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                errors.email ? "border-red-300" : "border-gray-300"
-              }`}
-              placeholder="Enter your email"
-            />
-            {errors.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-            )}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <Input
+          id="email"
+          label="Email address"
+          type="email"
+          placeholder="you@company.com"
+          autoComplete="email"
+          {...register('email')}
+          error={errors.email?.message}
+        />
+
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-sm font-medium text-gray-700">
+              Password
+            </label>
+            <Link href="/forgot-password" className="text-xs text-gray-500 hover:text-gray-900">
+              Forgot password?
+            </Link>
           </div>
+          <Input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            autoComplete="current-password"
+            {...register('password')}
+            error={errors.password?.message}
+          />
         </div>
 
-        {/* Password Field */}
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            Password
-          </label>
-          <div className="mt-1">
-            <input
-              {...register("password")}
-              type="password"
-              autoComplete="current-password"
-              className={`block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                errors.password ? "border-red-300" : "border-gray-300"
-              }`}
-              placeholder="Enter your password"
-            />
-            {errors.password && (
-              <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-            )}
-          </div>
-        </div>
-
-        {/* API Error */}
-        {apiError && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="text-sm text-red-800">{apiError}</div>
-          </div>
+        {errors.root && (
+          <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {errors.root.message}
+          </p>
         )}
 
-        {/* Submit Button */}
-        <div>
-          <Button
-            type="submit"
-            disabled={loginMutation.isPending}
-            className="w-full"
-          >
-            {loginMutation.isPending ? "Signing in..." : "Sign in"}
-          </Button>
-        </div>
+        <Button type="submit" size="lg" loading={isLoading} className="w-full mt-2">
+          Sign in
+        </Button>
       </form>
-    </div>
+
+      <p className="text-center text-sm text-gray-500 mt-6">
+        Don&apos;t have an account?{' '}
+        <Link href="/register" className="font-medium text-gray-900 hover:underline">
+          Create one
+        </Link>
+      </p>
+    </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

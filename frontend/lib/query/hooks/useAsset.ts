@@ -11,7 +11,6 @@ import {
   Asset,
   AssetHistoryEvent,
   AssetDocument,
-  AssetStatus,
   MaintenanceRecord,
   AssetNote,
   UpdateAssetStatusInput,
@@ -25,36 +24,6 @@ import {
 import { ApiError } from '../types';
 
 // Queries
-export function useAssets(
-  params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    status?: AssetStatus;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-  },
-  options?: Omit<UseQueryOptions<{
-    assets: Asset[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }, ApiError>, 'queryKey' | 'queryFn'>
-) {
-  return useQuery<{
-    assets: Asset[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }, ApiError>({
-    queryKey: queryKeys.assets.list(params || {}),
-    queryFn: () => assetApiClient.getAssets(params),
-    ...options,
-  });
-}
-
 export function useAsset(
   id: string,
   options?: Omit<UseQueryOptions<Asset, ApiError>, 'queryKey' | 'queryFn'>
@@ -243,6 +212,37 @@ export function useCreateNote(
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.notes(assetId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.history(assetId) });
+    },
+    ...options,
+  });
+}
+
+export function useDeleteNote(
+  assetId: string,
+  options?: UseMutationOptions<void, ApiError, string>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, ApiError, string>({
+    mutationFn: (noteId) => assetApiClient.deleteNote(assetId, noteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.notes(assetId) });
+    },
+    ...options,
+  });
+}
+
+export function useUpdateMaintenanceStatus(
+  assetId: string,
+  options?: UseMutationOptions<MaintenanceRecord, ApiError, { maintenanceId: string; status: string }>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<MaintenanceRecord, ApiError, { maintenanceId: string; status: string }>({
+    mutationFn: ({ maintenanceId, status }) =>
+      assetApiClient.updateMaintenanceStatus(assetId, maintenanceId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.maintenance(assetId) });
     },
     ...options,
   });

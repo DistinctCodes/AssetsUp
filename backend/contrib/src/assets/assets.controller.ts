@@ -1,55 +1,86 @@
-import { Body, Controller, Delete, Get, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Patch,
+  Delete,
+  Post,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
+import { CreateAssetDto } from './dto/create-asset.dto';
+import { UpdateAssetDto } from './dto/update-asset.dto';
+import { AssetFiltersDto } from './dto/asset-filters.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../users/user.entity';
-import { BulkUpdateStatusDto } from './dto/bulk-update-status.dto';
-import { BulkDeleteAssetsDto } from './dto/bulk-delete-assets.dto';
-import { BulkTransferDepartmentDto } from './dto/bulk-transfer-department.dto';
-import { UpdateAssetTagsDto } from './dto/update-asset-tags.dto';
-import { SearchAssetsDto } from './dto/search-assets.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
-@ApiTags('Assets')
-@ApiBearerAuth('JWT-auth')
+@ApiTags('assets')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('assets')
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
-  @Patch('bulk-status')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  bulkStatus(@Body() dto: BulkUpdateStatusDto, @Req() req: { user?: { id?: string } }) {
-    return this.assetsService.bulkUpdateStatus(dto.ids, dto.status, req.user?.id || null);
-  }
-
-  @Delete('bulk')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  bulkDelete(@Body() dto: BulkDeleteAssetsDto, @Req() req: { user?: { id?: string } }) {
-    return this.assetsService.bulkDelete(dto.ids, req.user?.id || null);
-  }
-
-  @Patch('bulk-department')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  bulkDepartment(@Body() dto: BulkTransferDepartmentDto, @Req() req: { user?: { id?: string } }) {
-    return this.assetsService.bulkTransferDepartment(dto.ids, dto.departmentId, req.user?.id || null);
-  }
-
-  @Patch(':id/tags')
-  updateTags(
-    @Param('id') id: string,
-    @Body() dto: UpdateAssetTagsDto,
-    @Req() req: { user?: { id?: string } },
+  @Post()
+  @ApiOperation({ summary: 'Create a new asset' })
+  @ApiResponse({ status: 201, description: 'Asset created' })
+  async create(
+    @Body() dto: CreateAssetDto,
+    @CurrentUser('userId') userId: string,
   ) {
-    return this.assetsService.updateTags(id, dto.tags, req.user?.id || null);
+    return this.assetsService.create(dto, userId);
   }
 
-  @Get('search')
-  search(@Query() query: SearchAssetsDto) {
-    return this.assetsService.search(query.q || '');
+  @Get()
+  @ApiOperation({ summary: 'List assets with filters and pagination' })
+  @ApiResponse({ status: 200, description: 'Returns paginated assets' })
+  async findAll(@Query() filters: AssetFiltersDto) {
+    return this.assetsService.findAll(filters);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a single asset by ID with all relations' })
+  @ApiResponse({ status: 200, description: 'Returns the asset' })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.assetsService.findOne(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Partially update an asset' })
+  @ApiResponse({ status: 200, description: 'Asset updated' })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateAssetDto,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.assetsService.update(id, dto, userId);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Soft delete an asset' })
+  @ApiResponse({ status: 204, description: 'Asset soft deleted' })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('userId') userId: string,
+  ) {
+    await this.assetsService.softDelete(id, userId);
+  }
+
+  @Post(':id/restore')
+  @ApiOperation({ summary: 'Restore a soft-deleted asset' })
+  @ApiResponse({ status: 200, description: 'Asset restored' })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  async restore(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.assetsService.restore(id, userId);
   }
 }

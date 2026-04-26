@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Asset } from './asset.entity';
 import { AssetHistoryAction } from './enums';
 
 @Entity('asset_history')
@@ -6,23 +13,17 @@ export class AssetHistory {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  assetId: string;
+  @ManyToOne(() => Asset, (asset) => asset.history, { onDelete: 'CASCADE' })
+  asset: Asset;
 
-  @Column({ type: 'enum', enum: AssetHistoryAction })
+  @Column()
   action: AssetHistoryAction;
 
-  @Column()
-  description: string;
-
   @Column({ type: 'jsonb', nullable: true })
-  previousValue: Record<string, unknown> | null;
-
-  @Column({ type: 'jsonb', nullable: true })
-  newValue: Record<string, unknown> | null;
+  changes: Record<string, unknown> | null;
 
   @Column({ nullable: true })
-  performedById: string | null;
+  performedBy: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

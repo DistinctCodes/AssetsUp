@@ -1,18 +1,18 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-const PROTECTED = [ '/assets', '/departments', '/users'];
-const AUTH_PAGES = ['/login', '/register'];
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+const PROTECTED = ["/assets", "/departments", "/users"];
+const AUTH_PAGES = ["/signin", "/signup"];
 
 export const middleware = (req: NextRequest) => {
-  const token = req.cookies.get('auth-token')?.value;
+  const token = req.cookies.get("auth-token")?.value;
   const { pathname } = req.nextUrl;
 
   const isProtected = PROTECTED.some((route) => pathname.startsWith(route));
   const isAuthPage = AUTH_PAGES.includes(pathname);
 
   if (isProtected && !token) {
-    const url = new URL('/login', req.url);
-    url.searchParams.set('redirect', pathname);
+    const url = new URL("/login", req.url);
+    url.searchParams.set("redirect", pathname);
     return NextResponse.redirect(url);
   }
 
@@ -25,11 +25,11 @@ export const middleware = (req: NextRequest) => {
 
 export const config = {
   matcher: [
-    '/dashboard/:path*',
-    '/assets/:path*',
-    '/departments/:path*',
-    '/users/:path*',
-    '/login',
-    '/register',
+    "/dashboard/:path*",
+    "/assets/:path*",
+    "/departments/:path*",
+    "/users/:path*",
+    "/signin",
+    "/signup",
   ],
 };

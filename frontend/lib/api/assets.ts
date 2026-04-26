@@ -1,167 +1,156 @@
-import { apiClient } from '@/lib/api/client';
-import {
+import { api } from '../api';
+import type {
   Asset,
-  AssetDocument,
   AssetHistoryEvent,
-  AssetHistoryFilters,
+  AssetDocument,
+  MaintenanceRecord,
   AssetNote,
-  AssetStatus,
-  AssetUser,
-  Category,
-  CategoryWithCount,
+  UpdateAssetStatusInput,
+  TransferAssetInput,
   CreateMaintenanceInput,
   CreateNoteInput,
+  AssetHistoryFilters,
   Department,
-  DepartmentWithCount,
-  MaintenanceRecord,
-  TransferAssetInput,
-  UpdateAssetStatusInput,
-} from '@/lib/query/types/asset';
+  AssetCategory,
+  AssetUser,
+} from '../query/types/asset';
+
+export interface DepartmentWithCount extends Department {
+  assetCount: number;
+  description?: string | null;
+}
+
+export interface CategoryWithCount extends AssetCategory {
+  assetCount: number;
+}
+
+export interface AssetListFilters {
+  search?: string;
+  status?: string;
+  condition?: string;
+  categoryId?: string;
+  departmentId?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface AssetListResponse {
+  data: Asset[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CreateAssetInput {
+  name: string;
+  description?: string;
+  categoryId: string;
+  departmentId: string;
+  serialNumber?: string;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  currentValue?: number;
+  warrantyExpiration?: string;
+  status?: string;
+  condition?: string;
+  location?: string;
+  assignedToId?: string;
+  manufacturer?: string;
+  model?: string;
+  tags?: string[];
+  notes?: string;
+}
 
 export const assetApiClient = {
-  getAssets(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    status?: AssetStatus;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-  }): Promise<{
-    assets: Asset[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          searchParams.append(key, String(value));
-        }
-      });
-    }
-    const qs = searchParams.toString();
-    return apiClient.request<{
-      assets: Asset[];
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
-    }>(`/assets${qs ? `?${qs}` : ''}`);
-  },
+  getAssets: (filters?: AssetListFilters): Promise<AssetListResponse> =>
+    api.get<AssetListResponse>('/assets', { params: filters }).then((r) => r.data),
 
-  getAsset(id: string): Promise<Asset> {
-    return apiClient.request<Asset>(`/assets/${id}`);
-  },
+  getAsset: (id: string): Promise<Asset> =>
+    api.get<Asset>(`/assets/${id}`).then((r) => r.data),
 
-  getAssetHistory(id: string, filters?: AssetHistoryFilters): Promise<AssetHistoryEvent[]> {
-    const params = new URLSearchParams();
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.append(key, String(value));
-        }
-      });
-    }
-    const qs = params.toString();
-    return apiClient.request<AssetHistoryEvent[]>(
-      `/assets/${id}/history${qs ? `?${qs}` : ''}`
-    );
-  },
+  createAsset: (data: CreateAssetInput): Promise<Asset> =>
+    api.post<Asset>('/assets', data).then((r) => r.data),
 
-  getAssetDocuments(id: string): Promise<AssetDocument[]> {
-    return apiClient.request<AssetDocument[]>(`/assets/${id}/documents`);
-  },
+  updateAsset: (id: string, data: Partial<CreateAssetInput>): Promise<Asset> =>
+    api.patch<Asset>(`/assets/${id}`, data).then((r) => r.data),
 
-  getMaintenanceRecords(id: string): Promise<MaintenanceRecord[]> {
-    return apiClient.request<MaintenanceRecord[]>(`/assets/${id}/maintenance`);
-  },
+  getAssetHistory: (id: string, filters?: AssetHistoryFilters): Promise<AssetHistoryEvent[]> =>
+    api.get<AssetHistoryEvent[]>(`/assets/${id}/history`, { params: filters }).then((r) => r.data),
 
-  getAssetNotes(id: string): Promise<AssetNote[]> {
-    return apiClient.request<AssetNote[]>(`/assets/${id}/notes`);
-  },
+  getAssetDocuments: (id: string): Promise<AssetDocument[]> =>
+    api.get<AssetDocument[]>(`/assets/${id}/documents`).then((r) => r.data),
 
-  getDepartments(): Promise<DepartmentWithCount[]> {
-    return apiClient.request<DepartmentWithCount[]>('/departments');
-  },
+  getMaintenanceRecords: (id: string): Promise<MaintenanceRecord[]> =>
+    api.get<MaintenanceRecord[]>(`/assets/${id}/maintenance`).then((r) => r.data),
 
-  createDepartment(data: { name: string; description?: string }): Promise<Department> {
-    return apiClient.request<Department>('/departments', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+  getAssetNotes: (id: string): Promise<AssetNote[]> =>
+    api.get<AssetNote[]>(`/assets/${id}/notes`).then((r) => r.data),
 
-  deleteDepartment(id: string): Promise<void> {
-    return apiClient.request<void>(`/departments/${id}`, { method: 'DELETE' });
-  },
+  getDepartments: (): Promise<DepartmentWithCount[]> =>
+    api.get<DepartmentWithCount[]>('/departments').then((r) => r.data),
 
-  getCategories(): Promise<CategoryWithCount[]> {
-    return apiClient.request<CategoryWithCount[]>('/categories');
-  },
+  createDepartment: (data: { name: string; description?: string }): Promise<Department> =>
+    api.post<Department>('/departments', data).then((r) => r.data),
 
-  createCategory(data: { name: string; description?: string }): Promise<Category> {
-    return apiClient.request<Category>('/categories', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+  deleteDepartment: (id: string): Promise<void> =>
+    api.delete(`/departments/${id}`).then(() => undefined),
 
-  deleteCategory(id: string): Promise<void> {
-    return apiClient.request<void>(`/categories/${id}`, { method: 'DELETE' });
-  },
+  updateDepartment: (id: string, data: { name?: string; description?: string }): Promise<Department> =>
+    api.patch<Department>(`/departments/${id}`, data).then((r) => r.data),
 
-  getUsers(): Promise<AssetUser[]> {
-    return apiClient.request<AssetUser[]>('/users');
-  },
+  getCategories: (): Promise<CategoryWithCount[]> =>
+    api.get<CategoryWithCount[]>('/categories').then((r) => r.data),
 
-  updateAssetStatus(id: string, data: UpdateAssetStatusInput): Promise<Asset> {
-    return apiClient.request<Asset>(`/assets/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
-  },
+  createCategory: (data: { name: string; description?: string }): Promise<{ id: string; name: string }> =>
+    api.post<{ id: string; name: string }>('/categories', data).then((r) => r.data),
 
-  transferAsset(id: string, data: TransferAssetInput): Promise<Asset> {
-    return apiClient.request<Asset>(`/assets/${id}/transfer`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+  deleteCategory: (id: string): Promise<void> =>
+    api.delete(`/categories/${id}`).then(() => undefined),
 
-  deleteAsset(id: string): Promise<void> {
-    return apiClient.request<void>(`/assets/${id}`, { method: 'DELETE' });
-  },
+  updateCategory: (id: string, data: { name?: string; description?: string }): Promise<{ id: string; name: string }> =>
+    api.patch<{ id: string; name: string }>(`/categories/${id}`, data).then((r) => r.data),
 
-  uploadDocument(assetId: string, file: File, name?: string): Promise<AssetDocument> {
+  getUsers: (): Promise<AssetUser[]> =>
+    api.get<AssetUser[]>('/users').then((r) => r.data),
+
+  updateAssetStatus: (id: string, data: UpdateAssetStatusInput): Promise<Asset> =>
+    api.patch<Asset>(`/assets/${id}/status`, data).then((r) => r.data),
+
+  transferAsset: (id: string, data: TransferAssetInput): Promise<Asset> =>
+    api.post<Asset>(`/assets/${id}/transfer`, data).then((r) => r.data),
+
+  deleteAsset: (id: string): Promise<void> =>
+    api.delete(`/assets/${id}`).then(() => undefined),
+
+  uploadDocument: (assetId: string, file: File, name?: string): Promise<AssetDocument> => {
     const form = new FormData();
     form.append('file', file);
     if (name) form.append('name', name);
-    return apiClient.request<AssetDocument>(`/assets/${assetId}/documents`, {
-      method: 'POST',
-      body: form,
-      headers: {},
-    });
+    return api
+      .post<AssetDocument>(`/assets/${assetId}/documents`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data);
   },
 
-  deleteDocument(assetId: string, documentId: string): Promise<void> {
-    return apiClient.request<void>(`/assets/${assetId}/documents/${documentId}`, {
-      method: 'DELETE',
-    });
-  },
+  deleteDocument: (assetId: string, documentId: string): Promise<void> =>
+    api.delete(`/assets/${assetId}/documents/${documentId}`).then(() => undefined),
 
-  createMaintenanceRecord(assetId: string, data: CreateMaintenanceInput): Promise<MaintenanceRecord> {
-    return apiClient.request<MaintenanceRecord>(`/assets/${assetId}/maintenance`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+  createMaintenanceRecord: (assetId: string, data: CreateMaintenanceInput): Promise<MaintenanceRecord> =>
+    api.post<MaintenanceRecord>(`/assets/${assetId}/maintenance`, data).then((r) => r.data),
 
-  createNote(assetId: string, data: CreateNoteInput): Promise<AssetNote> {
-    return apiClient.request<AssetNote>(`/assets/${assetId}/notes`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+  createNote: (assetId: string, data: CreateNoteInput): Promise<AssetNote> =>
+    api.post<AssetNote>(`/assets/${assetId}/notes`, data).then((r) => r.data),
+
+  deleteNote: (assetId: string, noteId: string): Promise<void> =>
+    api.delete(`/assets/${assetId}/notes/${noteId}`).then(() => undefined),
+
+  updateMaintenanceStatus: (
+    assetId: string,
+    maintenanceId: string,
+    status: string,
+  ): Promise<MaintenanceRecord> =>
+    api
+      .patch<MaintenanceRecord>(`/assets/${assetId}/maintenance/${maintenanceId}`, { status })
+      .then((r) => r.data),
 };

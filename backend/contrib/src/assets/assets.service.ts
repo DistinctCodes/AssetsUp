@@ -1,159 +1,180 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Asset } from './asset.entity';
 import { AssetHistory } from './asset-history.entity';
-import { AssetHistoryAction, AssetStatus } from './enums';
+import { CreateAssetDto } from './dto/create-asset.dto';
+import { UpdateAssetDto } from './dto/update-asset.dto';
+import { AssetFiltersDto } from './dto/asset-filters.dto';
+import { AssetHistoryAction } from './enums';
 
 @Injectable()
 export class AssetsService {
   constructor(
     @InjectRepository(Asset)
-    private readonly assetsRepo: Repository<Asset>,
+    private readonly assetRepo: Repository<Asset>,
     @InjectRepository(AssetHistory)
     private readonly historyRepo: Repository<AssetHistory>,
   ) {}
 
-  async bulkUpdateStatus(
-    ids: string[],
-    status: AssetStatus,
-    performedById: string | null,
-  ): Promise<{ updated: number }> {
-    const assets = await this.assetsRepo.find({ where: { id: In(ids), deletedAt: IsNull() } });
+  private async generateAssetId(): Promise<string> {
+    const result = await this.assetRepo
+      .createQueryBuilder('asset')
+      .select("MAX(CAST(SUBSTRING(asset.assetId, 5) AS INTEGER))", 'max')
+      .where("asset.assetId LIKE 'AST-%'")
+      .getRawOne<{ max: string | null }>();
 
-    if (assets.length === 0) {
-      return { updated: 0 };
-    }
-
-    const updates = assets.map((asset) => ({ ...asset, status }));
-    await this.assetsRepo.save(updates);
-
-    await this.historyRepo.insert(
-      assets.map((asset) => ({
-        assetId: asset.id,
-        action: AssetHistoryAction.STATUS_CHANGED,
-        description: `Status changed from ${asset.status} to ${status}`,
-        previousValue: { status: asset.status },
-        newValue: { status },
-        performedById,
-      })),
-    );
-
-    return { updated: assets.length };
+    const max = result?.max ? parseInt(result.max, 10) : 1000;
+    return `AST-${max + 1}`;
   }
 
-  async bulkDelete(ids: string[], performedById: string | null): Promise<{ deleted: number }> {
-    const assets = await this.assetsRepo.find({ where: { id: In(ids), deletedAt: IsNull() } });
+  async create(dto: CreateAssetDto, createdBy: string): Promise<Asset> {
+    const assetId = await this.generateAssetId();
 
-    if (assets.length === 0) {
-      return { deleted: 0 };
-    }
-
-    const targetIds = assets.map((asset) => asset.id);
-    await this.assetsRepo.softDelete(targetIds);
-
-    await this.historyRepo.insert(
-      assets.map((asset) => ({
-        assetId: asset.id,
-        action: AssetHistoryAction.DELETED,
-        description: 'Asset soft-deleted in bulk operation',
-        previousValue: { deletedAt: null },
-        newValue: { deletedAt: new Date().toISOString() },
-        performedById,
-      })),
-    );
-
-    return { deleted: assets.length };
-  }
-
-  async bulkTransferDepartment(
-    ids: string[],
-    departmentId: string,
-    performedById: string | null,
-  ): Promise<{ updated: number }> {
-    const assets = await this.assetsRepo.find({ where: { id: In(ids), deletedAt: IsNull() } });
-
-    if (assets.length === 0) {
-      return { updated: 0 };
-    }
-
-    const updates = assets.map((asset) => ({ ...asset, departmentId }));
-    await this.assetsRepo.save(updates);
-
-    await this.historyRepo.insert(
-      assets.map((asset) => ({
-        assetId: asset.id,
-        action: AssetHistoryAction.TRANSFERRED,
-        description: `Asset transferred from ${asset.departmentId || 'unassigned'} to ${departmentId}`,
-        previousValue: { departmentId: asset.departmentId },
-        newValue: { departmentId },
-        performedById,
-      })),
-    );
-
-    return { updated: assets.length };
-  }
-
-  async updateTags(id: string, tags: string[], performedById: string | null): Promise<Asset> {
-    const asset = await this.assetsRepo.findOne({ where: { id, deletedAt: IsNull() } });
-    if (!asset) {
-      throw new NotFoundException('Asset not found');
-    }
-
-    const previousTags = asset.tags || [];
-    asset.tags = tags;
-    const updated = await this.assetsRepo.save(asset);
-
-    await this.historyRepo.insert({
-      assetId: asset.id,
-      action: AssetHistoryAction.TAGS_UPDATED,
-      description: 'Asset tags updated',
-      previousValue: { tags: previousTags },
-      newValue: { tags },
-      performedById,
+    const asset = this.assetRepo.create({
+      ...dto,
+      assetId,
+      createdBy,
     });
+
+    const saved = await this.assetRepo.save(asset);
+
+    const history = this.historyRepo.create({
+      asset: saved,
+      action: AssetHistoryAction.CREATED,
+      changes: null,
+      performedBy: createdBy,
+    });
+    await this.historyRepo.save(history);
+
+    return this.assetRepo.findOneOrFail({
+      where: { id: saved.id },
+      relations: ['history'],
+    });
+  }
+
+  async findAll(filters: AssetFiltersDto): Promise<{ data: Asset[]; total: number; page: number; limit: number }> {
+    const { search, status, condition, categoryId, departmentId, page = 1, limit = 20 } = filters;
+    const qb = this.assetRepo.createQueryBuilder('asset')
+      .leftJoinAndSelect('asset.history', 'history')
+      .where('asset.deletedAt IS NULL');
+
+    if (search) {
+      const term = `%${search}%`;
+      qb.andWhere(
+        `(asset.name ILIKE :term OR asset.assetId ILIKE :term OR asset.serialNumber ILIKE :term OR asset.manufacturer ILIKE :term OR asset.model ILIKE :term)`,
+        { term },
+      );
+    }
+
+    if (status) {
+      qb.andWhere('asset.status = :status', { status });
+    }
+
+    if (condition) {
+      qb.andWhere('asset.condition = :condition', { condition });
+    }
+
+    if (categoryId) {
+      qb.andWhere('asset.categoryId = :categoryId', { categoryId });
+    }
+
+    if (departmentId) {
+      qb.andWhere('asset.departmentId = :departmentId', { departmentId });
+    }
+
+    const [data, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data, total, page, limit };
+  }
+
+  async findOne(id: string): Promise<Asset> {
+    const asset = await this.assetRepo.findOne({
+      where: { id },
+      relations: ['history'],
+      withDeleted: true,
+    });
+    if (!asset) {
+      throw new NotFoundException(`Asset with id "${id}" not found`);
+    }
+    return asset;
+  }
+
+  async update(id: string, dto: UpdateAssetDto, performedBy: string): Promise<Asset> {
+    const asset = await this.assetRepo.findOne({
+      where: { id },
+      relations: ['history'],
+    });
+    if (!asset) {
+      throw new NotFoundException(`Asset with id "${id}" not found`);
+    }
+
+    const changes: Record<string, unknown> = {};
+    for (const key of Object.keys(dto)) {
+      const k = key as keyof UpdateAssetDto;
+      if (dto[k] !== undefined && asset[k] !== dto[k]) {
+        changes[k] = { old: asset[k], new: dto[k] };
+        (asset as unknown as Record<string, unknown>)[k] = dto[k];
+      }
+    }
+
+    const updated = await this.assetRepo.save(asset);
+
+    if (Object.keys(changes).length > 0) {
+      const history = this.historyRepo.create({
+        asset: updated,
+        action: AssetHistoryAction.UPDATED,
+        changes,
+        performedBy,
+      });
+      await this.historyRepo.save(history);
+    }
 
     return updated;
   }
 
-  async search(q: string): Promise<Asset[]> {
-    const term = (q || '').trim();
-    if (!term) {
-      return [];
+  async softDelete(id: string, performedBy: string): Promise<void> {
+    const asset = await this.assetRepo.findOne({ where: { id } });
+    if (!asset) {
+      throw new NotFoundException(`Asset with id "${id}" not found`);
     }
 
-    const contains = `%${term}%`;
+    await this.assetRepo.softDelete(id);
 
-    return this.assetsRepo
-      .createQueryBuilder('asset')
-      .where('asset.deletedAt IS NULL')
-      .andWhere(
-        `(asset.name ILIKE :contains
-          OR asset.assetId ILIKE :contains
-          OR asset.serialNumber ILIKE :contains
-          OR asset.manufacturer ILIKE :contains
-          OR asset.model ILIKE :contains
-          OR asset.description ILIKE :contains
-          OR array_to_string(asset.tags, ' ') ILIKE :contains)`,
-        { contains },
-      )
-      .addSelect(
-        `CASE
-          WHEN asset.assetId = :exact THEN 1000
-          WHEN asset.assetId ILIKE :startsWith THEN 600
-          ELSE 0
-        END
-        + CASE WHEN asset.name ILIKE :contains THEN 120 ELSE 0 END
-        + CASE WHEN asset.serialNumber ILIKE :contains THEN 100 ELSE 0 END
-        + CASE WHEN asset.manufacturer ILIKE :contains THEN 80 ELSE 0 END
-        + CASE WHEN asset.model ILIKE :contains THEN 80 ELSE 0 END
-        + CASE WHEN asset.description ILIKE :contains THEN 40 ELSE 0 END
-        + CASE WHEN array_to_string(asset.tags, ' ') ILIKE :contains THEN 60 ELSE 0 END`,
-        'relevance',
-      )
-      .setParameters({ exact: term, startsWith: `${term}%`, contains })
-      .orderBy('relevance', 'DESC')
-      .addOrderBy('asset.updatedAt', 'DESC')
-      .getMany();
+    const history = this.historyRepo.create({
+      asset,
+      action: AssetHistoryAction.DELETED,
+      changes: null,
+      performedBy,
+    });
+    await this.historyRepo.save(history);
+  }
+
+  async restore(id: string, performedBy: string): Promise<Asset> {
+    const asset = await this.assetRepo.findOne({
+      where: { id },
+      withDeleted: true,
+    });
+    if (!asset) {
+      throw new NotFoundException(`Asset with id "${id}" not found`);
+    }
+
+    await this.assetRepo.restore(id);
+
+    const restored = await this.assetRepo.findOneOrFail({ where: { id } });
+
+    const history = this.historyRepo.create({
+      asset: restored,
+      action: AssetHistoryAction.RESTORED,
+      changes: null,
+      performedBy,
+    });
+    await this.historyRepo.save(history);
+
+    return restored;
   }
 }
+

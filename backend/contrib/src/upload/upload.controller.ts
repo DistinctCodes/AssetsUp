@@ -1,77 +1,74 @@
 import {
-  BadRequestException,
   Controller,
-  HttpCode,
-  HttpStatus,
   Post,
-  UploadedFile,
-  UseGuards,
+  Get,
+  Delete,
   UseInterceptors,
+  UploadedFile,
+  UploadedFiles,
+  Param,
+  BadRequestException,
+  Res,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { documentMulterOptions, imageMulterOptions, UploadService } from './upload.service';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
+import { UploadService } from './upload.service';
+import { UploadResponseDto } from './dto/upload-response.dto';
 
-interface UploadedFileShape {
-  filename: string;
-  mimetype: string;
-  size: number;
-}
-
-const uploadRoot =
-  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.UPLOAD_DEST ||
-  'uploads';
-
-@ApiTags('Upload')
-@ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+/**
+ * File upload controller for handling asset images and documents
+ */
 @Controller('upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
-  @Post('image')
-  @HttpCode(HttpStatus.OK)
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('file', imageMulterOptions(uploadRoot)),
-  )
-  async uploadImage(@UploadedFile() file: UploadedFileShape): Promise<{ url: string }> {
-    if (!file) {
-      throw new BadRequestException('Image file is required');
-    }
-
-    const isAllowed = ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
-    if (!isAllowed || file.size > 5 * 1024 * 1024) {
-      throw new BadRequestException('Invalid image type or size exceeds 5MB');
-    }
-
-    return { url: this.uploadService.imageUrl(file.filename) };
+  /**
+   * Upload a single file
+   * POST /api/upload/file
+   */
+  @Post('file')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<UploadResponseDto> {
+    return this.uploadService.uploadFile(file);
   }
 
-  @Post('document')
-  @HttpCode(HttpStatus.OK)
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('file', documentMulterOptions(uploadRoot)),
-  )
-  async uploadDocument(@UploadedFile() file: UploadedFileShape): Promise<{ url: string }> {
-    if (!file) {
-      throw new BadRequestException('Document file is required');
-    }
+  /**
+   * Upload multiple files
+   * POST /api/upload/files
+   */
+  @Post('files')
+  @UseInterceptors(FilesInterceptor('files', 5)) // max 5 files
+  async uploadFiles(
+    @UploadedFiles() files: Express.Multer.File[],
+  ): Promise<UploadResponseDto[]> {
+    return this.uploadService.uploadFiles(files);
+  }
 
-    const allowed = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/plain',
-    ];
-    if (!allowed.includes(file.mimetype) || file.size > 20 * 1024 * 1024) {
-      throw new BadRequestException('Invalid document type or size exceeds 20MB');
+  /**
+   * Download a file
+   * GET /api/upload/:filename
+   */
+  @Get(':filename')
+  async downloadFile(
+    @Param('filename') filename: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      const file = await this.uploadService.getFile(filename);
+      res.download(Buffer.from(file), filename);
+    } catch (error) {
+      throw new BadRequestException('File not found or invalid path');
     }
+  }
 
-    return { url: this.uploadService.documentUrl(file.filename) };
+  /**
+   * Delete a file
+   * DELETE /api/upload/:filename
+   */
+  @Delete(':filename')
+  async deleteFile(@Param('filename') filename: string): Promise<void> {
+    await this.uploadService.deleteFile(filename);
   }
 }

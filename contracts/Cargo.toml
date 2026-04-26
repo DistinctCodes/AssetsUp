@@ -3,9 +3,14 @@ resolver = "2"
 members = [
   "./asset-maintenance",
   "assetsup",
+  "contrib",
   "multisig-wallet",
   "multisig_transfer",
 ]
 
 [workspace.dependencies]
 soroban-sdk = "22"
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true

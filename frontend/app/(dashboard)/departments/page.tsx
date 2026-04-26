@@ -1,204 +1,334 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { Plus, Trash2, Building2, Tag, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
-    useDepartmentsList,
-    useCreateDepartment,
-    useDeleteDepartment,
-    useCategories,
-    useCreateCategory,
-    useDeleteCategory
-} from '@/lib/query/hooks/query.hook';
+  useDepartmentsList,
+  useCreateDepartment,
+  useDeleteDepartment,
+  useCategories,
+  useCreateCategory,
+  useDeleteCategory,
+} from '@/lib/query/hooks/useAssets';
 import { DepartmentWithCount, CategoryWithCount } from '@/lib/api/assets';
-import { Plus, Trash2, LayoutGrid, Tags, Loader2, AlertCircle } from 'lucide-react';
-import { toast } from 'react-toastify';
 
-type TabType = 'departments' | 'categories';
+type Tab = 'departments' | 'categories';
 
 export default function DepartmentsPage() {
-    const [activeTab, setActiveTab] = useState<TabType>('departments');
-    const [isAdding, setIsAdding] = useState(false);
-    const [formData, setFormData] = useState({ name: '', description: '' });
+  const [tab, setTab] = useState<Tab>('departments');
 
-    const { data: departments, isLoading: isLoadingDepts } = useDepartmentsList();
-    const { data: categories, isLoading: isLoadingCats } = useCategories();
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Organisation</h1>
+        <p className="text-sm text-gray-500 mt-1">Manage departments and asset categories</p>
+      </div>
 
-    const createDept = useCreateDepartment();
-    const deleteDept = useDeleteDepartment();
-    const createCat = useCreateCategory();
-    const deleteCat = useDeleteCategory();
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {([
+          { key: 'departments' as Tab, label: 'Departments', icon: <Building2 size={15} /> },
+          { key: 'categories' as Tab, label: 'Categories', icon: <Tag size={15} /> },
+        ] as const).map(({ key, label, icon }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              tab === key
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {icon}
+            {label}
+          </button>
+        ))}
+      </div>
 
-    const handleCreate = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.name.trim()) return;
+      {tab === 'departments' && <DepartmentsTab />}
+      {tab === 'categories' && <CategoriesTab />}
+    </div>
+  );
+}
 
-        try {
-            if (activeTab === 'departments') {
-                await createDept.mutateAsync(formData);
-            } else {
-                await createCat.mutateAsync(formData);
-            }
-            toast.success(`${activeTab === 'departments' ? 'Department' : 'Category'} created successfully`);
-            setFormData({ name: '', description: '' });
-            setIsAdding(false);
-        } catch (err: any) {
-            toast.error(err.message || `Failed to create ${activeTab}`);
-        }
-    };
+// ── Departments Tab ──────────────────────────────────────────
 
-    const handleDelete = async (id: string, name: string) => {
-        const confirmMessage = `Are you sure you want to delete ${name}? Assets in this ${activeTab === 'departments' ? 'department' : 'category'} will need to be reassigned/recategorised.`;
-        if (!window.confirm(confirmMessage)) return;
+function DepartmentsTab() {
+  const { data: departments = [], isLoading } = useDepartmentsList();
+  const createDept = useCreateDepartment();
+  const deleteDept = useDeleteDepartment();
 
-        try {
-            if (activeTab === 'departments') {
-                await deleteDept.mutateAsync(id);
-            } else {
-                await deleteCat.mutateAsync(id);
-            }
-            toast.success(`${activeTab === 'departments' ? 'Department' : 'Category'} deleted successfully`);
-        } catch (err: any) {
-            toast.error(err.message || `Failed to delete ${activeTab}`);
-        }
-    };
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [formError, setFormError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<DepartmentWithCount | null>(null);
 
-    const items = activeTab === 'departments' ? departments : categories;
-    const isLoading = activeTab === 'departments' ? isLoadingDepts : isLoadingCats;
+  const handleCreate = async () => {
+    if (!name.trim()) { setFormError('Name is required'); return; }
+    setFormError('');
+    try {
+      await createDept.mutateAsync({ name: name.trim(), description: description.trim() || undefined });
+      setName('');
+      setDescription('');
+      setShowForm(false);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setFormError(msg || 'Failed to create department.');
+    }
+  };
 
-    return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h1 className="text-3xl font-bold tracking-tight">Management</h1>
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteDept.mutateAsync(deleteTarget.id);
+    setDeleteTarget(null);
+  };
 
-                <div className="flex bg-gray-100 p-1 rounded-lg">
-                    <button
-                        onClick={() => { setActiveTab('departments'); setIsAdding(false); }}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${activeTab === 'departments'
-                                ? 'bg-white shadow-sm text-blue-600 font-medium'
-                                : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                    >
-                        <LayoutGrid size={18} />
-                        Departments
-                        {departments && <span className="ml-1 text-xs bg-gray-200 px-2 py-0.5 rounded-full text-gray-600">{departments.length}</span>}
-                    </button>
-                    <button
-                        onClick={() => { setActiveTab('categories'); setIsAdding(false); }}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${activeTab === 'categories'
-                                ? 'bg-white shadow-sm text-blue-600 font-medium'
-                                : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                    >
-                        <Tags size={18} />
-                        Categories
-                        {categories && <span className="ml-1 text-xs bg-gray-200 px-2 py-0.5 rounded-full text-gray-600">{categories.length}</span>}
-                    </button>
-                </div>
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          {departments.length} department{departments.length !== 1 ? 's' : ''}
+        </p>
+        <Button size="sm" onClick={() => { setShowForm(true); setFormError(''); }}>
+          <Plus size={15} className="mr-1" />
+          Add Department
+        </Button>
+      </div>
+
+      {/* Inline create form */}
+      {showForm && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">New Department</h3>
+          <div className="space-y-3">
+            <Input
+              id="dept-name"
+              label="Name *"
+              placeholder="e.g. Engineering"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+            />
+            <Input
+              id="dept-desc"
+              label="Description"
+              placeholder="Optional description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            {formError && <p className="text-xs text-red-500">{formError}</p>}
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => { setShowForm(false); setName(''); setDescription(''); }}>
+                Cancel
+              </Button>
+              <Button size="sm" loading={createDept.isPending} onClick={handleCreate}>
+                Create Department
+              </Button>
             </div>
-
-            <div className="flex justify-between items-center py-4 border-b">
-                <h2 className="text-xl font-semibold capitalize">
-                    {activeTab} ({items?.length || 0})
-                </h2>
-                <button
-                    onClick={() => setIsAdding(!isAdding)}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                >
-                    <Plus size={20} />
-                    Add {activeTab === 'departments' ? 'Department' : 'Category'}
-                </button>
-            </div>
-
-            {isAdding && (
-                <form onSubmit={handleCreate} className="bg-white p-6 rounded-xl shadow-sm border animate-in fade-in slide-in-from-top-4 duration-300">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-sm font-medium text-gray-700">Name *</label>
-                            <input
-                                required
-                                type="text"
-                                placeholder="Enter name"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                            />
-                            {activeTab === 'departments' ? createDept.isError && (
-                                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                                    <AlertCircle size={12} /> {createDept.error?.message}
-                                </p>
-                            ) : createCat.isError && (
-                                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                                    <AlertCircle size={12} /> {createCat.error?.message}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-sm font-medium text-gray-700">Description (Optional)</label>
-                            <input
-                                type="text"
-                                placeholder="Enter description"
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                            />
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-3 mt-6">
-                        <button
-                            type="button"
-                            onClick={() => setIsAdding(false)}
-                            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={createDept.isPending || createCat.isPending}
-                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                        >
-                            {(createDept.isPending || createCat.isPending) && <Loader2 size={18} className="animate-spin" />}
-                            Save {activeTab === 'departments' ? 'Department' : 'Category'}
-                        </button>
-                    </div>
-                </form>
-            )}
-
-            {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-20 text-gray-400 space-y-4">
-                    <Loader2 size={40} className="animate-spin text-blue-500" />
-                    <p>Loading {activeTab}...</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {items?.map((item: any) => (
-                        <div key={item.id} className="group relative bg-white p-6 rounded-xl border hover:shadow-md transition-all duration-300">
-                            <div className="flex justify-between items-start mb-4">
-                                <h3 className="text-lg font-semibold text-gray-900 truncate pr-8">{item.name}</h3>
-                                <button
-                                    onClick={() => handleDelete(item.id, item.name)}
-                                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                    title="Delete"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
-                            <p className="text-sm text-gray-500 leading-relaxed min-h-[40px] mb-4">
-                                {item.description || 'No description provided.'}
-                            </p>
-                            <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Asset Count</span>
-                                <span className="text-lg font-bold text-blue-600">{item.assetCount || 0}</span>
-                            </div>
-                        </div>
-                    ))}
-                    {!isLoading && items?.length === 0 && (
-                        <div className="col-span-full bg-gray-50 border-2 border-dashed rounded-xl py-20 flex flex-col items-center justify-center text-gray-400">
-                            <AlertCircle size={40} className="mb-2" />
-                            <p>No {activeTab} found. Create one to get started.</p>
-                        </div>
-                    )}
-                </div>
-            )}
+          </div>
         </div>
-    );
+      )}
+
+      {/* List */}
+      {isLoading ? (
+        <div className="text-sm text-gray-400 text-center py-12">Loading departments...</div>
+      ) : departments.length === 0 ? (
+        <EmptyState
+          icon={<Building2 size={32} className="text-gray-300" />}
+          title="No departments yet"
+          message='Click "Add Department" to create your first one.'
+        />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {departments.map((dept) => (
+            <EntityCard
+              key={dept.id}
+              name={dept.name}
+              description={dept.description}
+              count={dept.assetCount}
+              countLabel="asset"
+              onDelete={() => setDeleteTarget(dept)}
+            />
+          ))}
+        </div>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete department?"
+          message={`"${deleteTarget.name}" will be permanently deleted. Assets in this department will need to be reassigned.`}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          loading={deleteDept.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Categories Tab ───────────────────────────────────────────
+
+function CategoriesTab() {
+  const { data: categories = [], isLoading } = useCategories();
+  const createCat = useCreateCategory();
+  const deleteCat = useDeleteCategory();
+
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [formError, setFormError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<CategoryWithCount | null>(null);
+
+  const handleCreate = async () => {
+    if (!name.trim()) { setFormError('Name is required'); return; }
+    setFormError('');
+    try {
+      await createCat.mutateAsync({ name: name.trim(), description: description.trim() || undefined });
+      setName('');
+      setDescription('');
+      setShowForm(false);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setFormError(msg || 'Failed to create category.');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteCat.mutateAsync(deleteTarget.id);
+    setDeleteTarget(null);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          {categories.length} categor{categories.length !== 1 ? 'ies' : 'y'}
+        </p>
+        <Button size="sm" onClick={() => { setShowForm(true); setFormError(''); }}>
+          <Plus size={15} className="mr-1" />
+          Add Category
+        </Button>
+      </div>
+
+      {/* Inline create form */}
+      {showForm && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">New Category</h3>
+          <div className="space-y-3">
+            <Input
+              id="cat-name"
+              label="Name *"
+              placeholder="e.g. Laptops"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+            />
+            <Input
+              id="cat-desc"
+              label="Description"
+              placeholder="Optional description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            {formError && <p className="text-xs text-red-500">{formError}</p>}
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => { setShowForm(false); setName(''); setDescription(''); }}>
+                Cancel
+              </Button>
+              <Button size="sm" loading={createCat.isPending} onClick={handleCreate}>
+                Create Category
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      {isLoading ? (
+        <div className="text-sm text-gray-400 text-center py-12">Loading categories...</div>
+      ) : categories.length === 0 ? (
+        <EmptyState
+          icon={<Tag size={32} className="text-gray-300" />}
+          title="No categories yet"
+          message='Click "Add Category" to create your first one.'
+        />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {categories.map((cat) => (
+            <EntityCard
+              key={cat.id}
+              name={cat.name}
+              description={cat.description}
+              count={cat.assetCount}
+              countLabel="asset"
+              onDelete={() => setDeleteTarget(cat)}
+            />
+          ))}
+        </div>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete category?"
+          message={`"${deleteTarget.name}" will be permanently deleted. Assets in this category will need to be recategorised.`}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          loading={deleteCat.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Shared components ────────────────────────────────────────
+
+function EntityCard({
+  name,
+  description,
+  count,
+  countLabel,
+  onDelete,
+}: {
+  name: string;
+  description?: string | null;
+  count: number;
+  countLabel: string;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between group">
+      <div className="min-w-0">
+        <p className="font-medium text-gray-900 truncate">{name}</p>
+        {description && (
+          <p className="text-xs text-gray-400 mt-0.5 truncate">{description}</p>
+        )}
+        <div className="flex items-center gap-1 mt-2 text-xs text-gray-400">
+          <Package size={12} />
+          {count} {countLabel}{count !== 1 ? 's' : ''}
+        </div>
+      </div>
+      <button
+        onClick={onDelete}
+        className="opacity-0 group-hover:opacity-100 transition-opacity ml-3 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg flex-shrink-0"
+        title={`Delete ${name}`}
+      >
+        <Trash2 size={15} />
+      </button>
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, message }: { icon: React.ReactNode; title: string; message: string }) {
+  return (
+    <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
+      <div className="flex justify-center mb-3">{icon}</div>
+      <p className="text-sm font-medium text-gray-700">{title}</p>
+      <p className="text-xs text-gray-400 mt-1">{message}</p>
+    </div>
+  );
 }

@@ -1,23 +1,27 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
   DeleteDateColumn,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { AssetStatus } from './enums';
+import { AssetHistory } from './asset-history.entity';
 
-@Entity('assets')
+@Entity('asset')
 export class Asset {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
-  assetId: string;
-
   @Column()
   name: string;
+
+  @Column({ nullable: true })
+  description: string | null;
+
+  @Column({ nullable: true, unique: true })
+  assetId: string | null;
 
   @Column({ nullable: true })
   serialNumber: string | null;
@@ -28,17 +32,47 @@ export class Asset {
   @Column({ nullable: true })
   model: string | null;
 
-  @Column({ nullable: true, type: 'text' })
-  description: string | null;
+  @Column({ nullable: true })
+  categoryId: string | null;
 
   @Column({ nullable: true })
   departmentId: string | null;
 
+  @Column({ nullable: true })
+  location: string | null;
+
+  @Column({ type: 'enum', enum: ['NEW', 'GOOD', 'FAIR', 'POOR', 'DAMAGED'], nullable: true })
+  condition: string | null;
+
+  @Column({ type: 'decimal', precision: 18, scale: 2, nullable: true })
+  value: number | null;
+
+  @Column({ type: 'decimal', precision: 18, scale: 2, nullable: true })
+  purchasePrice: number | null;
+
+  @Column({ type: 'decimal', precision: 18, scale: 2, nullable: true })
+  currentValue: number | null;
+
+  @Column({ nullable: true })
+  purchaseDate: Date | null;
+
+  @Column({ nullable: true })
+  warrantyExpiration: Date | null;
+
+  @Column({ type: 'enum', enum: ['ACTIVE', 'INACTIVE', 'MAINTENANCE', 'RETIRED'], default: 'ACTIVE' })
+  status: string;
+
+  @Column({ nullable: true })
+  assignedToId: string | null;
+
   @Column({ type: 'simple-array', nullable: true })
   tags: string[] | null;
 
-  @Column({ type: 'enum', enum: AssetStatus, default: AssetStatus.ACTIVE })
-  status: AssetStatus;
+  @Column({ type: 'text', nullable: true })
+  notes: string | null;
+
+  @Column({ nullable: true })
+  createdBy: string | null;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -46,6 +80,9 @@ export class Asset {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @DeleteDateColumn({ nullable: true })
+  @DeleteDateColumn()
   deletedAt: Date | null;
+
+  @OneToMany(() => AssetHistory, (history) => history.asset, { cascade: true })
+  history: AssetHistory[];
 }
