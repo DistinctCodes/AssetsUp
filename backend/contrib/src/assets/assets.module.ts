@@ -7,6 +7,7 @@ import { Maintenance } from './maintenance.entity';
 import { AssetDocument } from './asset-document.entity';
 import { Category } from '../common/category.entity';
 import { Department } from '../common/department.entity';
+import { User } from '../users/user.entity';
 import { AssetsService } from './assets.service';
 import { AssetsController } from './assets.controller';
 
