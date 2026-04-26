@@ -31,4 +31,8 @@ export const queryKeys = {
     all: ['users'] as const,
     list: () => [...queryKeys.users.all, 'list'] as const,
   },
+  reports: {
+    all: ['reports'] as const,
+    summary: () => [...queryKeys.reports.all, 'summary'] as const,
+  },
 } as const;

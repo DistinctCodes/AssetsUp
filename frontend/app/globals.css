@@ -54,3 +54,28 @@
   --chart-4: 280 65% 60%;
   --chart-5: 340 75% 55%;
 }
+
+/* Print styles */
+@media print {
+  /* Hide navigation elements */
+  aside, nav, [class*="sidebar"], [class*="topbar"] {
+    display: none !important;
+  }
+  
+  /* Remove background colors and shadows for cleaner print */
+  body {
+    background: white !important;
+  }
+  
+  /* Ensure text is black for printing */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  /* Adjust main content layout for print */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
