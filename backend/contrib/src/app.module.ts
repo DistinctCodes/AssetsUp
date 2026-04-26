@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { AssetsModule } from './assets/assets.module';
+import { HealthModule } from './health/health.module';
 import { ReportsModule } from './reports/reports.module';
 import { UploadModule } from './upload/upload.module';
 
@@ -23,9 +26,20 @@ import { UploadModule } from './upload/upload.module';
         synchronize: config.get('NODE_ENV') !== 'production',
       }),
     }),
+    ThrottlerModule.forRoot({
+      ttl: 60,
+      limit: 100,
+    }),
     UsersModule,
     AuthModule,
     AssetsModule,
+    HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     ReportsModule,
     UploadModule,
   ],
