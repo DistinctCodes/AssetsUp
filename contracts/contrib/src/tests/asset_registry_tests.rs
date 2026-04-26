@@ -31,11 +31,12 @@ fn create_asset_data(env: &Env, id: u8, owner: &Address) -> Asset {
 #[test]
 fn test_register_asset_success() {
     let env = Env::default();
-    let (client, _admin) = setup_test(&env);
+    let (client, admin) = setup_test(&env);
     let owner = Address::generate(&env);
     let asset = create_asset_data(&env, 1, &owner);
 
-    client.register_asset(&asset);
+    env.mock_all_auths();
+    client.register_asset(&admin, &asset);
 
     let info = client.get_asset_info(&asset.id);
     assert_eq!(info.id, asset.id);
@@ -47,25 +48,25 @@ fn test_register_asset_success() {
 #[should_panic(expected = "Asset already exists")]
 fn test_register_asset_duplicate_panic() {
     let env = Env::default();
-    let (client, _admin) = setup_test(&env);
+    let (client, admin) = setup_test(&env);
     let owner = Address::generate(&env);
     let asset = create_asset_data(&env, 1, &owner);
 
-    client.register_asset(&asset);
-    client.register_asset(&asset);
+    env.mock_all_auths();
+    client.register_asset(&admin, &asset);
+    client.register_asset(&admin, &asset);
 }
 
 #[test]
 fn test_transfer_asset_success() {
     let env = Env::default();
-    let (client, _admin) = setup_test(&env);
+    let (client, admin) = setup_test(&env);
     let owner = Address::generate(&env);
     let new_owner = Address::generate(&env);
     let asset = create_asset_data(&env, 1, &owner);
 
-    client.register_asset(&asset);
-
     env.mock_all_auths();
+    client.register_asset(&admin, &asset);
     client.transfer_asset(&asset.id, &new_owner, &owner);
 
     let info = client.get_asset_info(&asset.id);
@@ -77,15 +78,14 @@ fn test_transfer_asset_success() {
 #[should_panic(expected = "Unauthorized")]
 fn test_transfer_asset_unauthorized_panic() {
     let env = Env::default();
-    let (client, _admin) = setup_test(&env);
+    let (client, admin) = setup_test(&env);
     let owner = Address::generate(&env);
     let malicious = Address::generate(&env);
     let new_owner = Address::generate(&env);
     let asset = create_asset_data(&env, 1, &owner);
 
-    client.register_asset(&asset);
-
     env.mock_all_auths();
+    client.register_asset(&admin, &asset);
     client.transfer_asset(&asset.id, &new_owner, &malicious);
 }
 
@@ -93,14 +93,13 @@ fn test_transfer_asset_unauthorized_panic() {
 #[should_panic(expected = "Asset is retired")]
 fn test_transfer_asset_retired_panic() {
     let env = Env::default();
-    let (client, _admin) = setup_test(&env);
+    let (client, admin) = setup_test(&env);
     let owner = Address::generate(&env);
     let new_owner = Address::generate(&env);
     let asset = create_asset_data(&env, 1, &owner);
 
-    client.register_asset(&asset);
-    
     env.mock_all_auths();
+    client.register_asset(&admin, &asset);
     client.retire_asset(&asset.id, &owner);
     client.transfer_asset(&asset.id, &new_owner, &owner);
 }
@@ -108,13 +107,12 @@ fn test_transfer_asset_retired_panic() {
 #[test]
 fn test_retire_asset_success() {
     let env = Env::default();
-    let (client, _admin) = setup_test(&env);
+    let (client, admin) = setup_test(&env);
     let owner = Address::generate(&env);
     let asset = create_asset_data(&env, 1, &owner);
 
-    client.register_asset(&asset);
-
     env.mock_all_auths();
+    client.register_asset(&admin, &asset);
     client.retire_asset(&asset.id, &owner);
 
     let info = client.get_asset_info(&asset.id);
@@ -125,13 +123,12 @@ fn test_retire_asset_success() {
 #[should_panic(expected = "Already retired")]
 fn test_retire_asset_already_retired_panic() {
     let env = Env::default();
-    let (client, _admin) = setup_test(&env);
+    let (client, admin) = setup_test(&env);
     let owner = Address::generate(&env);
     let asset = create_asset_data(&env, 1, &owner);
 
-    client.register_asset(&asset);
-
     env.mock_all_auths();
+    client.register_asset(&admin, &asset);
     client.retire_asset(&asset.id, &owner);
     client.retire_asset(&asset.id, &owner);
 }
@@ -174,7 +171,7 @@ fn test_fail_when_paused() {
 
     env.mock_all_auths();
     client.pause_contract(&admin);
-    client.register_asset(&asset);
+    client.register_asset(&admin, &asset);
 }
 
 #[test]
@@ -189,7 +186,7 @@ fn test_unpause_works() {
     client.unpause_contract(&admin);
     assert!(!client.is_paused());
 
-    client.register_asset(&asset);
+    client.register_asset(&admin, &asset);
     let info = client.get_asset_info(&asset.id);
     assert_eq!(info.id, asset.id);
 }
