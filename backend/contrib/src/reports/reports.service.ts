@@ -132,4 +132,55 @@ export class ReportsService {
       doc.end();
     });
   }
+
+  async getSummary() {
+    const total = await this.assetRepository.count();
+
+    const byStatus = await this.assetRepository
+      .createQueryBuilder('asset')
+      .select('asset.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('asset.status')
+      .getRawMany();
+
+    const byCategory = await this.assetRepository
+      .createQueryBuilder('asset')
+      .leftJoin('asset.category', 'category')
+      .select('category.name', 'name')
+      .addSelect('COUNT(*)', 'count')
+      .where('category.name IS NOT NULL')
+      .groupBy('category.name')
+      .orderBy('count', 'DESC')
+      .getRawMany();
+
+    const byDepartment = await this.assetRepository
+      .createQueryBuilder('asset')
+      .leftJoin('asset.department', 'department')
+      .select('department.name', 'name')
+      .addSelect('COUNT(*)', 'count')
+      .where('department.name IS NOT NULL')
+      .groupBy('department.name')
+      .orderBy('count', 'DESC')
+      .getRawMany();
+
+    const recent = await this.assetRepository.find({
+      relations: ['category', 'department'],
+      order: { createdAt: 'DESC' },
+      take: 5,
+      select: ['id', 'name', 'createdAt'],
+    });
+
+    return {
+      total,
+      byStatus: byStatus.map(item => ({ status: item.status, count: parseInt(item.count) })),
+      byCategory: byCategory.map(item => ({ name: item.name, count: parseInt(item.count) })),
+      byDepartment: byDepartment.map(item => ({ name: item.name, count: parseInt(item.count) })),
+      recent: recent.map(asset => ({
+        id: asset.id,
+        name: asset.name,
+        category: asset.category?.name || null,
+        department: asset.department?.name || null,
+      })),
+    };
+  }
 }

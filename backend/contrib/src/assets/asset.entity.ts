@@ -3,11 +3,14 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { AssetHistory } from './asset-history.entity';
+import { Category } from '../common/category.entity';
+import { Department } from '../common/department.entity';
 
 @Entity('asset')
 export class Asset {
@@ -35,8 +38,14 @@ export class Asset {
   @Column({ nullable: true })
   categoryId: string | null;
 
+  @ManyToOne(() => Category, { nullable: true })
+  category: Category | null;
+
   @Column({ nullable: true })
   departmentId: string | null;
+
+  @ManyToOne(() => Department, { nullable: true })
+  department: Department | null;
 
   @Column({ nullable: true })
   location: string | null;

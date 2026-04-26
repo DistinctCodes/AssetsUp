@@ -6,6 +6,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ReportsService } from './reports.service';
 
@@ -13,6 +14,13 @@ import { ReportsService } from './reports.service';
 @UseGuards(JwtAuthGuard)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Get asset summary statistics' })
+  @ApiResponse({ status: 200, description: 'Returns summary statistics' })
+  async getSummary() {
+    return this.reportsService.getSummary();
+  }
 
   @Get('export/excel')
   async exportExcel(@Res() res: Response) {

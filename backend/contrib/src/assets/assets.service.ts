@@ -3,10 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Asset } from './asset.entity';
 import { AssetHistory } from './asset-history.entity';
+import { Category } from '../common/category.entity';
+import { Department } from '../common/department.entity';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { DuplicateAssetDto } from './dto/duplicate-asset.dto';
 import { AssetFiltersDto } from './dto/asset-filters.dto';
 import { AssetHistoryAction } from './enums';
+import * as Papa from 'papaparse';
 
 @Injectable()
 export class AssetsService {
@@ -15,6 +19,10 @@ export class AssetsService {
     private readonly assetRepo: Repository<Asset>,
     @InjectRepository(AssetHistory)
     private readonly historyRepo: Repository<AssetHistory>,
+    @InjectRepository(Category)
+    private readonly categoryRepo: Repository<Category>,
+    @InjectRepository(Department)
+    private readonly departmentRepo: Repository<Department>,
   ) {}
 
   private async generateAssetId(): Promise<string> {
@@ -175,6 +183,158 @@ export class AssetsService {
     await this.historyRepo.save(history);
 
     return restored;
+  }
+
+  async duplicate(id: string, dto: DuplicateAssetDto, performedBy: string): Promise<Asset> {
+    const original = await this.assetRepo.findOne({ where: { id } });
+    if (!original) {
+      throw new NotFoundException(`Asset with id "${id}" not found`);
+    }
+
+    const assetId = await this.generateAssetId();
+
+    const duplicated = this.assetRepo.create({
+      name: dto.name || `Copy of ${original.name}`,
+      description: original.description,
+      assetId,
+      manufacturer: original.manufacturer,
+      model: original.model,
+      categoryId: original.categoryId,
+      departmentId: original.departmentId,
+      location: original.location,
+      condition: original.condition,
+      value: original.value,
+      purchasePrice: original.purchasePrice,
+      currentValue: original.currentValue,
+      purchaseDate: original.purchaseDate,
+      warrantyExpiration: original.warrantyExpiration,
+      status: original.status,
+      assignedToId: original.assignedToId,
+      tags: original.tags,
+      notes: original.notes,
+      createdBy: performedBy,
+    });
+
+    const saved = await this.assetRepo.save(duplicated);
+
+    const history = this.historyRepo.create({
+      asset: saved,
+      action: AssetHistoryAction.CREATED,
+      changes: null,
+      performedBy,
+    });
+    await this.historyRepo.save(history);
+
+    return this.assetRepo.findOneOrFail({
+      where: { id: saved.id },
+      relations: ['category', 'department'],
+    });
+  }
+
+  async getDepreciation(id: string) {
+    const asset = await this.assetRepo.findOne({ where: { id } });
+    if (!asset) {
+      throw new NotFoundException(`Asset with id "${id}" not found`);
+    }
+
+    if (!asset.purchasePrice || !asset.purchaseDate) {
+      throw new NotFoundException('Asset must have purchasePrice and purchaseDate to calculate depreciation');
+    }
+
+    const usefulLifeYears = 5;
+    const salvageValuePercent = 0.1; // 10%
+    const salvageValue = asset.purchasePrice * salvageValuePercent;
+    const depreciableAmount = asset.purchasePrice - salvageValue;
+    const depreciationPerYear = depreciableAmount / usefulLifeYears;
+
+    const now = new Date();
+    const ageInMs = now.getTime() - asset.purchaseDate.getTime();
+    const ageInYears = ageInMs / (1000 * 60 * 60 * 24 * 365.25);
+
+    const totalDepreciation = Math.min(depreciationPerYear * ageInYears, depreciableAmount);
+    const currentBookValue = asset.purchasePrice - totalDepreciation;
+    const percentDepreciated = (totalDepreciation / asset.purchasePrice) * 100;
+
+    return {
+      purchasePrice: asset.purchasePrice,
+      currentBookValue: Math.max(currentBookValue, salvageValue),
+      totalDepreciation,
+      depreciationPerYear,
+      ageInYears,
+      percentDepreciated,
+    };
+  }
+
+  async importCsv(csvBuffer: Buffer, performedBy: string) {
+    const csvString = csvBuffer.toString('utf-8');
+    const parsed = Papa.parse(csvString, { header: true, skipEmptyLines: true });
+
+    if (parsed.errors.length > 0) {
+      throw new Error(`CSV parsing error: ${parsed.errors[0].message}`);
+    }
+
+    const rows = parsed.data as any[];
+    let created = 0;
+    const errors: { row: number; reason: string }[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        let categoryId: string | null = null;
+        if (row.categoryName) {
+          let category = await this.categoryRepo.findOne({ where: { name: row.categoryName } });
+          if (!category) {
+            category = this.categoryRepo.create({ name: row.categoryName });
+            await this.categoryRepo.save(category);
+          }
+          categoryId = category.id;
+        }
+
+        let departmentId: string | null = null;
+        if (row.departmentName) {
+          let department = await this.departmentRepo.findOne({ where: { name: row.departmentName } });
+          if (!department) {
+            department = this.departmentRepo.create({ name: row.departmentName });
+            await this.departmentRepo.save(department);
+          }
+          departmentId = department.id;
+        }
+
+        const assetId = await this.generateAssetId();
+
+        const asset = this.assetRepo.create({
+          name: row.name,
+          categoryId,
+          departmentId,
+          serialNumber: row.serialNumber || null,
+          purchasePrice: row.purchasePrice ? parseFloat(row.purchasePrice) : null,
+          condition: row.condition || null,
+          location: row.location || null,
+          createdBy: performedBy,
+          assetId,
+        });
+
+        await this.assetRepo.save(asset);
+
+        const history = this.historyRepo.create({
+          asset,
+          action: AssetHistoryAction.CREATED,
+          changes: null,
+          performedBy,
+        });
+        await this.historyRepo.save(history);
+
+        created++;
+      } catch (error) {
+        errors.push({ row: i + 2, reason: error.message });
+      }
+    }
+
+    return {
+      created,
+      failed: errors.length,
+      errors,
+    };
   }
 }
 
