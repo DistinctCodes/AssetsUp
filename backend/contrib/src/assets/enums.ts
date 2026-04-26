@@ -3,6 +3,17 @@ export enum AssetHistoryAction {
   UPDATED = 'UPDATED',
   DELETED = 'DELETED',
   RESTORED = 'RESTORED',
+  STATUS_CHANGED = 'STATUS_CHANGED',
+  TRANSFERRED = 'TRANSFERRED',
+  NOTE_ADDED = 'NOTE_ADDED',
+  DOCUMENT_UPLOADED = 'DOCUMENT_UPLOADED',
+}
+
+export enum AssetStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  MAINTENANCE = 'MAINTENANCE',
+  RETIRED = 'RETIRED',
 }
 
 export enum MaintenanceType {
