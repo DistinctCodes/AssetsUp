@@ -1,14 +1,11 @@
-
-
 @Enitity()
 export class CategoryEntity {
-    
-    @PrimaryGenarated()
-    id: number;
+  @PrimaryGenarated()
+  id: number;
 
-    @string()
-    description: string;
+  @string()
+  description: string;
 
-        @string()
-    performerdBy: string;
+  @string()
+  performerdBy: string;
 }

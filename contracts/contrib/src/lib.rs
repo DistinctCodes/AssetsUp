@@ -1,6 +1,8 @@
+#![no_std]
+#![allow(clippy::too_many_arguments)]
+
 mod audit;
 mod pause;
-mod metadata;
 mod types;
 
 mod insurance;
@@ -10,7 +12,9 @@ mod lease;
 mod tests;
 
 use crate::types::AssetStatus;
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec,
+};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -122,7 +126,10 @@ impl ContribContract {
     }
 
     pub fn get_total_count(env: Env) -> u64 {
-        env.storage().persistent().get(&DataKey::TotalCount).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::TotalCount)
+            .unwrap_or(0)
     }
 
     pub fn get_total_asset_count(env: Env) -> u64 {
@@ -270,7 +277,11 @@ impl ContribContract {
 
     pub fn pause_contract(env: Env, caller: Address) {
         caller.require_auth();
-        let admin: Address = env.storage().persistent().get(&DataKey::Admin).expect("Not initialized");
+        let admin: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Admin)
+            .expect("Not initialized");
         if caller != admin {
             panic!("Unauthorized");
         }
@@ -279,7 +290,11 @@ impl ContribContract {
 
     pub fn unpause_contract(env: Env, caller: Address) {
         caller.require_auth();
-        let admin: Address = env.storage().persistent().get(&DataKey::Admin).expect("Not initialized");
+        let admin: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Admin)
+            .expect("Not initialized");
         if caller != admin {
             panic!("Unauthorized");
         }
@@ -287,13 +302,17 @@ impl ContribContract {
     }
 
     pub fn is_paused(env: Env) -> bool {
-        env.storage().persistent().get(&DataKey::Paused).unwrap_or(false)
+        env.storage()
+            .persistent()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
     }
 
     fn add_to_owner_registry(env: &Env, owner: &Address, asset_id: &BytesN<32>) {
         let store = env.storage().persistent();
         let owner_key = DataKey::OwnerAssets(owner.clone());
-        let mut owner_assets: Vec<BytesN<32>> = store.get(&owner_key).unwrap_or_else(|| Vec::new(env));
+        let mut owner_assets: Vec<BytesN<32>> =
+            store.get(&owner_key).unwrap_or_else(|| Vec::new(env));
         if owner_assets.iter().position(|x| x == *asset_id).is_none() {
             owner_assets.push_back(asset_id.clone());
         }
@@ -303,7 +322,8 @@ impl ContribContract {
     fn remove_from_owner_registry(env: &Env, owner: &Address, asset_id: &BytesN<32>) {
         let store = env.storage().persistent();
         let owner_key = DataKey::OwnerAssets(owner.clone());
-        let mut owner_assets: Vec<BytesN<32>> = store.get(&owner_key).unwrap_or_else(|| Vec::new(env));
+        let mut owner_assets: Vec<BytesN<32>> =
+            store.get(&owner_key).unwrap_or_else(|| Vec::new(env));
         if let Some(idx) = owner_assets.iter().position(|x| x == *asset_id) {
             owner_assets.remove(idx as u32);
         }
@@ -311,7 +331,12 @@ impl ContribContract {
     }
 
     fn check_not_paused(env: &Env) {
-        if env.storage().persistent().get(&DataKey::Paused).unwrap_or(false) {
+        if env
+            .storage()
+            .persistent()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
+        {
             panic!("Contract is paused");
         }
     }
@@ -334,11 +359,22 @@ impl ContribContract {
         insurance::is_policy_active(env, policy_id)
     }
 
-    pub fn submit_claim(env: Env, policy_id: BytesN<32>, amount: i128, description: String, claimant: Address) {
+    pub fn submit_claim(
+        env: Env,
+        policy_id: BytesN<32>,
+        amount: i128,
+        description: String,
+        claimant: Address,
+    ) {
         insurance::submit_claim(env, policy_id, amount, description, claimant);
     }
 
-    pub fn update_claim_status(env: Env, claim_id: BytesN<32>, new_status: insurance::ClaimStatus, insurer: Address) {
+    pub fn update_claim_status(
+        env: Env,
+        claim_id: BytesN<32>,
+        new_status: insurance::ClaimStatus,
+        insurer: Address,
+    ) {
         insurance::update_claim_status(env, claim_id, new_status, insurer);
     }
 
@@ -352,6 +388,7 @@ impl ContribContract {
 
     // --- Lease Functions ---
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_lease(
         env: Env,
         asset_id: BytesN<32>,
@@ -377,4 +414,3 @@ impl ContribContract {
         lease::get_active_leases(env, asset_id)
     }
 }
-

@@ -1,4 +1,4 @@
-use assetsup::types::AssetType;
+use assetsup::AssetType;
 use assetsup::{AssetUpContract, AssetUpContractClient};
 use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
@@ -36,8 +36,8 @@ fn test_cast_vote_success() {
 
     client.cast_vote(&1u64, &1u64, &voter);
 
-    assert!(client.has_voted(&1u64, &1u64, &voter).unwrap());
-    assert_eq!(client.get_vote_tally(&1u64, &1u64).unwrap(), 1_000_000);
+    assert!(client.has_voted(&1u64, &1u64, &voter));
+    assert_eq!(client.get_vote_tally(&1u64, &1u64), 1_000_000);
 }
 
 #[test]
@@ -96,5 +96,5 @@ fn test_proposal_passed_with_majority() {
     client.cast_vote(&1u64, &1u64, &voter);
 
     // voter holds 100% of supply — proposal must pass
-    assert!(client.proposal_passed(&1u64, &1u64).unwrap());
+    assert!(client.proposal_passed(&1u64, &1u64));
 }

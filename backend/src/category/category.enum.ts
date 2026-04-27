@@ -1,7 +1,6 @@
-export Enum CategoryType {
-    PENDING: 'pending',
-    COMPLETED: 'completed',
-    REVIEW: 'review',
-    UPDATED: 'updated'
-
+export enum CategoryType {
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  REVIEW = 'review',
+  UPDATED = 'updated',
 }

@@ -1,4 +1,4 @@
-use assetsup::types::AssetType;
+use assetsup::AssetType;
 use assetsup::{AssetUpContract, AssetUpContractClient};
 use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
@@ -37,14 +37,14 @@ fn test_distribute_and_claim_dividends_single_holder() {
 
     client.distribute_dividends(&1u64, &10_000i128);
 
-    let unclaimed = client.get_unclaimed_dividends(&1u64, &holder).unwrap();
+    let unclaimed = client.get_unclaimed_dividends(&1u64, &holder);
     assert_eq!(unclaimed, 10_000);
 
-    let claimed = client.claim_dividends(&1u64, &holder).unwrap();
+    let claimed = client.claim_dividends(&1u64, &holder);
     assert_eq!(claimed, 10_000);
 
     // After claiming, unclaimed should be zero
-    assert_eq!(client.get_unclaimed_dividends(&1u64, &holder).unwrap(), 0);
+    assert_eq!(client.get_unclaimed_dividends(&1u64, &holder), 0);
 }
 
 #[test]
@@ -63,8 +63,8 @@ fn test_distribute_dividends_proportional_multiple_holders() {
 
     client.distribute_dividends(&1u64, &1_000_000i128);
 
-    let a_unclaimed = client.get_unclaimed_dividends(&1u64, &holder_a).unwrap();
-    let b_unclaimed = client.get_unclaimed_dividends(&1u64, &holder_b).unwrap();
+    let a_unclaimed = client.get_unclaimed_dividends(&1u64, &holder_a);
+    let b_unclaimed = client.get_unclaimed_dividends(&1u64, &holder_b);
 
     assert_eq!(a_unclaimed, 750_000); // 75%
     assert_eq!(b_unclaimed, 250_000); // 25%

@@ -1,12 +1,8 @@
-
-
+import { Module } from '@nestjs/common';
 
 @Module({
-    controller:[]
-    import:[],
-    export:[],
-
+  controllers: [],
+  imports: [],
+  exports: [],
 })
-export class CatergoryModule {
-
-}
+export class CatergoryModule {}
