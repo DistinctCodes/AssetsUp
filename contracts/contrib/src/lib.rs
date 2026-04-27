@@ -1,22 +1,17 @@
-#![no_std]
+mod audit;
+mod pause;
+mod metadata;
+mod types;
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, Address, BytesN, Env, String, Symbol, Vec,
-};
+mod insurance;
+mod lease;
 
 #[cfg(test)]
 mod tests;
 
-/// Represents the current operational status of an asset.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AssetStatus {
-    Active,
-    Transferred,
-    Retired,
-}
+use crate::types::AssetStatus;
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec};
 
-/// Represents a registered asset in the system.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Asset {
@@ -32,6 +27,16 @@ pub struct Asset {
     pub purchase_value: i128,
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AssetInfo {
+    pub id: BytesN<32>,
+    pub name: String,
+    pub category: String,
+    pub owner: Address,
+    pub status: AssetStatus,
+}
+
 /// Storage keys for type-safe contract state access.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -42,6 +47,8 @@ pub enum DataKey {
     Admin,
     Paused,
     AuthorizedRegistrar(Address),
+    AuditLogCount,
+    AuditLogs(BytesN<32>),
 }
 
 #[contract]
@@ -49,133 +56,325 @@ pub struct ContribContract;
 
 #[contractimpl]
 impl ContribContract {
-    /// Initialize the contract with an admin address.
+    /// Initialize the contract with an admin.
     pub fn initialize(env: Env, admin: Address) {
-        admin.require_auth();
-
         if env.storage().persistent().has(&DataKey::Admin) {
-            panic!("contract already initialized");
+            panic!("Already initialized");
         }
-
         env.storage().persistent().set(&DataKey::Admin, &admin);
+        env.storage().persistent().set(&DataKey::Paused, &false);
+        env.storage().persistent().set(&DataKey::TotalCount, &0u64);
         env.storage()
             .persistent()
             .set(&DataKey::AuthorizedRegistrar(admin.clone()), &true);
-        env.storage().persistent().set(&DataKey::TotalCount, &0u64);
     }
 
-    pub fn register_asset(env: Env, registrar: Address, asset_data: Asset) {
-        registrar.require_auth();
-
-        let is_authorized: bool = env
-            .storage()
+    pub fn get_admin(env: Env) -> Address {
+        env.storage()
             .persistent()
-            .get(&DataKey::AuthorizedRegistrar(registrar))
-            .unwrap_or_default();
-        if !is_authorized {
-            panic!("registrar is not authorized");
-        }
-
-        let asset_key = DataKey::Asset(asset_data.id.clone());
-        let store = env.storage().persistent();
-
-        if store.has(&asset_key) {
-            panic!("asset already exists");
-        }
-
-        store.set(&asset_key, &asset_data);
-
-        let owner_key = DataKey::OwnerAssets(asset_data.owner.clone());
-        let mut owner_assets: Vec<BytesN<32>> =
-            store.get(&owner_key).unwrap_or_else(|| Vec::new(&env));
-        owner_assets.push_back(asset_data.id.clone());
-        store.set(&owner_key, &owner_assets);
-
-        let total_count: u64 = store.get(&DataKey::TotalCount).unwrap_or_default();
-        store.set(&DataKey::TotalCount, &(total_count + 1));
-
-        env.events().publish(
-            (Symbol::new(&env, "asset"), Symbol::new(&env, "registered")),
-            (asset_data.id.clone(), asset_data.owner.clone()),
-        );
+            .get(&DataKey::Admin)
+            .expect("Not initialized")
     }
 
-    pub fn add_authorized_registrar(env: Env, registrar: Address) {
-        let admin: Address = env
+    pub fn add_authorized_registrar(env: Env, caller: Address, registrar: Address) {
+        caller.require_auth();
+        let admin = env
             .storage()
             .persistent()
             .get(&DataKey::Admin)
-            .expect("admin not set");
-        admin.require_auth();
-
+            .expect("Not initialized");
+        if caller != admin {
+            panic!("Unauthorized");
+        }
         env.storage()
             .persistent()
             .set(&DataKey::AuthorizedRegistrar(registrar), &true);
+    }
+
+    pub fn remove_authorized_registrar(env: Env, caller: Address, registrar: Address) {
+        caller.require_auth();
+        let admin = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Admin)
+            .expect("Not initialized");
+        if caller != admin {
+            panic!("Unauthorized");
+        }
+        env.storage()
+            .persistent()
+            .set(&DataKey::AuthorizedRegistrar(registrar), &false);
     }
 
     pub fn is_authorized_registrar(env: Env, address: Address) -> bool {
         env.storage()
             .persistent()
             .get(&DataKey::AuthorizedRegistrar(address))
-            .unwrap_or_default()
+            .unwrap_or(false)
+    }
+
+    pub fn add_registrar(env: Env, caller: Address, registrar: Address) {
+        Self::add_authorized_registrar(env, caller, registrar);
+    }
+
+    pub fn remove_registrar(env: Env, caller: Address, registrar: Address) {
+        Self::remove_authorized_registrar(env, caller, registrar);
     }
 
     pub fn get_total_count(env: Env) -> u64 {
-        env.storage()
-            .persistent()
-            .get(&DataKey::TotalCount)
-            .unwrap_or_default()
+        env.storage().persistent().get(&DataKey::TotalCount).unwrap_or(0)
     }
 
-    pub fn transfer_asset(env: Env, asset_id: BytesN<32>, new_owner: Address) {
+    pub fn get_total_asset_count(env: Env) -> u64 {
+        Self::get_total_count(env)
+    }
+
+    /// Asset Registry Functions
+    pub fn register_asset(env: Env, registrar: Address, asset: Asset) {
+        Self::check_not_paused(&env);
+        registrar.require_auth();
+
+        if !env
+            .storage()
+            .persistent()
+            .get(&DataKey::AuthorizedRegistrar(registrar.clone()))
+            .unwrap_or(false)
+        {
+            panic!("Unauthorized registrar");
+        }
+
         let store = env.storage().persistent();
+        let key = DataKey::Asset(asset.id.clone());
 
-        let asset_key = DataKey::Asset(asset_id.clone());
-        let mut asset: Asset = store.get(&asset_key).expect("asset not found");
-
-        if asset.status == AssetStatus::Retired {
-            panic!("cannot transfer a retired asset");
+        if store.has(&key) {
+            panic!("Asset already exists");
         }
 
-        let old_owner = asset.owner.clone();
-        old_owner.require_auth();
+        store.set(&key, &asset);
+        Self::add_to_owner_registry(&env, &asset.owner, &asset.id);
 
-        let old_owner_key = DataKey::OwnerAssets(old_owner.clone());
-        let old_owner_assets: Vec<BytesN<32>> =
-            store.get(&old_owner_key).unwrap_or_else(|| Vec::new(&env));
-        let mut removed = false;
-        let mut updated_list = Vec::new(&env);
-        for i in 0..old_owner_assets.len() {
-            let id = old_owner_assets.get(i).unwrap();
-            if id == asset_id && !removed {
-                removed = true;
-            } else {
-                updated_list.push_back(id);
-            }
-        }
-        if updated_list.is_empty() {
-            store.remove(&old_owner_key);
-        } else {
-            store.set(&old_owner_key, &updated_list);
-        }
+        let mut count: u64 = store.get(&DataKey::TotalCount).unwrap_or(0);
+        count += 1;
+        store.set(&DataKey::TotalCount, &count);
 
-        let new_owner_key = DataKey::OwnerAssets(new_owner.clone());
-        let mut new_owner_assets: Vec<BytesN<32>> =
-            store.get(&new_owner_key).unwrap_or_else(|| Vec::new(&env));
-        new_owner_assets.push_back(asset_id.clone());
-        store.set(&new_owner_key, &new_owner_assets);
-
-        asset.owner = new_owner.clone();
-        asset.last_transfer_timestamp = env.ledger().timestamp();
-        store.set(&asset_key, &asset);
+        audit::append_audit_log(
+            &env,
+            asset.id.clone(),
+            String::from_str(&env, "register"),
+            registrar.clone(),
+            String::from_str(&env, "Asset registered"),
+        );
 
         env.events().publish(
-            (Symbol::new(&env, "asset"), Symbol::new(&env, "transferred")),
-            (asset_id, old_owner, new_owner),
+            (symbol_short!("asset_reg"), asset.id.clone()),
+            (asset.owner, env.ledger().timestamp()),
         );
     }
 
-    pub fn get_asset(env: Env, id: BytesN<32>) -> Option<Asset> {
-        env.storage().persistent().get(&DataKey::Asset(id))
+    pub fn transfer_asset(env: Env, asset_id: BytesN<32>, new_owner: Address, caller: Address) {
+        Self::check_not_paused(&env);
+        caller.require_auth();
+
+        let store = env.storage().persistent();
+        let key = DataKey::Asset(asset_id.clone());
+
+        let mut asset: Asset = store.get(&key).expect("Asset not found");
+
+        if asset.owner != caller {
+            panic!("Unauthorized");
+        }
+
+        if asset.status == AssetStatus::Retired {
+            panic!("Asset is retired");
+        }
+
+        let old_owner = asset.owner.clone();
+        Self::remove_from_owner_registry(&env, &old_owner, &asset_id);
+
+        asset.owner = new_owner.clone();
+        asset.status = AssetStatus::Transferred;
+        asset.last_transfer_timestamp = env.ledger().timestamp();
+        store.set(&key, &asset);
+
+        Self::add_to_owner_registry(&env, &new_owner, &asset_id);
+
+        audit::append_audit_log(
+            &env,
+            asset_id.clone(),
+            String::from_str(&env, "transfer"),
+            caller.clone(),
+            String::from_str(&env, "Asset transferred"),
+        );
+
+        env.events().publish(
+            (symbol_short!("asset_tra"), asset_id.clone()),
+            (old_owner, new_owner, env.ledger().timestamp()),
+        );
+    }
+
+    pub fn retire_asset(env: Env, asset_id: BytesN<32>, caller: Address) {
+        Self::check_not_paused(&env);
+        caller.require_auth();
+
+        let store = env.storage().persistent();
+        let key = DataKey::Asset(asset_id.clone());
+
+        let mut asset: Asset = store.get(&key).expect("Asset not found");
+
+        if asset.owner != caller {
+            panic!("Unauthorized");
+        }
+
+        if asset.status == AssetStatus::Retired {
+            panic!("Already retired");
+        }
+
+        asset.status = AssetStatus::Retired;
+        store.set(&key, &asset);
+
+        audit::append_audit_log(
+            &env,
+            asset_id.clone(),
+            String::from_str(&env, "retire"),
+            caller.clone(),
+            String::from_str(&env, "Asset retired"),
+        );
+
+        env.events().publish(
+            (symbol_short!("asset_ret"), asset_id),
+            (caller, env.ledger().timestamp()),
+        );
+    }
+
+    pub fn get_asset(env: Env, asset_id: BytesN<32>) -> Option<Asset> {
+        env.storage().persistent().get(&DataKey::Asset(asset_id))
+    }
+
+    pub fn get_asset_info(env: Env, asset_id: BytesN<32>) -> Asset {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Asset(asset_id))
+            .expect("Asset not found")
+    }
+
+    pub fn get_assets_by_owner(env: Env, owner: Address) -> Vec<BytesN<32>> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::OwnerAssets(owner))
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    pub fn get_audit_logs(env: Env, asset_id: BytesN<32>) -> Vec<audit::AuditLog> {
+        audit::get_audit_logs(&env, asset_id)
+    }
+
+    pub fn pause_contract(env: Env, caller: Address) {
+        caller.require_auth();
+        let admin: Address = env.storage().persistent().get(&DataKey::Admin).expect("Not initialized");
+        if caller != admin {
+            panic!("Unauthorized");
+        }
+        env.storage().persistent().set(&DataKey::Paused, &true);
+    }
+
+    pub fn unpause_contract(env: Env, caller: Address) {
+        caller.require_auth();
+        let admin: Address = env.storage().persistent().get(&DataKey::Admin).expect("Not initialized");
+        if caller != admin {
+            panic!("Unauthorized");
+        }
+        env.storage().persistent().set(&DataKey::Paused, &false);
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage().persistent().get(&DataKey::Paused).unwrap_or(false)
+    }
+
+    fn add_to_owner_registry(env: &Env, owner: &Address, asset_id: &BytesN<32>) {
+        let store = env.storage().persistent();
+        let owner_key = DataKey::OwnerAssets(owner.clone());
+        let mut owner_assets: Vec<BytesN<32>> = store.get(&owner_key).unwrap_or_else(|| Vec::new(env));
+        if owner_assets.iter().position(|x| x == *asset_id).is_none() {
+            owner_assets.push_back(asset_id.clone());
+        }
+        store.set(&owner_key, &owner_assets);
+    }
+
+    fn remove_from_owner_registry(env: &Env, owner: &Address, asset_id: &BytesN<32>) {
+        let store = env.storage().persistent();
+        let owner_key = DataKey::OwnerAssets(owner.clone());
+        let mut owner_assets: Vec<BytesN<32>> = store.get(&owner_key).unwrap_or_else(|| Vec::new(env));
+        if let Some(idx) = owner_assets.iter().position(|x| x == *asset_id) {
+            owner_assets.remove(idx as u32);
+        }
+        store.set(&owner_key, &owner_assets);
+    }
+
+    fn check_not_paused(env: &Env) {
+        if env.storage().persistent().get(&DataKey::Paused).unwrap_or(false) {
+            panic!("Contract is paused");
+        }
+    }
+
+    // --- Insurance Functions ---
+
+    pub fn create_policy(env: Env, asset_id: BytesN<32>, policy_data: insurance::InsurancePolicy) {
+        insurance::create_policy(env, asset_id, policy_data);
+    }
+
+    pub fn get_policy(env: Env, policy_id: BytesN<32>) -> insurance::InsurancePolicy {
+        insurance::get_policy(env, policy_id)
+    }
+
+    pub fn cancel_policy(env: Env, policy_id: BytesN<32>, caller: Address) {
+        insurance::cancel_policy(env, policy_id, caller);
+    }
+
+    pub fn is_policy_active(env: Env, policy_id: BytesN<32>) -> bool {
+        insurance::is_policy_active(env, policy_id)
+    }
+
+    pub fn submit_claim(env: Env, policy_id: BytesN<32>, amount: i128, description: String, claimant: Address) {
+        insurance::submit_claim(env, policy_id, amount, description, claimant);
+    }
+
+    pub fn update_claim_status(env: Env, claim_id: BytesN<32>, new_status: insurance::ClaimStatus, insurer: Address) {
+        insurance::update_claim_status(env, claim_id, new_status, insurer);
+    }
+
+    pub fn get_claim(env: Env, claim_id: BytesN<32>) -> insurance::InsuranceClaim {
+        insurance::get_claim(env, claim_id)
+    }
+
+    pub fn get_claims_for_policy(env: Env, policy_id: BytesN<32>) -> Vec<BytesN<32>> {
+        insurance::get_claims_for_policy(env, policy_id)
+    }
+
+    // --- Lease Functions ---
+
+    pub fn create_lease(
+        env: Env,
+        asset_id: BytesN<32>,
+        lessee: Address,
+        start: u64,
+        end: u64,
+        rent: i128,
+        deposit: i128,
+        lessor: Address,
+    ) -> BytesN<32> {
+        lease::create_lease(env, asset_id, lessee, start, end, rent, deposit, lessor)
+    }
+
+    pub fn check_in_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
+        lease::check_in_lease(env, lease_id, caller);
+    }
+
+    pub fn cancel_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
+        lease::cancel_lease(env, lease_id, caller);
+    }
+
+    pub fn get_active_leases(env: Env, asset_id: BytesN<32>) -> Vec<BytesN<32>> {
+        lease::get_active_leases(env, asset_id)
     }
 }
+

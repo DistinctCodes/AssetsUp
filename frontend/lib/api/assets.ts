@@ -95,6 +95,9 @@ export const assetApiClient = {
   deleteDepartment: (id: string): Promise<void> =>
     api.delete(`/departments/${id}`).then(() => undefined),
 
+  updateDepartment: (id: string, data: { name?: string; description?: string }): Promise<Department> =>
+    api.patch<Department>(`/departments/${id}`, data).then((r) => r.data),
+
   getCategories: (): Promise<CategoryWithCount[]> =>
     api.get<CategoryWithCount[]>('/categories').then((r) => r.data),
 
@@ -103,6 +106,9 @@ export const assetApiClient = {
 
   deleteCategory: (id: string): Promise<void> =>
     api.delete(`/categories/${id}`).then(() => undefined),
+
+  updateCategory: (id: string, data: { name?: string; description?: string }): Promise<{ id: string; name: string }> =>
+    api.patch<{ id: string; name: string }>(`/categories/${id}`, data).then((r) => r.data),
 
   getUsers: (): Promise<AssetUser[]> =>
     api.get<AssetUser[]>('/users').then((r) => r.data),
@@ -135,4 +141,16 @@ export const assetApiClient = {
 
   createNote: (assetId: string, data: CreateNoteInput): Promise<AssetNote> =>
     api.post<AssetNote>(`/assets/${assetId}/notes`, data).then((r) => r.data),
+
+  deleteNote: (assetId: string, noteId: string): Promise<void> =>
+    api.delete(`/assets/${assetId}/notes/${noteId}`).then(() => undefined),
+
+  updateMaintenanceStatus: (
+    assetId: string,
+    maintenanceId: string,
+    status: string,
+  ): Promise<MaintenanceRecord> =>
+    api
+      .patch<MaintenanceRecord>(`/assets/${assetId}/maintenance/${maintenanceId}`, { status })
+      .then((r) => r.data),
 };
