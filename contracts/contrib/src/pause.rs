@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::DataKey;
 use soroban_sdk::{Address, Env};
 
@@ -30,7 +32,10 @@ pub fn unpause(env: &Env, caller: Address) {
 }
 
 pub fn is_paused(env: &Env) -> bool {
-    env.storage().persistent().get(&DataKey::Paused).unwrap_or(false)
+    env.storage()
+        .persistent()
+        .get(&DataKey::Paused)
+        .unwrap_or(false)
 }
 
 pub fn require_not_paused(env: &Env) {

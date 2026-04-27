@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{ContribContract, ContribContractClient, Asset, AssetStatus};
+use crate::{Asset, AssetStatus, ContribContract, ContribContractClient};
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String};
 
 fn setup_test(env: &Env) -> (ContribContractClient<'_>, Address) {
@@ -151,7 +151,7 @@ fn test_pause_unpause_flow() {
     let (client, admin) = setup_test(&env);
 
     env.mock_all_auths();
-    
+
     // Pause
     client.pause_contract(&admin);
     assert!(client.is_paused());

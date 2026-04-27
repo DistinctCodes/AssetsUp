@@ -16,10 +16,12 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // Enable validation globally
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
 
   // Swagger Configuration
   const config = new DocumentBuilder()

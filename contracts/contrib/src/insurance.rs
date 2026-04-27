@@ -1,5 +1,5 @@
-use soroban_sdk::{contracttype, symbol_short, Address, BytesN, Env, String, Vec};
 use crate::DataKey as GlobalDataKey;
+use soroban_sdk::{contracttype, symbol_short, Address, BytesN, Env, String, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,7 +55,7 @@ pub enum DataKey {
 
 pub fn create_policy(env: Env, asset_id: BytesN<32>, policy_data: InsurancePolicy) {
     let store = env.storage().persistent();
-    
+
     // Authorization: admin or insurer
     let admin: Address = store.get(&GlobalDataKey::Admin).expect("Not initialized");
     if policy_data.insurer != admin {
@@ -78,7 +78,10 @@ pub fn create_policy(env: Env, asset_id: BytesN<32>, policy_data: InsurancePolic
 }
 
 pub fn get_policy(env: Env, policy_id: BytesN<32>) -> InsurancePolicy {
-    env.storage().persistent().get(&DataKey::Policy(policy_id)).expect("Policy not found")
+    env.storage()
+        .persistent()
+        .get(&DataKey::Policy(policy_id))
+        .expect("Policy not found")
 }
 
 pub fn cancel_policy(env: Env, policy_id: BytesN<32>, caller: Address) {
@@ -102,15 +105,25 @@ pub fn cancel_policy(env: Env, policy_id: BytesN<32>, caller: Address) {
 
 pub fn is_policy_active(env: Env, policy_id: BytesN<32>) -> bool {
     let store = env.storage().persistent();
-    let policy: InsurancePolicy = store.get(&DataKey::Policy(policy_id)).expect("Policy not found");
-    
+    let policy: InsurancePolicy = store
+        .get(&DataKey::Policy(policy_id))
+        .expect("Policy not found");
+
     let current_time = env.ledger().timestamp();
-    policy.status == PolicyStatus::Active && current_time >= policy.start_date && current_time <= policy.end_date
+    policy.status == PolicyStatus::Active
+        && current_time >= policy.start_date
+        && current_time <= policy.end_date
 }
 
-pub fn submit_claim(env: Env, policy_id: BytesN<32>, amount: i128, description: String, claimant: Address) {
+pub fn submit_claim(
+    env: Env,
+    policy_id: BytesN<32>,
+    amount: i128,
+    description: String,
+    claimant: Address,
+) {
     claimant.require_auth();
-    
+
     if !is_policy_active(env.clone(), policy_id.clone()) {
         panic!("Policy is not active");
     }
@@ -152,7 +165,12 @@ pub fn submit_claim(env: Env, policy_id: BytesN<32>, amount: i128, description: 
     );
 }
 
-pub fn update_claim_status(env: Env, claim_id: BytesN<32>, new_status: ClaimStatus, insurer: Address) {
+pub fn update_claim_status(
+    env: Env,
+    claim_id: BytesN<32>,
+    new_status: ClaimStatus,
+    insurer: Address,
+) {
     insurer.require_auth();
     let store = env.storage().persistent();
     let claim_key = DataKey::Claim(claim_id.clone());
@@ -173,9 +191,15 @@ pub fn update_claim_status(env: Env, claim_id: BytesN<32>, new_status: ClaimStat
 }
 
 pub fn get_claim(env: Env, claim_id: BytesN<32>) -> InsuranceClaim {
-    env.storage().persistent().get(&DataKey::Claim(claim_id)).expect("Claim not found")
+    env.storage()
+        .persistent()
+        .get(&DataKey::Claim(claim_id))
+        .expect("Claim not found")
 }
 
 pub fn get_claims_for_policy(env: Env, policy_id: BytesN<32>) -> Vec<BytesN<32>> {
-    env.storage().persistent().get(&DataKey::PolicyClaims(policy_id)).unwrap_or_else(|| Vec::new(&env))
+    env.storage()
+        .persistent()
+        .get(&DataKey::PolicyClaims(policy_id))
+        .unwrap_or_else(|| Vec::new(&env))
 }

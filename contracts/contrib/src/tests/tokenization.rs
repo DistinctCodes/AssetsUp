@@ -66,7 +66,7 @@ fn test_transfer_tokens_success() {
 
     client.transfer_tokens(&1u64, &from, &to, &400_000i128);
 
-    assert_eq!(client.get_token_balance(&1u64, &from),600_000);
+    assert_eq!(client.get_token_balance(&1u64, &from), 600_000);
     assert_eq!(client.get_token_balance(&1u64, &to), 400_000);
 }
 

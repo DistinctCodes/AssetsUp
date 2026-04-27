@@ -1,5 +1,5 @@
 #![allow(clippy::upper_case_acronyms)]
-use soroban_sdk::{contracttype, Address, BytesN, String, Vec};
+use soroban_sdk::{contracttype, Address, String, Vec};
 
 /// Represents the current operational status of an asset.
 #[contracttype]
