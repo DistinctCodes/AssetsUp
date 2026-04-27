@@ -1,4 +1,4 @@
-use assetsup::types::AssetType;
+use assetsup::AssetType;
 use assetsup::{AssetUpContract, AssetUpContractClient};
 use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
@@ -35,18 +35,18 @@ fn test_execute_detokenization_end_to_end() {
     tokenize(&client, &env, 1, &proposer);
 
     // Propose detokenization
-    let proposal_id = client.propose_detokenization(&1u64, &proposer).unwrap();
-    assert!(client.is_detokenization_active(&1u64).unwrap());
+    let proposal_id = client.propose_detokenization(&1u64, &proposer);
+    assert!(client.is_detokenization_active(&1u64));
 
     // proposer holds 100% — cast vote so proposal passes
     client.cast_vote(&1u64, &proposal_id, &proposer);
-    assert!(client.proposal_passed(&1u64, &proposal_id).unwrap());
+    assert!(client.proposal_passed(&1u64, &proposal_id));
 
     // Execute detokenization
     client.execute_detokenization(&1u64, &proposal_id);
 
     // Asset should no longer be tokenized
-    assert!(!client.is_detokenization_active(&1u64).unwrap());
+    assert!(!client.is_detokenization_active(&1u64));
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn test_execute_detokenization_without_votes_panics() {
     env.mock_all_auths();
     tokenize(&client, &env, 1, &proposer);
 
-    let proposal_id = client.propose_detokenization(&1u64, &proposer).unwrap();
+    let proposal_id = client.propose_detokenization(&1u64, &proposer);
 
     // No votes cast — should panic with DetokenizationNotApproved (#28)
     client.execute_detokenization(&1u64, &proposal_id);

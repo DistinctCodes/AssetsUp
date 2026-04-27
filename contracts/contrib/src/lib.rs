@@ -377,4 +377,3 @@ impl ContribContract {
         lease::get_active_leases(env, asset_id)
     }
 }
-

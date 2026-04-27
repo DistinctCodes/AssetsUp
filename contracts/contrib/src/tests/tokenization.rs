@@ -1,4 +1,4 @@
-use assetsup::types::AssetType;
+use assetsup::AssetType;
 use assetsup::{AssetUpContract, AssetUpContractClient};
 use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
@@ -66,8 +66,8 @@ fn test_transfer_tokens_success() {
 
     client.transfer_tokens(&1u64, &from, &to, &400_000i128);
 
-    assert_eq!(client.get_token_balance(&1u64, &from).unwrap(), 600_000);
-    assert_eq!(client.get_token_balance(&1u64, &to).unwrap(), 400_000);
+    assert_eq!(client.get_token_balance(&1u64, &from),600_000);
+    assert_eq!(client.get_token_balance(&1u64, &to), 400_000);
 }
 
 #[test]
