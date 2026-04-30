@@ -1,4 +1,0 @@
-# Local build/deps
-node_modules/
-dist/
-*.tsbuildinfo

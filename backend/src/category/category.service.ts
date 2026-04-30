@@ -1,2 +1,0 @@
-@Injectable()
-export class CatergoryServies {}
