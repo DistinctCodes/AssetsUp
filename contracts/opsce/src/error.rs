@@ -17,4 +17,8 @@ pub enum ContractError {
     InvalidCost = 11,
     DuplicateRecord = 12,
     RecordNotFound = 13,
+    AdminNotSet = 14,
+    NotAdmin = 15,
+    AlertNotFound = 16,
+    AdminAlreadySet = 17,
 }

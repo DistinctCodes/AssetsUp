@@ -53,6 +53,35 @@ pub struct MaintenanceRecord {
     pub created_at: u64,
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AlertType {
+    ServiceDue,
+    Overdue,
+}
+
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AlertSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaintenanceAlert {
+    pub alert_id: BytesN<32>,
+    pub asset_id: String,
+    pub record_id: BytesN<32>,
+    pub alert_type: AlertType,
+    pub severity: AlertSeverity,
+    pub due_date: u64,
+    pub created_at: u64,
+    pub resolved: bool,
+}
+
 /// Storage keys for the opsce multisig contract.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -69,4 +98,10 @@ pub enum DataKey {
     MaintenanceRecord(BytesN<32>),
     /// Per-asset index of `record_id`s for fast retrieval.
     MaintenanceIndex(String),
+    /// Contract administrator (instance scope).
+    Admin,
+    /// Stores a `MaintenanceAlert` keyed by its content-derived id.
+    Alert(BytesN<32>),
+    /// Per-asset index of `alert_id`s.
+    AlertIndex(String),
 }

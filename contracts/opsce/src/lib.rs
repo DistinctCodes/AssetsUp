@@ -3,6 +3,7 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Vec};
 
 pub mod error;
+pub mod maintenance_alerts;
 pub mod maintenance_record;
 pub mod multisig_revoke;
 pub mod types;
@@ -12,7 +13,8 @@ mod tests;
 
 pub use crate::error::ContractError;
 pub use crate::types::{
-    DataKey, MaintenanceRecord, MaintenanceRecordType, MaintenanceStatus, Transaction, Wallet,
+    AlertSeverity, AlertType, DataKey, MaintenanceAlert, MaintenanceRecord, MaintenanceRecordType,
+    MaintenanceStatus, Transaction, Wallet,
 };
 
 #[contract]
@@ -221,6 +223,30 @@ impl OpsceMultisig {
         env.storage()
             .persistent()
             .get(&DataKey::MaintenanceRecord(record_id))
+    }
+
+    /// One-time admin initialization (used by alert dismissal).
+    pub fn set_admin(env: Env, admin: Address) -> Result<(), ContractError> {
+        maintenance_alerts::set_admin(&env, admin)
+    }
+
+    /// Evaluate scheduled maintenance and generate / return alerts due within 7 days.
+    pub fn check_maintenance_alerts(env: Env, asset_id: String) -> Vec<MaintenanceAlert> {
+        maintenance_alerts::check_maintenance_alerts(&env, asset_id)
+    }
+
+    /// Return all unresolved alerts for the given asset.
+    pub fn get_active_alerts(env: Env, asset_id: String) -> Vec<MaintenanceAlert> {
+        maintenance_alerts::get_active_alerts(&env, asset_id)
+    }
+
+    /// Mark an alert resolved (admin only).
+    pub fn dismiss_alert(
+        env: Env,
+        caller: Address,
+        alert_id: BytesN<32>,
+    ) -> Result<(), ContractError> {
+        maintenance_alerts::dismiss_alert(&env, caller, alert_id)
     }
 
     /// Read-only getter for tests / clients.
