@@ -1,8 +1,9 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, Address, Env, Vec};
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Vec};
 
 pub mod error;
+pub mod maintenance_record;
 pub mod multisig_revoke;
 pub mod types;
 
@@ -10,7 +11,9 @@ pub mod types;
 mod tests;
 
 pub use crate::error::ContractError;
-pub use crate::types::{DataKey, Transaction, Wallet};
+pub use crate::types::{
+    DataKey, MaintenanceRecord, MaintenanceRecordType, MaintenanceStatus, Transaction, Wallet,
+};
 
 #[contract]
 pub struct OpsceMultisig;
@@ -182,6 +185,42 @@ impl OpsceMultisig {
         tx_id: u64,
     ) -> Result<(), ContractError> {
         multisig_revoke::revoke_approval(&env, caller, wallet_id, tx_id)
+    }
+
+    /// Create a maintenance record (see [`maintenance_record::create_maintenance_record`]).
+    pub fn create_maintenance_record(
+        env: Env,
+        asset_id: String,
+        record_type: MaintenanceRecordType,
+        provider: Address,
+        scheduled_date: u64,
+        cost: i128,
+        notes: String,
+    ) -> Result<BytesN<32>, ContractError> {
+        maintenance_record::create_maintenance_record(
+            &env,
+            asset_id,
+            record_type,
+            provider,
+            scheduled_date,
+            cost,
+            notes,
+        )
+    }
+
+    /// Get all maintenance records associated with the given `asset_id`.
+    pub fn get_maintenance_records(env: Env, asset_id: String) -> Vec<MaintenanceRecord> {
+        maintenance_record::get_maintenance_records(&env, asset_id)
+    }
+
+    /// Get a single maintenance record by its `record_id`.
+    pub fn get_maintenance_record(
+        env: Env,
+        record_id: BytesN<32>,
+    ) -> Option<MaintenanceRecord> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::MaintenanceRecord(record_id))
     }
 
     /// Read-only getter for tests / clients.

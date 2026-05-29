@@ -13,4 +13,8 @@ pub enum ContractError {
     InsufficientApprovals = 7,
     InvalidThreshold = 8,
     InsufficientOwners = 9,
+    InvalidAssetId = 10,
+    InvalidCost = 11,
+    DuplicateRecord = 12,
+    RecordNotFound = 13,
 }
