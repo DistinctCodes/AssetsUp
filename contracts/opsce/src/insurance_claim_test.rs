@@ -3,7 +3,7 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{Address, Env, String};
+use soroban_sdk::{Address, BytesN, Env, String};
 
 #[test]
 fn test_file_insurance_claim() {
@@ -99,6 +99,6 @@ fn test_settle_claim_invalid_caller() {
         .unwrap();
 
     // Clear auths so the settle_claim call fails for admin authorization
-    env.reset_auths();
+    env.set_auths(&[]);
     client.settle_claim(&claim_id, &true, &75).unwrap();
 }
