@@ -4,6 +4,7 @@ import axios, {
   InternalAxiosRequestConfig,
   AxiosError,
 } from 'axios';
+import { useAuthStore } from '@/store/auth.store';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -85,12 +86,10 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
-    // Only attempt refresh on 401 and only once per request
     if (error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
     }
 
-    // If a refresh is already in-flight, queue this request until it resolves
     if (isRefreshing) {
       return new Promise<string>((resolve, reject) => {
         failedQueue.push({ resolve, reject });
@@ -119,7 +118,6 @@ apiClient.interceptors.response.use(
 
       const newToken = data.accessToken;
 
-      // Persist new token — same pattern as auth.store
       localStorage.setItem('accessToken', newToken);
       setAuthCookie(newToken);
 
@@ -133,13 +131,7 @@ apiClient.interceptors.response.use(
     } catch (refreshError) {
       processQueue(refreshError, null);
 
-      // Refresh failed — wipe everything and redirect to login
       clearAuthStorage();
-
-      // Update Zustand state so UI reflects signed-out status
-      // Lazy require avoids circular dep at module init time
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { useAuthStore } = require('@/store/auth.store');
       useAuthStore.getState().setUser(null);
 
       if (typeof window !== 'undefined') {
