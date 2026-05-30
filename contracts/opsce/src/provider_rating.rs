@@ -15,28 +15,10 @@
 //! - Emits a `provider_rated` event carrying the rating value and record id
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, Address, Env, String, Symbol,
+    contract, contractimpl, contracttype, Address, Env, String, Symbol,
 };
 
-/// Errors returned by this contract.
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum ContractError {
-    NotInitialized = 1,
-    AlreadyInitialized = 2,
-    Unauthorized = 3,
-    /// Rating is outside the allowed 1..=5 range.
-    InvalidRating = 4,
-    /// The maintenance record was already rated.
-    AlreadyRated = 5,
-    /// Maintenance record id was not found.
-    RecordNotFound = 6,
-    /// Maintenance record exists but is not yet marked complete.
-    RecordNotComplete = 7,
-    /// Provider profile is not registered.
-    ProviderNotFound = 8,
-}
+pub use crate::error::ContractError;
 
 /// Provider profile with cumulative rating fields.
 ///
@@ -94,6 +76,15 @@ pub enum DataKey {
     RatedRecord(u64),
     /// The persisted review for a record id.
     Review(u64),
+}
+
+/// Internal helper used by sibling modules (e.g. `kyc_verification`) to read
+/// the admin address registered through [`OpsceContract::init`].
+pub(crate) fn read_admin(env: &Env) -> Result<Address, ContractError> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::Admin)
+        .ok_or(ContractError::NotInitialized)
 }
 
 #[contract]
