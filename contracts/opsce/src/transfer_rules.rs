@@ -129,12 +129,16 @@ mod tests {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
 
-    fn env() -> Env { Env::default() }
-    fn asset(env: &Env) -> BytesN<32> { BytesN::from_array(env, &[1u8; 32]) }
+    fn env() -> Env {
+        Env::default()
+    }
+    fn asset(env: &Env) -> BytesN<32> {
+        BytesN::from_array(env, &[1u8; 32])
+    }
 
     fn register_contract(env: &Env) -> Address {
-    env.register(crate::TransferRulesContract, ())
-}
+        env.register(crate::TransferRulesContract, ())
+    }
 
     #[test]
     fn test_happy_path() {
@@ -143,9 +147,9 @@ mod tests {
         let contract_id = register_contract(&env);
         env.as_contract(&contract_id, || {
             let admin = Address::generate(&env);
-            let from  = Address::generate(&env);
-            let to    = Address::generate(&env);
-            let a     = asset(&env);
+            let from = Address::generate(&env);
+            let to = Address::generate(&env);
+            let a = asset(&env);
             set_transfer_limits(&env, &admin, a.clone(), 100, 10_000).unwrap();
             assert_eq!(validate_transfer(&env, &from, &to, &a, 500), Ok(()));
         });
@@ -153,11 +157,11 @@ mod tests {
 
     #[test]
     fn test_self_transfer() {
-        let env  = env();
+        let env = env();
         let contract_id = register_contract(&env);
         env.as_contract(&contract_id, || {
             let addr = Address::generate(&env);
-            let a    = asset(&env);
+            let a = asset(&env);
             assert_eq!(
                 validate_transfer(&env, &addr, &addr, &a, 500),
                 Err(ContractError::SelfTransfer)
@@ -172,9 +176,9 @@ mod tests {
         let contract_id = register_contract(&env);
         env.as_contract(&contract_id, || {
             let admin = Address::generate(&env);
-            let from  = Address::generate(&env);
-            let to    = Address::generate(&env);
-            let a     = asset(&env);
+            let from = Address::generate(&env);
+            let to = Address::generate(&env);
+            let a = asset(&env);
             set_transfer_limits(&env, &admin, a.clone(), 100, 10_000).unwrap();
             assert_eq!(
                 validate_transfer(&env, &from, &to, &a, 50),
@@ -190,9 +194,9 @@ mod tests {
         let contract_id = register_contract(&env);
         env.as_contract(&contract_id, || {
             let admin = Address::generate(&env);
-            let from  = Address::generate(&env);
-            let to    = Address::generate(&env);
-            let a     = asset(&env);
+            let from = Address::generate(&env);
+            let to = Address::generate(&env);
+            let a = asset(&env);
             set_transfer_limits(&env, &admin, a.clone(), 100, 10_000).unwrap();
             assert_eq!(
                 validate_transfer(&env, &from, &to, &a, 20_000),
@@ -208,9 +212,9 @@ mod tests {
         let contract_id = register_contract(&env);
         env.as_contract(&contract_id, || {
             let admin = Address::generate(&env);
-            let from  = Address::generate(&env);
-            let to    = Address::generate(&env);
-            let a     = asset(&env);
+            let from = Address::generate(&env);
+            let to = Address::generate(&env);
+            let a = asset(&env);
             block_address(&env, &admin, to.clone());
             assert_eq!(
                 validate_transfer(&env, &from, &to, &a, 500),
@@ -225,8 +229,8 @@ mod tests {
         let contract_id = register_contract(&env);
         env.as_contract(&contract_id, || {
             let from = Address::generate(&env);
-            let to   = Address::generate(&env);
-            let a    = asset(&env);
+            let to = Address::generate(&env);
+            let a = asset(&env);
             assert_eq!(validate_transfer(&env, &from, &to, &a, 1), Ok(()));
         });
     }
@@ -238,7 +242,7 @@ mod tests {
         let contract_id = register_contract(&env);
         env.as_contract(&contract_id, || {
             let admin = Address::generate(&env);
-            let a     = asset(&env);
+            let a = asset(&env);
             assert_eq!(
                 set_transfer_limits(&env, &admin, a, 1_000, 100),
                 Err(ContractError::InvalidLimits)
@@ -253,11 +257,11 @@ mod tests {
         let contract_id = register_contract(&env);
         env.as_contract(&contract_id, || {
             let admin = Address::generate(&env);
-            let from  = Address::generate(&env);
-            let to    = Address::generate(&env);
-            let a     = asset(&env);
+            let from = Address::generate(&env);
+            let to = Address::generate(&env);
+            let a = asset(&env);
             set_transfer_limits(&env, &admin, a.clone(), 100, 10_000).unwrap();
-            assert_eq!(validate_transfer(&env, &from, &to, &a, 100),    Ok(()));
+            assert_eq!(validate_transfer(&env, &from, &to, &a, 100), Ok(()));
             assert_eq!(validate_transfer(&env, &from, &to, &a, 10_000), Ok(()));
         });
     }
