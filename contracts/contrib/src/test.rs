@@ -171,7 +171,7 @@ fn test_confirm_release() {
     client.confirm_release(&escrow_id);
 
     let escrow = client.get_escrow(&escrow_id);
-    assert_eq!(escrow.status, EscrowStatus::Completed);
+    assert_eq!(escrow.status, EscrowStatus::Released);
 }
 
 #[test]
