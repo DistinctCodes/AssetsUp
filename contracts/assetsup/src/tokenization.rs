@@ -125,9 +125,15 @@ pub fn mint_tokens(
         return Err(Error::Unauthorized);
     }
 
-    // Update total supply
-    tokenized_asset.total_supply += amount;
-    tokenized_asset.tokens_in_circulation += amount;
+    let new_total_supply = tokenized_asset
+        .total_supply
+        .checked_add(amount)
+        .ok_or(Error::MaxSupplyExceeded)?;
+    tokenized_asset.total_supply = new_total_supply;
+    tokenized_asset.tokens_in_circulation = tokenized_asset
+        .tokens_in_circulation
+        .checked_add(amount)
+        .ok_or(Error::MaxSupplyExceeded)?;
 
     // Update tokenizer's ownership
     let holder_key = TokenDataKey::TokenHolder(asset_id, minter.clone());
@@ -243,6 +249,10 @@ pub fn transfer_tokens(
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
     let tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
+
+    if from == to {
+        return Err(Error::InvalidTokenTransfer);
+    }
 
     // Check if from address has locked tokens
     let lock_key = TokenDataKey::TokenLockedUntil(asset_id, from.clone());
