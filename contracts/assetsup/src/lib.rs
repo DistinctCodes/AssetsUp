@@ -16,6 +16,7 @@ pub(crate) mod insurance;
 pub(crate) mod lease;
 pub(crate) mod tokenization;
 pub(crate) mod transfer_restrictions;
+pub(crate) mod admin_transfer;
 pub(crate) mod types;
 pub(crate) mod voting;
 
@@ -33,6 +34,7 @@ pub enum DataKey {
     ContractMetadata,
     AuthorizedRegistrar(Address),
     ScheduledTransfer(BytesN<32>),
+    PendingAdmin,
     PendingApproval(BytesN<32>),
 }
 
