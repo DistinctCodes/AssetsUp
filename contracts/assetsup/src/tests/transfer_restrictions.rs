@@ -25,8 +25,8 @@ fn test_add_to_whitelist() {
     // Initially not whitelisted
     assert!(!client.is_whitelisted(&1u64, &user2));
 
-    // Add to whitelist
-    client.add_to_whitelist(&1u64, &user2);
+    // Add to whitelist (tokenizer is `user1`)
+    client.add_to_whitelist(&1u64, &user1, &user2);
 
     assert!(client.is_whitelisted(&1u64, &user2));
 }
@@ -51,12 +51,12 @@ fn test_remove_from_whitelist() {
         &AssetType::Physical,
     );
 
-    // Add to whitelist
-    client.add_to_whitelist(&1u64, &user2);
+    // Add to whitelist (tokenizer is `user1`)
+    client.add_to_whitelist(&1u64, &user1, &user2);
     assert!(client.is_whitelisted(&1u64, &user2));
 
     // Remove from whitelist
-    client.remove_from_whitelist(&1u64, &user2);
+    client.remove_from_whitelist(&1u64, &user1, &user2);
     assert!(!client.is_whitelisted(&1u64, &user2));
 }
 
@@ -80,9 +80,9 @@ fn test_get_whitelist() {
         &AssetType::Physical,
     );
 
-    // Add multiple addresses to whitelist
-    client.add_to_whitelist(&1u64, &user2);
-    client.add_to_whitelist(&1u64, &user3);
+    // Add multiple addresses to whitelist (tokenizer is `user1`)
+    client.add_to_whitelist(&1u64, &user1, &user2);
+    client.add_to_whitelist(&1u64, &user1, &user3);
 
     let whitelist = client.get_whitelist(&1u64);
     assert_eq!(whitelist.len(), 2);
@@ -109,8 +109,8 @@ fn test_add_duplicate_to_whitelist() {
     );
 
     // Add to whitelist twice
-    client.add_to_whitelist(&1u64, &user2);
-    client.add_to_whitelist(&1u64, &user2);
+    client.add_to_whitelist(&1u64, &user1, &user2);
+    client.add_to_whitelist(&1u64, &user1, &user2);
 
     // Should still only have one entry
     let whitelist = client.get_whitelist(&1u64);
@@ -163,8 +163,8 @@ fn test_transfer_with_whitelist() {
         &AssetType::Physical,
     );
 
-    // Add user2 to whitelist
-    client.add_to_whitelist(&1u64, &user2);
+    // Add user2 to whitelist (tokenizer is `user1`)
+    client.add_to_whitelist(&1u64, &user1, &user2);
 
     // Transfer should succeed
     client.transfer_tokens(&1u64, &user1, &user2, &100000i128);
@@ -220,8 +220,8 @@ fn test_transfer_to_non_whitelisted_fails() {
         &AssetType::Physical,
     );
 
-    // Only user2 is whitelisted
-    client.add_to_whitelist(&2u64, &user2);
+    // Only user2 is whitelisted (tokenizer is `user1`)
+    client.add_to_whitelist(&2u64, &user1, &user2);
 
     // Transfer to user3 (not whitelisted) should panic with TransferRestricted
     client.transfer_tokens(&2u64, &user1, &user3, &100000i128);
