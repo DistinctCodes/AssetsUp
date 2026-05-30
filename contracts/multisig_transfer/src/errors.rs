@@ -27,5 +27,7 @@ pub enum MultiSigError {
     NotEnoughApprovals = 16,
     ExecuteTooEarly = 17,
 
-    RegistryCallFailed = 18,
+    AssetsUpContractNotConfigured = 18,
+    AssetTransferFailed = 19,
+    RegistryCallFailed = 20,
 }
