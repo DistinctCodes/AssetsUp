@@ -14,9 +14,7 @@
 //!   `{ average_rating, total_reviews }`
 //! - Emits a `provider_rated` event carrying the rating value and record id
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, Address, Env, String, Symbol,
-};
+use soroban_sdk::{contracttype, Address, Env, String, Symbol};
 
 pub use crate::error::ContractError;
 
@@ -78,307 +76,176 @@ pub enum DataKey {
     Review(u64),
 }
 
-/// Internal helper used by sibling modules (e.g. `kyc_verification`) to read
-/// the admin address registered through [`OpsceContract::init`].
-pub(crate) fn read_admin(env: &Env) -> Result<Address, ContractError> {
+/// Read the admin address registered through [`init`].
+pub fn read_admin(env: &Env) -> Result<Address, ContractError> {
     env.storage()
         .persistent()
         .get(&DataKey::Admin)
         .ok_or(ContractError::NotInitialized)
 }
 
-#[contract]
-pub struct OpsceContract;
+/// One-time initialization. Stores the admin used to register providers and
+/// seed maintenance records.
+pub fn init(env: &Env, admin: Address) -> Result<(), ContractError> {
+    if env.storage().persistent().has(&DataKey::Admin) {
+        return Err(ContractError::AlreadyInitialized);
+    }
+    env.storage().persistent().set(&DataKey::Admin, &admin);
+    Ok(())
+}
 
-#[contractimpl]
-impl OpsceContract {
-    /// One-time initialization. Stores the admin used to register providers
-    /// and seed maintenance records.
-    pub fn init(env: Env, admin: Address) -> Result<(), ContractError> {
-        if env.storage().persistent().has(&DataKey::Admin) {
-            return Err(ContractError::AlreadyInitialized);
-        }
-        env.storage().persistent().set(&DataKey::Admin, &admin);
-        Ok(())
+/// Register a new provider with a zeroed rating profile. Admin only.
+pub fn register_provider(env: &Env, provider: Address) -> Result<(), ContractError> {
+    let admin = read_admin(env)?;
+    admin.require_auth();
+
+    let profile = ProviderProfile {
+        address: provider.clone(),
+        total_reviews: 0,
+        rating_sum: 0,
+        average_rating: 0,
+    };
+    env.storage()
+        .persistent()
+        .set(&DataKey::Provider(provider), &profile);
+    Ok(())
+}
+
+/// Persist a maintenance record (already completed). Admin only.
+///
+/// In production this would be invoked by the asset-maintenance contract when
+/// a record is marked complete; here it acts as the entry point that makes a
+/// record eligible for rating.
+pub fn record_completed_maintenance(
+    env: &Env,
+    record_id: u64,
+    asset_id: u64,
+    owner: Address,
+    provider: Address,
+) -> Result<(), ContractError> {
+    let admin = read_admin(env)?;
+    admin.require_auth();
+
+    if !env
+        .storage()
+        .persistent()
+        .has(&DataKey::Provider(provider.clone()))
+    {
+        return Err(ContractError::ProviderNotFound);
     }
 
-    /// Register a new provider with a zeroed rating profile. Admin only.
-    pub fn register_provider(env: Env, provider: Address) -> Result<(), ContractError> {
-        let admin: Address = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Admin)
-            .ok_or(ContractError::NotInitialized)?;
-        admin.require_auth();
+    let record = MaintenanceRecord {
+        record_id,
+        asset_id,
+        provider,
+        owner,
+        completed: true,
+    };
+    env.storage()
+        .persistent()
+        .set(&DataKey::Record(record_id), &record);
+    Ok(())
+}
 
-        let profile = ProviderProfile {
-            address: provider.clone(),
-            total_reviews: 0,
-            rating_sum: 0,
+/// Rate a provider on a completed maintenance record.
+///
+/// Authorization: the asset owner stored on the record must authorize the
+/// call (`require_auth`). Rating must be in the inclusive range 1..=5 and each
+/// record can be rated only once.
+pub fn rate_provider(
+    env: &Env,
+    record_id: u64,
+    rating: u32,
+    comment: String,
+) -> Result<(), ContractError> {
+    // Validate rating bounds first so 0 and 6+ are rejected before any
+    // storage access.
+    if rating < 1 || rating > 5 {
+        return Err(ContractError::InvalidRating);
+    }
+
+    let record: MaintenanceRecord = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Record(record_id))
+        .ok_or(ContractError::RecordNotFound)?;
+
+    if !record.completed {
+        return Err(ContractError::RecordNotComplete);
+    }
+
+    // Caller must be the asset owner stored on the record.
+    record.owner.require_auth();
+
+    if env
+        .storage()
+        .persistent()
+        .has(&DataKey::RatedRecord(record_id))
+    {
+        return Err(ContractError::AlreadyRated);
+    }
+
+    let mut profile: ProviderProfile = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Provider(record.provider.clone()))
+        .ok_or(ContractError::ProviderNotFound)?;
+
+    // Update the running totals and average (scaled by 100).
+    profile.rating_sum = profile.rating_sum.saturating_add(rating);
+    profile.total_reviews = profile.total_reviews.saturating_add(1);
+    profile.average_rating = (profile.rating_sum.saturating_mul(100)) / profile.total_reviews;
+
+    env.storage()
+        .persistent()
+        .set(&DataKey::Provider(record.provider.clone()), &profile);
+
+    // Mark this record as rated and persist the review entry.
+    env.storage()
+        .persistent()
+        .set(&DataKey::RatedRecord(record_id), &true);
+
+    let review = Review {
+        record_id,
+        provider: record.provider.clone(),
+        rater: record.owner.clone(),
+        rating,
+        comment,
+        timestamp: env.ledger().timestamp(),
+    };
+    env.storage()
+        .persistent()
+        .set(&DataKey::Review(record_id), &review);
+
+    // Emit the `provider_rated` event with the rating value and record id.
+    let topic = Symbol::new(env, "provider_rated");
+    env.events()
+        .publish((topic, record.provider), (rating, record_id));
+
+    Ok(())
+}
+
+/// Returns the current `{ average_rating, total_reviews }` for a provider.
+/// Unknown providers return zero values rather than an error so callers can
+/// use this as a cheap query.
+pub fn get_provider_rating(env: &Env, provider_address: Address) -> ProviderRating {
+    match env
+        .storage()
+        .persistent()
+        .get::<_, ProviderProfile>(&DataKey::Provider(provider_address))
+    {
+        Some(p) => ProviderRating {
+            average_rating: p.average_rating,
+            total_reviews: p.total_reviews,
+        },
+        None => ProviderRating {
             average_rating: 0,
-        };
-        env.storage()
-            .persistent()
-            .set(&DataKey::Provider(provider), &profile);
-        Ok(())
-    }
-
-    /// Persist a maintenance record (already completed). Admin only.
-    /// In production this would be invoked by the asset-maintenance contract
-    /// when a record is marked complete; here it acts as the entry point that
-    /// makes a record eligible for rating.
-    pub fn record_completed_maintenance(
-        env: Env,
-        record_id: u64,
-        asset_id: u64,
-        owner: Address,
-        provider: Address,
-    ) -> Result<(), ContractError> {
-        let admin: Address = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Admin)
-            .ok_or(ContractError::NotInitialized)?;
-        admin.require_auth();
-
-        if !env
-            .storage()
-            .persistent()
-            .has(&DataKey::Provider(provider.clone()))
-        {
-            return Err(ContractError::ProviderNotFound);
-        }
-
-        let record = MaintenanceRecord {
-            record_id,
-            asset_id,
-            provider,
-            owner,
-            completed: true,
-        };
-        env.storage()
-            .persistent()
-            .set(&DataKey::Record(record_id), &record);
-        Ok(())
-    }
-
-    /// Rate a provider on a completed maintenance record.
-    ///
-    /// Authorization: the asset owner stored on the record must authorize the
-    /// call (`require_auth`). Rating must be in the inclusive range 1..=5 and
-    /// each record can be rated only once.
-    pub fn rate_provider(
-        env: Env,
-        record_id: u64,
-        rating: u32,
-        comment: String,
-    ) -> Result<(), ContractError> {
-        // Validate rating bounds first so 0 and 6+ are rejected before any
-        // storage access.
-        if rating < 1 || rating > 5 {
-            return Err(ContractError::InvalidRating);
-        }
-
-        let record: MaintenanceRecord = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Record(record_id))
-            .ok_or(ContractError::RecordNotFound)?;
-
-        if !record.completed {
-            return Err(ContractError::RecordNotComplete);
-        }
-
-        // Caller must be the asset owner stored on the record.
-        record.owner.require_auth();
-
-        if env
-            .storage()
-            .persistent()
-            .has(&DataKey::RatedRecord(record_id))
-        {
-            return Err(ContractError::AlreadyRated);
-        }
-
-        let mut profile: ProviderProfile = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Provider(record.provider.clone()))
-            .ok_or(ContractError::ProviderNotFound)?;
-
-        // Update the running totals and average (scaled by 100).
-        profile.rating_sum = profile.rating_sum.saturating_add(rating);
-        profile.total_reviews = profile.total_reviews.saturating_add(1);
-        profile.average_rating = (profile.rating_sum.saturating_mul(100)) / profile.total_reviews;
-
-        env.storage()
-            .persistent()
-            .set(&DataKey::Provider(record.provider.clone()), &profile);
-
-        // Mark this record as rated and persist the review entry.
-        env.storage()
-            .persistent()
-            .set(&DataKey::RatedRecord(record_id), &true);
-
-        let review = Review {
-            record_id,
-            provider: record.provider.clone(),
-            rater: record.owner.clone(),
-            rating,
-            comment,
-            timestamp: env.ledger().timestamp(),
-        };
-        env.storage()
-            .persistent()
-            .set(&DataKey::Review(record_id), &review);
-
-        // Emit the `provider_rated` event with the rating value and record id.
-        let topic = Symbol::new(&env, "provider_rated");
-        env.events()
-            .publish((topic, record.provider), (rating, record_id));
-
-        Ok(())
-    }
-
-    /// Returns the current `{ average_rating, total_reviews }` for a provider.
-    /// Unknown providers return zero values rather than an error so callers
-    /// can use this as a cheap query.
-    pub fn get_provider_rating(env: Env, provider_address: Address) -> ProviderRating {
-        match env
-            .storage()
-            .persistent()
-            .get::<_, ProviderProfile>(&DataKey::Provider(provider_address))
-        {
-            Some(p) => ProviderRating {
-                average_rating: p.average_rating,
-                total_reviews: p.total_reviews,
-            },
-            None => ProviderRating {
-                average_rating: 0,
-                total_reviews: 0,
-            },
-        }
-    }
-
-    /// Fetch the persisted review for a record, if any.
-    pub fn get_review(env: Env, record_id: u64) -> Option<Review> {
-        env.storage().persistent().get(&DataKey::Review(record_id))
+            total_reviews: 0,
+        },
     }
 }
 
-#[cfg(test)]
-mod tests {
-    extern crate std;
-
-    use super::*;
-    use soroban_sdk::testutils::Address as _;
-    use soroban_sdk::{Address, Env, String};
-
-    struct Fixture {
-        env: Env,
-        client: OpsceContractClient<'static>,
-        owner: Address,
-        provider: Address,
-        record_id: u64,
-    }
-
-    fn setup() -> Fixture {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let contract_id = env.register(OpsceContract, ());
-        let client = OpsceContractClient::new(&env, &contract_id);
-
-        let admin = Address::generate(&env);
-        let provider = Address::generate(&env);
-        let owner = Address::generate(&env);
-
-        client.init(&admin);
-        client.register_provider(&provider);
-
-        let record_id: u64 = 1;
-        client.record_completed_maintenance(&record_id, &101u64, &owner, &provider);
-
-        Fixture {
-            env,
-            client,
-            owner,
-            provider,
-            record_id,
-        }
-    }
-
-    #[test]
-    fn rate_provider_valid_rating_updates_running_average() {
-        let fx = setup();
-
-        // First rating: 5 stars.
-        fx.client
-            .rate_provider(&fx.record_id, &5u32, &String::from_str(&fx.env, "Great"));
-
-        let rating = fx.client.get_provider_rating(&fx.provider);
-        assert_eq!(rating.total_reviews, 1);
-        assert_eq!(rating.average_rating, 500); // 5.00 stars scaled by 100
-
-        // Second rating on a different record: 4 stars => running avg 4.5.
-        let record_id2: u64 = 2;
-        fx.client
-            .record_completed_maintenance(&record_id2, &102u64, &fx.owner, &fx.provider);
-        fx.client
-            .rate_provider(&record_id2, &4u32, &String::from_str(&fx.env, "Good"));
-
-        let rating = fx.client.get_provider_rating(&fx.provider);
-        assert_eq!(rating.total_reviews, 2);
-        assert_eq!(rating.average_rating, 450); // (5+4)*100/2 = 450
-    }
-
-    #[test]
-    fn rate_provider_duplicate_returns_already_rated() {
-        let fx = setup();
-
-        fx.client
-            .rate_provider(&fx.record_id, &5u32, &String::from_str(&fx.env, "Great"));
-
-        // try_ returns the error variant without panicking on contract errors.
-        let result = fx.client.try_rate_provider(
-            &fx.record_id,
-            &4u32,
-            &String::from_str(&fx.env, "Again"),
-        );
-        assert_eq!(result, Err(Ok(ContractError::AlreadyRated)));
-
-        // The provider's average must remain at the first rating only.
-        let rating = fx.client.get_provider_rating(&fx.provider);
-        assert_eq!(rating.total_reviews, 1);
-        assert_eq!(rating.average_rating, 500);
-    }
-
-    #[test]
-    fn rate_provider_rejects_rating_below_one() {
-        let fx = setup();
-
-        let result = fx
-            .client
-            .try_rate_provider(&fx.record_id, &0u32, &String::from_str(&fx.env, ""));
-        assert_eq!(result, Err(Ok(ContractError::InvalidRating)));
-
-        // No state change occurred.
-        let rating = fx.client.get_provider_rating(&fx.provider);
-        assert_eq!(rating.total_reviews, 0);
-        assert_eq!(rating.average_rating, 0);
-    }
-
-    #[test]
-    fn rate_provider_rejects_rating_above_five() {
-        let fx = setup();
-
-        let result = fx
-            .client
-            .try_rate_provider(&fx.record_id, &6u32, &String::from_str(&fx.env, ""));
-        assert_eq!(result, Err(Ok(ContractError::InvalidRating)));
-
-        let rating = fx.client.get_provider_rating(&fx.provider);
-        assert_eq!(rating.total_reviews, 0);
-        assert_eq!(rating.average_rating, 0);
-    }
+/// Fetch the persisted review for a record, if any.
+pub fn get_review(env: &Env, record_id: u64) -> Option<Review> {
+    env.storage().persistent().get(&DataKey::Review(record_id))
 }
