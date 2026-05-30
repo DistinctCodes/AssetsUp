@@ -3,12 +3,11 @@ name = "opsce"
 version = "0.1.0"
 edition = "2021"
 
-t[lib]
+[lib]
 crate-type = ["lib", "cdylib"]
 doctest = false
 
 [dependencies]
-assetsup = { path = "../assetsup" }
 soroban-sdk = { workspace = true }
 
 [dev-dependencies]
