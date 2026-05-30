@@ -251,3 +251,43 @@ fn test_empty_whitelist_allows_transfer() {
     client.transfer_tokens(&3u64, &user1, &user2, &100000i128);
     assert_eq!(client.get_token_balance(&3u64, &user2), 100000);
 }
+
+#[test]
+fn test_whitelist_enforcement_toggle() {
+    let env = create_env();
+    let (admin, user1, user2, _) = create_mock_addresses(&env);
+    let client = initialize_contract(&env, &admin);
+
+    env.mock_all_auths();
+
+    client.tokenize_asset(
+        &1u64,
+        &String::from_str(&env, "TST"),
+        &1000000i128,
+        &6u32,
+        &100i128,
+        &user1,
+        &String::from_str(&env, "Test Token"),
+        &String::from_str(&env, "A test tokenized asset"),
+        &AssetType::Physical,
+    );
+
+    // Enable whitelist enforcement
+    client.set_whitelist_enabled(&1u64, &user1, &true);
+
+    // Add only recipient
+    client.add_to_whitelist(&1u64, &user1, &user2);
+
+    // Transfer should fail because sender (user1) is not whitelisted
+    let res = std::panic::catch_unwind(|| {
+        client.transfer_tokens(&1u64, &user1, &user2, &100000i128);
+    });
+    assert!(res.is_err());
+
+    // Now whitelist sender as well
+    client.add_to_whitelist(&1u64, &user1, &user1);
+
+    // Transfer should now succeed
+    client.transfer_tokens(&1u64, &user1, &user2, &100000i128);
+    assert_eq!(client.get_token_balance(&1u64, &user2), 100000);
+}
