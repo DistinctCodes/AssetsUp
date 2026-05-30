@@ -1,5 +1,6 @@
 #![no_std]
 
+use opsce::transfer_rules::validate_transfer;
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
 
 mod approvals;
@@ -266,6 +267,8 @@ impl MultiSigTransferContract {
                 return Err(MultiSigError::ExecuteTooEarly);
             }
         }
+        validate_transfer(&e, &req.current_owner, &req.new_owner, &req.asset_id, 1i128)
+            .map_err(|_| MultiSigError::Unauthorized)?;
 
         // registry transfer ownership
         registry::transfer_owner(&e, &registry_addr, &req.asset_id, &req.new_owner)?;

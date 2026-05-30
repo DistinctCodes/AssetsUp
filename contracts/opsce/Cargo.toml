@@ -1,5 +1,5 @@
 [package]
-name = "multisig-transfer"
+name = "opsce"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,7 +9,6 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-opsce = { path = "../opsce" }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

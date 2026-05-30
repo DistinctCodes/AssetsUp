@@ -4,6 +4,7 @@ members = [
   "./asset-maintenance",
   "assetsup",
   "contrib",
+  "opsce",
   "multisig-wallet",
   "multisig_transfer",
 ]
