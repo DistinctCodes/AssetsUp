@@ -7,6 +7,7 @@ members = [
   "contrib",
   "multisig-wallet",
   "multisig_transfer",
+  "opsce",
 ]
 
 [workspace.dependencies]
