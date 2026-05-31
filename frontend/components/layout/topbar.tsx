@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { Menu, User, ChevronDown } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
+import { NotificationBell } from "@/opsce/features/notifications/NotificationBell";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -68,6 +69,9 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           {getPageTitle(pathname)}
         </h1>
       </div>
+
+      {/* Notifications */}
+      <NotificationBell />
 
       {/* Right: user dropdown */}
       <div className="relative" ref={dropdownRef}>
