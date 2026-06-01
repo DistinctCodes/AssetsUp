@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuditLog } from './entities/audit-log.entity';
-import { AuditService } from './audit.service';
+import { TerminusModule } from '@nestjs/terminus';
+
+import { HealthController } from './health.controller';
+import { RedisHealthIndicator } from './indicators/redis.health';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([])],
-  providers: [HealthService],
-  exports: [HealthService, TypeOrmModule],
+  imports: [TerminusModule],
+  controllers: [HealthController],
+  providers: [RedisHealthIndicator],
 })
 export class HealthModule {}
