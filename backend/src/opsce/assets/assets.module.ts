@@ -9,5 +9,13 @@ import { AssetsController } from './assets.controller';
   providers: [AssetsService],
   controllers: [AssetsController],
   exports: [TypeOrmModule, AssetsService],
+import { AssetsController } from './assets.controller';
+import { AssetsService } from './assets.service';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([Asset])],
+  controllers: [AssetsController],
+  providers: [AssetsService],
+  exports: [AssetsService],
 })
 export class AssetsModule {}

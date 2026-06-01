@@ -9,9 +9,13 @@ import {
   OneToMany,
   ManyToMany,
   JoinColumn,
+
+  Index,
+
   JoinTable,
   Index,
   Check,
+
   BeforeInsert,
   BeforeUpdate,
 } from 'typeorm';
@@ -26,6 +30,8 @@ export const MAX_DEPARTMENT_DEPTH = 5;
 export const DEPARTMENT_CODE_PATTERN = /^[A-Z0-9_-]{2,20}$/;
 
 // ─── Entity ───────────────────────────────────────────────────────────────────
+
+export const DEPARTMENT_CODE_PATTERN = /^[A-Z0-9-]{2,20}$/;
 
 @Entity('departments')
 @Index('IDX_DEPT_PARENT_ACTIVE', ['parentId', 'isActive'])
@@ -51,6 +57,7 @@ export class Department {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+
   /**
    * Short uppercase code used in HR systems (e.g. "ENG", "FIN-OPS").
    * Must match DEPARTMENT_CODE_PATTERN when provided.
@@ -58,6 +65,7 @@ export class Department {
   @Index('IDX_DEPT_CODE_ACTIVE', { where: '"deletedAt" IS NULL AND "code" IS NOT NULL' })
   @Column({ length: 20, nullable: true })
   code?: string;
+
 
   @Column({ default: true })
   isActive: boolean;
@@ -68,6 +76,15 @@ export class Department {
   parentId?: string;
 
   /**
+
+   * Materialized path for efficient tree queries.
+   * Format: "/{rootId}/{childId}/{...}/{thisId}/"
+   */
+  @Column({ length: 500, nullable: true })
+  path?: string;
+
+  @ManyToOne(() => Department, (d) => d.children, { nullable: true })
+
    * Materialized path for efficient ancestor/descendant queries.
    * Format: /<root-id>/<parent-id>/<this-id>/
    * Maintained automatically by lifecycle hooks.
@@ -86,11 +103,23 @@ export class Department {
     nullable: true,
     onDelete: 'SET NULL',
   })
+
   @JoinColumn({ name: 'parentId' })
   parent?: Department;
 
   @OneToMany(() => Department, (d) => d.parent, { cascade: ['soft-remove'] })
   children: Department[];
+
+
+  /**
+   * Short uppercase code used in HR systems (e.g. "ENG", "FIN-OPS").
+   * Must match DEPARTMENT_CODE_PATTERN when provided.
+   */
+  @Index('IDX_DEPT_CODE_ACTIVE', {
+    where: '"deletedAt" IS NULL AND "code" IS NOT NULL',
+  })
+  @Column({ length: 20, nullable: true })
+  code?: string;
 
   // ─── Staffing ─────────────────────────────────────────────────────────────
 
@@ -214,10 +243,14 @@ export class Department {
    */
   get ancestorIds(): string[] {
     if (!this.path) return [];
+
+    return this.path.split('/').filter(Boolean).slice(0, -1); // last segment is this department's own id
+
     return this.path
       .split('/')
       .filter(Boolean)
       .slice(0, -1); // last segment is this department's own id
+
   }
 
   // ─── Lifecycle hooks ──────────────────────────────────────────────────────
@@ -246,4 +279,8 @@ export class Department {
     if (this.description) this.description = this.description.trim();
     if (this.code) this.code = this.code.toUpperCase().trim();
   }
+
 }
+
+}
+
