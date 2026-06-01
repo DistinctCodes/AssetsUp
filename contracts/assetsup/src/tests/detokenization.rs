@@ -221,7 +221,7 @@ fn test_detokenization_clears_all_data() {
 
     // Set up some data
     client.transfer_tokens(&1u64, &user1, &user2, &600000i128);
-    client.add_to_whitelist(&1u64, &user2);
+        client.add_to_whitelist(&1u64, &user1, &user2);
     client.enable_revenue_sharing(&1u64);
 
     // Propose and execute detokenization
