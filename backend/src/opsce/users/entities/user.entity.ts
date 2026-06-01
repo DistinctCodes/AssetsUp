@@ -58,6 +58,11 @@ export class User {
   @Column({ select: false })
   passwordHash: string;
 
+  /** Hashed refresh token for one active device/session (nullable) */
+  @Column({ nullable: true })
+  refreshTokenHash?: string;
+
+  @Column()
   @Column({ length: 100 })
   fullName: string;
 

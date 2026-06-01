@@ -13,13 +13,9 @@ import {
   BeforeUpdate,
 } from 'typeorm';
 
+import { User } from '../../users/entities/user.entity';
 import { Department } from '../../departments/entities/department.entity';
 import { Location } from '../../locations/entities/location.entity';
-
-import { User }       from '../../users/entities/user.entity';
-import { Department } from '../../departments/entities/department.entity';
-import { Location }   from '../../locations/entities/location.entity';
-
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -31,65 +27,6 @@ export enum AssetStatus {
   ACTIVE      = 'active',
   INACTIVE    = 'inactive',
   MAINTENANCE = 'maintenance',
-
-  RESERVED = 'reserved',
-  LOST = 'lost',
-  STOLEN = 'stolen',
-  DISPOSED = 'disposed',
-  RETIRED = 'retired',
-}
-
-export enum AssetCondition {
-  NEW = 'new',
-  EXCELLENT = 'excellent',
-  GOOD = 'good',
-  FAIR = 'fair',
-  POOR = 'poor',
-  DAMAGED = 'damaged',
-}
-
-export enum DepreciationMethod {
-  STRAIGHT_LINE = 'straight_line',
-  DECLINING_BALANCE = 'declining_balance',
-  NONE = 'none',
-}
-
-export enum MaintenanceFrequency {
-  WEEKLY = 'weekly',
-  MONTHLY = 'monthly',
-  QUARTERLY = 'quarterly',
-  ANNUALLY = 'annually',
-  AS_NEEDED = 'as_needed',
-}
-
-// ─── Value-object interfaces ──────────────────────────────────────────────────
-
-export interface WarrantyInfo {
-  /** Warranty provider / vendor name */
-  provider: string;
-  /** Warranty reference or contract number */
-  referenceNumber?: string;
-  /** ISO 8601 date — when warranty begins */
-  startDate: string;
-  /** ISO 8601 date — when warranty expires */
-  expiryDate: string;
-  /** Coverage description (e.g. "Parts and labour") */
-  coverageDetails?: string;
-  /** Support contact (email or phone) */
-  contactInfo?: string;
-}
-
-export interface DepreciationConfig {
-  method: DepreciationMethod;
-  /** Useful life in years */
-  usefulLifeYears: number;
-  /** Residual / salvage value at end of life */
-  residualValue: number;
-  /** Annual depreciation rate as a decimal (e.g. 0.2 = 20%) — for declining-balance */
-  annualRate?: number;
-}
-
-
   RESERVED    = 'reserved',
   LOST        = 'lost',
   STOLEN      = 'stolen',
@@ -123,38 +60,25 @@ export enum MaintenanceFrequency {
 // ─── Value-object interfaces ──────────────────────────────────────────────────
 
 export interface WarrantyInfo {
-  /** Warranty provider / vendor name */
   provider: string;
-  /** Warranty reference or contract number */
   referenceNumber?: string;
-  /** ISO 8601 date — when warranty begins */
   startDate: string;
-  /** ISO 8601 date — when warranty expires */
   expiryDate: string;
-  /** Coverage description (e.g. "Parts and labour") */
   coverageDetails?: string;
-  /** Support contact (email or phone) */
   contactInfo?: string;
 }
 
 export interface DepreciationConfig {
   method: DepreciationMethod;
-  /** Useful life in years */
   usefulLifeYears: number;
-  /** Residual / salvage value at end of life */
   residualValue: number;
-  /** Annual depreciation rate as a decimal (e.g. 0.2 = 20%) — for declining-balance */
   annualRate?: number;
 }
 
-
 export interface MaintenanceSchedule {
   frequency: MaintenanceFrequency;
-  /** ISO 8601 date of the next scheduled maintenance */
   nextDueDate: string;
-  /** ISO 8601 date of the last completed maintenance */
   lastCompletedDate?: string;
-  /** Estimated duration in minutes */
   estimatedDurationMinutes?: number;
   notes?: string;
 }
@@ -162,9 +86,7 @@ export interface MaintenanceSchedule {
 export interface InsuranceInfo {
   provider: string;
   policyNumber: string;
-  /** ISO 8601 date */
   expiryDate: string;
-  /** Insured value */
   insuredValue: number;
   currency: string;
 }
@@ -200,33 +122,11 @@ export class Asset {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  /**
-   * Asset tag / barcode printed on the physical label.
-   * Must match ASSET_TAG_PATTERN when set.
-   */
-
-  @Index('IDX_ASSET_TAG', {
-    unique: true,
-    where: '"deletedAt" IS NULL AND "assetTag" IS NOT NULL',
-  })
-
   @Index('IDX_ASSET_TAG', { unique: true, where: '"deletedAt" IS NULL AND "assetTag" IS NOT NULL' })
-
   @Column({ length: 30, nullable: true })
   assetTag?: string;
 
-  /**
-   * Manufacturer serial number.
-   * Partial unique index — allows duplicate nulls for assets without serials.
-   */
-
-  @Index('IDX_ASSET_SERIAL', {
-    unique: true,
-    where: '"deletedAt" IS NULL AND "serialNumber" IS NOT NULL',
-  })
-
   @Index('IDX_ASSET_SERIAL', { unique: true, where: '"deletedAt" IS NULL AND "serialNumber" IS NOT NULL' })
-
   @Column({ length: 100, nullable: true })
   serialNumber?: string;
 
@@ -236,7 +136,6 @@ export class Asset {
   @Column({ length: 100, nullable: true })
   model?: string;
 
-  /** Model year (e.g. 2023). */
   @Column({ type: 'int', nullable: true })
   modelYear?: number;
 
@@ -246,104 +145,37 @@ export class Asset {
   @Column({ length: 100 })
   category: string;
 
-  /**
-   * Optional sub-category (e.g. category="IT" → subCategory="Laptop").
-   */
   @Index()
-
-
   @Column({ length: 100, nullable: true })
   subCategory?: string;
 
-  @Column({
-    type: 'enum',
-    enum: AssetStatus,
-    default: AssetStatus.ACTIVE,
-  })
   @Index()
-
+  @Column({ type: 'enum', enum: AssetStatus, default: AssetStatus.ACTIVE })
   status: AssetStatus;
 
-  @Column({
-    type: 'enum',
-    enum: AssetCondition,
-    default: AssetCondition.GOOD,
-  })
+  @Column({ type: 'enum', enum: AssetCondition, default: AssetCondition.GOOD })
   condition: AssetCondition;
 
-
-  @Column({ length: 100, nullable: true })
-  vendor?: string;
-
-  @Column({ type: 'varchar', array: true, nullable: true, default: [] })
-  tags?: string[];
-
-  @Column({ type: 'jsonb', nullable: true })
-  warrantyInfo?: WarrantyInfo;
-
-  @Column({ type: 'jsonb', nullable: true })
-  insuranceInfo?: InsuranceInfo;
-
-  @Column({ type: 'jsonb', nullable: true })
-  maintenanceSchedule?: MaintenanceSchedule;
-
-  @Column({ type: 'jsonb', nullable: true })
-  depreciationConfig?: DepreciationConfig;
-
-  @Column({ type: 'jsonb', nullable: true })
-  checkoutInfo?: AssetCheckout;
-
-  /**
-   * Searchable tags (e.g. ["portable", "shared", "critical"]).
-   * Deduplicated and lowercased by lifecycle hook.
-   */
   @Column({ type: 'text', array: true, nullable: true, default: [] })
   tags: string[];
 
   // ─── Financials ──────────────────────────────────────────────────────────────
 
-  /** ISO 4217 currency code for all monetary values (e.g. "USD", "NGN"). */
   @Column({ length: 3, nullable: true, default: 'USD' })
   currency?: string;
-
 
   @Column({ type: 'date', nullable: true })
   purchaseDate?: Date;
 
-
-  @Column({ type: 'date', nullable: true })
-  warrantyExpiryDate?: Date;
-
-  @Column({ type: 'date', nullable: true })
-  insuranceExpiryDate?: Date;
-
-  @Column({ type: 'date', nullable: true })
-  nextMaintenanceDue?: Date;
-
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
-
   @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
-
   purchaseValue?: number;
 
-  /** Book value as of the last valuation. */
   @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
   currentValue?: number;
 
-
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
-  residualValue?: number;
-
-  @Column({ type: 'int', nullable: true })
-  usefulLifeYears?: number;
-
-  @Column({ nullable: true })
-
-  /** Salvage / residual value at end of useful life. */
   @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
   residualValue?: number;
 
-  /** Useful life in years — used for depreciation calculations. */
   @Column({ type: 'int', nullable: true })
   usefulLifeYears?: number;
 
@@ -355,33 +187,24 @@ export class Asset {
   })
   depreciationMethod?: DepreciationMethod;
 
-  /** Full depreciation configuration stored as JSONB. */
   @Column({ type: 'jsonb', nullable: true })
   depreciationConfig?: DepreciationConfig;
 
-  /** Name of the vendor / supplier the asset was purchased from. */
   @Column({ length: 200, nullable: true })
   vendor?: string;
 
-  /** Purchase order number for procurement traceability. */
   @Column({ length: 100, nullable: true })
   purchaseOrderNumber?: string;
 
-  /** Invoice number from the vendor. */
   @Column({ length: 100, nullable: true })
   invoiceNumber?: string;
 
   // ─── Warranty ────────────────────────────────────────────────────────────────
 
-  /**
-   * Denormalised expiry date for fast "expiring soon" queries.
-   * Kept in sync with warrantyInfo.expiryDate by the lifecycle hook.
-   */
   @Index('IDX_ASSET_WARRANTY_EXPIRY')
   @Column({ type: 'date', nullable: true })
   warrantyExpiryDate?: Date;
 
-  /** Full warranty detail stored as JSONB. */
   @Column({ type: 'jsonb', nullable: true })
   warrantyInfo?: WarrantyInfo;
 
@@ -409,18 +232,15 @@ export class Asset {
   // ─── Assignment ──────────────────────────────────────────────────────────────
 
   @Column({ type: 'uuid', nullable: true })
-
   assignedToUserId?: string;
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL', eager: false })
   @JoinColumn({ name: 'assignedToUserId' })
   assignedToUser?: User;
 
-  /** ISO 8601 timestamp when the current assignment began. */
   @Column({ type: 'timestamptz', nullable: true })
   assignedAt?: Date;
 
-  /** Expected return date for temporarily assigned assets. */
   @Column({ type: 'date', nullable: true })
   expectedReturnDate?: Date;
 
@@ -429,53 +249,30 @@ export class Asset {
   @Column({ type: 'uuid', nullable: true })
   departmentId?: string;
 
-
-  @ManyToOne(() => Department, {
-    nullable: true,
-    onDelete: 'SET NULL',
-    eager: false,
-  })
-
   @ManyToOne(() => Department, { nullable: true, onDelete: 'SET NULL', eager: false })
-
   @JoinColumn({ name: 'departmentId' })
   department?: Department;
 
   @Column({ type: 'uuid', nullable: true })
   locationId?: string;
 
-
-  @ManyToOne(() => Location, {
-    nullable: true,
-    onDelete: 'SET NULL',
-    eager: false,
-  })
-
   @ManyToOne(() => Location, { nullable: true, onDelete: 'SET NULL', eager: false })
-
   @JoinColumn({ name: 'locationId' })
   location?: Location;
 
   // ─── Media & documentation ───────────────────────────────────────────────────
 
-  /** URL to the primary photo of the asset. */
   @Column({ type: 'text', nullable: true })
   photoUrl?: string;
 
-  /** Additional photo URLs. */
   @Column({ type: 'text', array: true, nullable: true, default: [] })
   additionalPhotoUrls: string[];
 
-  /** URLs to manuals, certificates, invoices, etc. */
   @Column({ type: 'text', array: true, nullable: true, default: [] })
   documentUrls: string[];
 
   // ─── Metadata ────────────────────────────────────────────────────────────────
 
-  /**
-   * Arbitrary JSON for third-party integrations
-   * (e.g. { "helpDeskTicketId": "…", "externalAssetId": "…" }).
-   */
   @Column({ type: 'jsonb', nullable: true })
   metadata?: Record<string, unknown>;
 
@@ -499,37 +296,29 @@ export class Asset {
   @Column({ type: 'uuid', nullable: true })
   deletedBy?: string;
 
-  /** Free-text reason for the most recent status change. */
   @Column({ type: 'text', nullable: true })
   statusChangeReason?: string;
 
-  /** Timestamp of the most recent status change. */
   @Column({ type: 'timestamptz', nullable: true })
   statusChangedAt?: Date;
 
   // ─── Tokenization ──────────────────────────────────────────────────────────────
 
-  /** Stellar contract ID for tokenized assets */
   @Column({ type: 'text', nullable: true })
   stellarContractId?: string;
 
-  /** Total number of shares for tokenized assets */
   @Column({ type: 'decimal', precision: 20, scale: 0, nullable: true })
   totalShares?: number;
 
-  /** Whether this asset has been tokenized on Stellar */
   @Column({ default: false })
   isTokenized: boolean;
 
-  /** Transaction hash of the tokenization transaction */
   @Column({ type: 'text', nullable: true })
   tokenizationTxHash?: string;
 
-  /** Timestamp when the asset was tokenized */
   @Column({ type: 'timestamptz', nullable: true })
   tokenizedAt?: Date;
 
-  /** Token symbol on Stellar network */
   @Column({ length: 50, nullable: true })
   tokenSymbol?: string;
 
@@ -543,37 +332,20 @@ export class Asset {
     return !!this.assignedToUserId;
   }
 
-  /**
-   * Depreciation to date using straight-line method.
-   * Returns null if required fields are missing.
-   */
   get accruedDepreciation(): number | null {
     if (
       this.purchaseValue == null ||
       this.residualValue == null ||
       this.usefulLifeYears == null ||
       !this.purchaseDate
-
-    )
+    ) {
       return null;
-
-    const msPerYear = 365.25 * 24 * 60 * 60 * 1000;
-    const ageYears =
-      (Date.now() - new Date(this.purchaseDate).getTime()) / msPerYear;
-    const annualDep =
-      (this.purchaseValue - this.residualValue) / this.usefulLifeYears;
-    const total = Math.min(
-      annualDep * ageYears,
-      this.purchaseValue - this.residualValue,
-    );
-
-    ) return null;
+    }
 
     const msPerYear = 365.25 * 24 * 60 * 60 * 1000;
     const ageYears  = (Date.now() - new Date(this.purchaseDate).getTime()) / msPerYear;
     const annualDep = (this.purchaseValue - this.residualValue) / this.usefulLifeYears;
     const total     = Math.min(annualDep * ageYears, this.purchaseValue - this.residualValue);
-
 
     return Math.max(0, parseFloat(total.toFixed(2)));
   }
@@ -583,15 +355,9 @@ export class Asset {
   @BeforeInsert()
   @BeforeUpdate()
   normalizeFields(): void {
-
-    if (this.name) this.name = this.name.trim();
-    if (this.description) this.description = this.description.trim();
-    if (this.vendor) this.vendor = this.vendor.trim();
-
     if (this.name)        this.name        = this.name.trim();
     if (this.description) this.description = this.description.trim();
     if (this.vendor)      this.vendor      = this.vendor.trim();
-
 
     if (this.assetTag) {
       this.assetTag = this.assetTag.toUpperCase().trim();
@@ -606,22 +372,18 @@ export class Asset {
       this.serialNumber = this.serialNumber.trim();
     }
 
-    // Deduplicate + lowercase tags
     if (this.tags) {
       this.tags = [...new Set(this.tags.map((t) => t.toLowerCase().trim()))];
     }
 
-    // Sync denormalised warranty expiry date from JSONB
     if (this.warrantyInfo?.expiryDate) {
       this.warrantyExpiryDate = new Date(this.warrantyInfo.expiryDate);
     }
 
-    // Sync denormalised insurance expiry date from JSONB
     if (this.insuranceInfo?.expiryDate) {
       this.insuranceExpiryDate = new Date(this.insuranceInfo.expiryDate);
     }
 
-    // Sync denormalised maintenance due date from JSONB
     if (this.maintenanceSchedule?.nextDueDate) {
       this.nextMaintenanceDue = new Date(this.maintenanceSchedule.nextDueDate);
     }
@@ -646,8 +408,4 @@ export class Asset {
       throw new Error('currentValue cannot exceed purchaseValue');
     }
   }
-
 }
-
-}
-
