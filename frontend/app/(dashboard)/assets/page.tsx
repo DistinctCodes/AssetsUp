@@ -9,6 +9,7 @@ import { ConditionBadge } from "@/components/assets/condition-badge";
 import { CreateAssetModal } from "@/components/assets/create-asset-modal";
 import { useAssets } from "@/lib/query/hooks/useAssets";
 import { AssetStatus, AssetCondition } from "@/lib/query/types/asset";
+import { ExportAssetsButton } from "@/opsce/features/assets/ExportAssetsButton";
 
 const STATUS_OPTIONS = ["All", ...Object.values(AssetStatus)];
 
@@ -42,10 +43,13 @@ export default function AssetsPage() {
               : "No assets yet"}
           </p>
         </div>
-        <Button onClick={() => setShowModal(true)}>
-          <Plus size={16} className="mr-1.5" />
-          Register Asset
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportAssetsButton />
+          <Button onClick={() => setShowModal(true)}>
+            <Plus size={16} className="mr-1.5" />
+            Register Asset
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

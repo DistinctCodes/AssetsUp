@@ -7,34 +7,76 @@ import {
   DeleteDateColumn,
   ManyToOne,
   OneToMany,
+  ManyToMany,
   JoinColumn,
+
   Index,
+
+  JoinTable,
+  Index,
+  Check,
+
   BeforeInsert,
   BeforeUpdate,
 } from 'typeorm';
+import { User } from '../../users/entities/user.entity';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Maximum nesting depth enforced at the application layer. */
+export const MAX_DEPARTMENT_DEPTH = 5;
+
+/** Regex that department codes must satisfy. */
+export const DEPARTMENT_CODE_PATTERN = /^[A-Z0-9_-]{2,20}$/;
+
+// ─── Entity ───────────────────────────────────────────────────────────────────
 
 export const DEPARTMENT_CODE_PATTERN = /^[A-Z0-9-]{2,20}$/;
 
 @Entity('departments')
+@Index('IDX_DEPT_PARENT_ACTIVE', ['parentId', 'isActive'])
+@Index('IDX_DEPT_DELETED_AT', ['deletedAt'])
+@Check(`"code" IS NULL OR LENGTH(TRIM("code")) > 0`)
+@Check(`"name" <> ''`)
 export class Department {
+
   // ─── Identity ─────────────────────────────────────────────────────────────
 
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  /**
+   * Human-readable department name — unique across non-deleted departments.
+   * Uniqueness is enforced via a partial index rather than a column constraint
+   * so that soft-deleted names can be reused.
+   */
+  @Index('IDX_DEPT_NAME_ACTIVE', { where: '"deletedAt" IS NULL' })
+  @Column({ length: 150 })
   name: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   description?: string;
+
+
+  /**
+   * Short uppercase code used in HR systems (e.g. "ENG", "FIN-OPS").
+   * Must match DEPARTMENT_CODE_PATTERN when provided.
+   */
+  @Index('IDX_DEPT_CODE_ACTIVE', { where: '"deletedAt" IS NULL AND "code" IS NOT NULL' })
+  @Column({ length: 20, nullable: true })
+  code?: string;
+
 
   @Column({ default: true })
   isActive: boolean;
 
-  @Column({ nullable: true })
+  // ─── Hierarchy ────────────────────────────────────────────────────────────
+
+  @Column({ type: 'uuid', nullable: true })
   parentId?: string;
 
   /**
+
    * Materialized path for efficient tree queries.
    * Format: "/{rootId}/{childId}/{...}/{thisId}/"
    */
@@ -42,11 +84,32 @@ export class Department {
   path?: string;
 
   @ManyToOne(() => Department, (d) => d.children, { nullable: true })
+
+   * Materialized path for efficient ancestor/descendant queries.
+   * Format: /<root-id>/<parent-id>/<this-id>/
+   * Maintained automatically by lifecycle hooks.
+   */
+  @Column({ type: 'text', nullable: true })
+  path?: string;
+
+  /**
+   * Nesting depth — 0 for root departments.
+   * Maintained automatically by lifecycle hooks.
+   */
+  @Column({ type: 'int', default: 0 })
+  depth: number;
+
+  @ManyToOne(() => Department, (d) => d.children, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+
   @JoinColumn({ name: 'parentId' })
   parent?: Department;
 
-  @OneToMany(() => Department, (d) => d.parent)
+  @OneToMany(() => Department, (d) => d.parent, { cascade: ['soft-remove'] })
   children: Department[];
+
 
   /**
    * Short uppercase code used in HR systems (e.g. "ENG", "FIN-OPS").
@@ -58,10 +121,83 @@ export class Department {
   @Column({ length: 20, nullable: true })
   code?: string;
 
+  // ─── Staffing ─────────────────────────────────────────────────────────────
+
+  /**
+   * The designated head of this department.
+   * Nullable — a department may exist without an assigned head.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  headId?: string;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL', eager: false })
+  @JoinColumn({ name: 'headId' })
+  head?: User;
+
+  /** Members directly assigned to this department. */
+  @ManyToMany(() => User, { cascade: false, eager: false })
+  @JoinTable({
+    name: 'department_members',
+    joinColumn: { name: 'departmentId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
+  })
+  members: User[];
+
+  /**
+   * Cached headcount — updated by application logic or a DB trigger.
+   * Avoids COUNT(*) joins on hot read paths.
+   */
+  @Column({ type: 'int', default: 0 })
+  memberCount: number;
+
+  // ─── Budget ───────────────────────────────────────────────────────────────
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
+  budgetAmount?: number;
+
+  /** ISO 4217 currency code, e.g. "USD", "NGN". */
+  @Column({ length: 3, nullable: true })
+  budgetCurrency?: string;
+
+  /** Fiscal year the budget applies to (e.g. 2025). */
+  @Column({ type: 'int', nullable: true })
+  budgetYear?: number;
+
+  // ─── Display / UX ─────────────────────────────────────────────────────────
+
+  /**
+   * Hex colour used in org-chart UIs (e.g. "#3B82F6").
+   * Validated in the DTO layer.
+   */
+  @Column({ length: 7, nullable: true })
+  color?: string;
+
+  /** URL or icon key for org-chart and navigation usage. */
+  @Column({ type: 'text', nullable: true })
+  iconUrl?: string;
+
+  /**
+   * Display order among siblings — lower = shown first.
+   * Defaults to 0; ties are broken by createdAt.
+   */
+  @Column({ type: 'int', default: 0 })
+  sortOrder: number;
+
+  // ─── Metadata ─────────────────────────────────────────────────────────────
+
+  /**
+   * Arbitrary JSON key–value metadata for integrations
+   * (e.g. external HR system IDs, Slack channel IDs).
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  metadata?: Record<string, unknown>;
+
+  // ─── Audit ────────────────────────────────────────────────────────────────
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
   /**
@@ -107,7 +243,14 @@ export class Department {
    */
   get ancestorIds(): string[] {
     if (!this.path) return [];
+
     return this.path.split('/').filter(Boolean).slice(0, -1); // last segment is this department's own id
+
+    return this.path
+      .split('/')
+      .filter(Boolean)
+      .slice(0, -1); // last segment is this department's own id
+
   }
 
   // ─── Lifecycle hooks ──────────────────────────────────────────────────────
@@ -136,4 +279,8 @@ export class Department {
     if (this.description) this.description = this.description.trim();
     if (this.code) this.code = this.code.toUpperCase().trim();
   }
+
 }
+
+}
+

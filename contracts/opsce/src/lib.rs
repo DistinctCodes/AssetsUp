@@ -1,16 +1,26 @@
 #![no_std]
+use soroban_sdk::Env;
 
+pub mod whitelist;
+
+pub use whitelist::*;
+
+pub mod cross_contract;
+
+pub use cross_contract::AssetsUpClient;
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Vec};
 
 pub mod error;
 pub mod maintenance_alerts;
 pub mod maintenance_record;
 pub mod multisig_revoke;
+pub mod transfer_rules;
 pub mod types;
 
 #[cfg(test)]
 mod tests;
 
+pub use transfer_rules::TransferRulesContract;
 pub use crate::error::ContractError;
 pub use crate::types::{
     AlertSeverity, AlertType, DataKey, MaintenanceAlert, MaintenanceRecord, MaintenanceRecordType,
