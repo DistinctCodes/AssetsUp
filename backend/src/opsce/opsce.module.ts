@@ -4,8 +4,7 @@ import { DepartmentsModule } from './departments/departments.module';
 import { AuditModule } from './audit/audit.module';
 import { UsersModule } from './users/users.module';
 import { LocationsModule } from './locations/locations.module';
-import { AuthModule } from './auth/auth.module';
-import { UploadsModule } from './uploads/uploads.module';
+import { StellarModule } from './stellar/stellar.module';
 
 /**
  * OpsceModule
@@ -16,13 +15,12 @@ import { UploadsModule } from './uploads/uploads.module';
  */
 @Module({
   imports: [
-    AuthModule,
     UsersModule,
     LocationsModule,
     AuditModule,
     DepartmentsModule,
     AssetsModule,
-    UploadsModule,
+    StellarModule,
   ],
   exports: [
     AuthModule,
@@ -31,7 +29,7 @@ import { UploadsModule } from './uploads/uploads.module';
     AuditModule,
     DepartmentsModule,
     AssetsModule,
-    UploadsModule,
+    StellarModule,
   ],
 })
 export class OpsceModule {}
