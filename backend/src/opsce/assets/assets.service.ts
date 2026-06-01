@@ -6,193 +6,16 @@ import { FilterAssetsDto } from './dto/filter-assets.dto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AuditService } from '../../audit/audit.service';
-import { Asset } from './entities/asset.entity';
+import { Asset, AssetStatus } from './entities/asset.entity';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
-import { TransferAssetDto } from './dto/transfer-asset.dto';
-
-@Injectable()
-export class AssetsService {
-  private readonly relations = ['assignedToUser', 'department', 'location'];
-
-  constructor(
-    @InjectRepository(Asset)
-    private readonly assetRepo: Repository<Asset>,
-    private readonly auditService: AuditService,
-  ) {}
-
-  async create(dto: CreateAssetDto, userId?: string): Promise<Asset> {
-    const payload = this.mapDtoToEntity(dto) as Partial<Asset>;
-    if (dto.assignedTo) {
-      payload.assignedAt = new Date();
-    }
-    if (userId) {
-      payload.createdBy = userId;
-    }
-
-    const asset = this.assetRepo.create(payload);
-    const saved = await this.assetRepo.save(asset);
-
-    await this.auditService.log({
-      userId,
-      action: 'ASSET_CREATED',
-      resourceType: 'asset',
-      resourceId: saved.id,
-      newValue: saved,
-    });
-
-    return this.findOne(saved.id);
-  }
-
-  async findAll(page = 1, limit = 25): Promise<{ data: Asset[]; total: number; page: number; limit: number }> {
-    const [data, total] = await this.assetRepo.findAndCount({
-      relations: this.relations,
-      order: { createdAt: 'DESC' },
-      take: limit,
-      skip: (page - 1) * limit,
-    });
-    return { data, total, page, limit };
-  }
-
-  async findOne(id: string): Promise<Asset> {
-    const asset = await this.assetRepo.findOne({
-      where: { id },
-      relations: this.relations,
-    });
-
-    if (!asset) {
-      throw new NotFoundException('Asset not found');
-    }
-
-    return asset;
-  }
-
-  async update(id: string, dto: UpdateAssetDto, userId?: string): Promise<Asset> {
-    const asset = await this.assetRepo.findOne({ where: { id } });
-
-    if (!asset) {
-      throw new NotFoundException('Asset not found');
-    }
-
-    const oldValue = {
-      assignedTo: asset.assignedToUserId,
-      departmentId: asset.departmentId,
-      locationId: asset.locationId,
-      name: asset.name,
-      category: asset.category,
-      status: asset.status,
-      condition: asset.condition,
-    };
-
-    const payload = this.mapDtoToEntity(dto) as Partial<Asset>;
-    Object.entries(payload).forEach(([key, value]) => {
-      if (value !== undefined) {
-        (asset as any)[key] = value;
-      }
-    });
-
-    if (dto.assignedTo && dto.assignedTo !== asset.assignedToUserId) {
-      asset.assignedAt = new Date();
-    }
-    if (userId) {
-      asset.updatedBy = userId;
-    }
-
-    const updated = await this.assetRepo.save(asset);
-
-    await this.auditService.log({
-      userId,
-      action: 'ASSET_UPDATED',
-      resourceType: 'asset',
-      resourceId: updated.id,
-      oldValue,
-      newValue: updated,
-    });
-
-    return this.findOne(updated.id);
-  }
-
-  async transfer(id: string, dto: TransferAssetDto, userId?: string): Promise<Asset> {
-    const asset = await this.assetRepo.findOne({ where: { id } });
-
-    if (!asset) {
-      throw new NotFoundException('Asset not found');
-    }
-
-    const oldValue = {
-      assignedTo: asset.assignedToUserId,
-      departmentId: asset.departmentId,
-      locationId: asset.locationId,
-    };
-
-    if (dto.assignedTo !== undefined) {
-      asset.assignedToUserId = dto.assignedTo;
-      asset.assignedAt = new Date();
-    }
-    if (dto.departmentId !== undefined) {
-      asset.departmentId = dto.departmentId;
-    }
-    if (dto.locationId !== undefined) {
-      asset.locationId = dto.locationId;
-    }
-    if (userId) {
-      asset.updatedBy = userId;
-    }
-
-    const updated = await this.assetRepo.save(asset);
-
-    await this.auditService.log({
-      userId,
-      action: 'ASSET_TRANSFER',
-      resourceType: 'asset',
-      resourceId: updated.id,
-      oldValue,
-      newValue: {
-        assignedTo: updated.assignedToUserId,
-        departmentId: updated.departmentId,
-        locationId: updated.locationId,
-      },
-    });
-
-    return this.findOne(updated.id);
-  }
-
-  async softRemove(id: string, userId?: string): Promise<Asset> {
-    const asset = await this.assetRepo.findOne({ where: { id } });
-
-    if (!asset) {
-      throw new NotFoundException('Asset not found');
-    }
-
-    const oldValue = { ...asset };
-    asset.deletedBy = userId;
-
-    const deletedAsset = await this.assetRepo.softRemove(asset);
-
-    await this.auditService.log({
-      userId,
-      action: 'ASSET_DELETED',
-      resourceType: 'asset',
-      resourceId: deletedAsset.id,
-      oldValue,
-      newValue: { deletedAt: deletedAsset.deletedAt, deletedBy: deletedAsset.deletedBy },
-    });
-
-    return deletedAsset;
-  }
-
-  private mapDtoToEntity(dto: CreateAssetDto | UpdateAssetDto | TransferAssetDto): Record<string, unknown> {
-    const payload = { ...dto } as Record<string, unknown>;
-    if ('assignedTo' in payload) {
-      payload.assignedToUserId = payload.assignedTo;
-      delete payload.assignedTo;
-    }
-    return payload;
-import { Asset } from './entities/asset.entity';
-import { CreateAssetDto } from './dto/create-asset.dto';
-import { UpdateAssetDto } from './dto/update-asset.dto';
+import {
+  BulkAssetOperationDto,
+  BulkOperation,
+  BulkOperationResult,
+} from './dto/bulk-asset-operation.dto';
 import { PaginationDto, PaginatedResponseDto, paginate } from '../common';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class AssetsService {
@@ -245,16 +68,43 @@ export class AssetsService {
 
     return { items, total };
     private readonly assetRepository: Repository<Asset>,
+    private readonly auditService: AuditService,
   ) {}
 
   async create(createAssetDto: CreateAssetDto): Promise<Asset> {
     const asset = this.assetRepository.create(createAssetDto);
-    return this.assetRepository.save(asset);
+    const saved = await this.assetRepository.save(asset);
+
+    await this.auditService.log({
+      action: 'CREATE',
+      resourceType: 'Asset',
+      resourceId: saved.id,
+      newValue: createAssetDto as unknown as Record<string, unknown>,
+    });
+
+    return saved;
   }
 
   async findAll(
     paginationDto: PaginationDto,
+    search?: string,
   ): Promise<PaginatedResponseDto<Asset>> {
+    if (search) {
+      const { page = 1, limit = 20 } = paginationDto;
+      const qb = this.assetRepository
+        .createQueryBuilder('asset')
+        .where(
+          'asset.name ILIKE :search OR asset.category ILIKE :search OR asset.serialNumber ILIKE :search',
+          { search: `%${search}%` },
+        )
+        .orderBy('asset.createdAt', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit);
+
+      const [data, total] = await qb.getManyAndCount();
+      return new PaginatedResponseDto<Asset>(data, total, page, limit);
+    }
+
     return paginate(this.assetRepository, paginationDto, {
       order: { createdAt: 'DESC' },
     });
@@ -268,14 +118,138 @@ export class AssetsService {
     return asset;
   }
 
-  async update(id: string, updateAssetDto: UpdateAssetDto): Promise<Asset> {
+  async update(
+    id: string,
+    updateAssetDto: UpdateAssetDto,
+    userId?: string,
+  ): Promise<Asset> {
     const asset = await this.findOne(id);
+    const oldValue = { ...asset } as unknown as Record<string, unknown>;
+
     Object.assign(asset, updateAssetDto);
-    return this.assetRepository.save(asset);
+    const saved = await this.assetRepository.save(asset);
+
+    await this.auditService.log({
+      userId,
+      action: 'UPDATE',
+      resourceType: 'Asset',
+      resourceId: id,
+      oldValue,
+      newValue: updateAssetDto as unknown as Record<string, unknown>,
+    });
+
+    return saved;
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, userId?: string): Promise<void> {
     const asset = await this.findOne(id);
     await this.assetRepository.remove(asset);
+
+    await this.auditService.log({
+      userId,
+      action: 'DELETE',
+      resourceType: 'Asset',
+      resourceId: id,
+    });
+  }
+
+  /**
+   * Apply a single operation to multiple assets in one request.
+   * Each asset is processed independently — failures do not roll back
+   * successful operations. Returns per-asset success/failure results.
+   *
+   * Maximum 100 IDs per request (enforced at the DTO layer).
+   */
+  async bulkOperation(
+    dto: BulkAssetOperationDto,
+    userId?: string,
+  ): Promise<BulkOperationResult> {
+    const result: BulkOperationResult = { succeeded: [], failed: [] };
+
+    for (const id of dto.ids) {
+      try {
+        await this.applyBulkOperation(id, dto.operation, dto.payload ?? {}, userId);
+        result.succeeded.push(id);
+      } catch (error) {
+        result.failed.push({
+          id,
+          reason: (error as Error).message ?? 'Unknown error',
+        });
+      }
+    }
+
+    return result;
+  }
+
+  // ─── Private helpers ────────────────────────────────────────────────────────
+
+  private async applyBulkOperation(
+    id: string,
+    operation: BulkOperation,
+    payload: Record<string, unknown>,
+    userId?: string,
+  ): Promise<void> {
+    const asset = await this.findOne(id);
+    const oldValue = { ...asset } as unknown as Record<string, unknown>;
+
+    switch (operation) {
+      case BulkOperation.UPDATE_STATUS: {
+        const status = payload['status'] as AssetStatus;
+        if (!status) throw new Error('payload.status is required for update-status');
+        asset.status = status;
+        if (payload['reason']) {
+          asset.statusChangeReason = payload['reason'] as string;
+          asset.statusChangedAt = new Date();
+        }
+        break;
+      }
+
+      case BulkOperation.REASSIGN: {
+        const assignedToUserId = payload['assignedToUserId'] as string;
+        if (!assignedToUserId) throw new Error('payload.assignedToUserId is required for reassign');
+        asset.assignedToUserId = assignedToUserId;
+        asset.assignedAt = new Date();
+        break;
+      }
+
+      case BulkOperation.CHANGE_DEPARTMENT: {
+        const departmentId = payload['departmentId'] as string;
+        if (!departmentId) throw new Error('payload.departmentId is required for change-department');
+        asset.departmentId = departmentId;
+        break;
+      }
+
+      case BulkOperation.CHANGE_LOCATION: {
+        const locationId = payload['locationId'] as string;
+        if (!locationId) throw new Error('payload.locationId is required for change-location');
+        asset.locationId = locationId;
+        break;
+      }
+
+      case BulkOperation.SOFT_DELETE: {
+        await this.assetRepository.softRemove(asset);
+        await this.auditService.log({
+          userId,
+          action: 'BULK_SOFT_DELETE',
+          resourceType: 'Asset',
+          resourceId: id,
+          oldValue,
+        });
+        return;
+      }
+
+      default:
+        throw new Error(`Unsupported bulk operation: ${operation as string}`);
+    }
+
+    await this.assetRepository.save(asset);
+    await this.auditService.log({
+      userId,
+      action: `BULK_${operation.toUpperCase().replace(/-/g, '_')}`,
+      resourceType: 'Asset',
+      resourceId: id,
+      oldValue,
+      newValue: payload,
+    });
   }
 }

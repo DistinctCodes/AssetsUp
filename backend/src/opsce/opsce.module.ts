@@ -7,13 +7,15 @@ import { UsersModule } from './users/users.module';
 import { LocationsModule } from './locations/locations.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { StellarModule } from './stellar/stellar.module';
+import { MailerModule } from './mailer/mailer.module';
 
 /**
  * OpsceModule
  *
- * Aggregates all operational sub-modules: users, locations, audit, and
- * departments. ConfigModule is already global (registered in AppModule), so
- * every sub-module can inject ConfigService without re-importing it here.
+ * Aggregates all operational sub-modules: users, locations, audit,
+ * departments, assets, stellar, and mailer.
+ * ConfigModule is already global (registered in AppModule), so every
+ * sub-module can inject ConfigService without re-importing it here.
  */
 @Module({
   imports: [UsersModule, LocationsModule, AuditModule, DepartmentsModule, AssetsModule],
@@ -31,15 +33,16 @@ import { StellarModule } from './stellar/stellar.module';
     DepartmentsModule,
     AssetsModule,
     StellarModule,
+    MailerModule,
   ],
   exports: [
-    AuthModule,
     UsersModule,
     LocationsModule,
     AuditModule,
     DepartmentsModule,
     AssetsModule,
     StellarModule,
+    MailerModule,
   ],
 })
 export class OpsceModule {}
