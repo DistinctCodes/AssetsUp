@@ -35,7 +35,7 @@ export class LocationsService {
     return this.locationRepository.save(location);
   }
 
-  async findAll(type?: string): Promise<Location[]> {
+  async findAll(type?: string): Promise<(Location & { childCount: number })[]> {
     const queryBuilder = this.locationRepository.createQueryBuilder('location');
 
     if (type) {
@@ -49,7 +49,7 @@ export class LocationsService {
     // Add childCount to each location
     return locations.map((loc) => {
       const childCount = locations.filter((l) => l.parentId === loc.id).length;
-      return { ...loc, childCount };
+      return { ...loc, childCount } as Location & { childCount: number };
     });
   }
 
@@ -68,7 +68,7 @@ export class LocationsService {
       where: { locationId: id, status: AssetStatus.ACTIVE },
     });
 
-    return { ...location, assetCount };
+    return { ...location, assetCount } as Location & { assetCount: number };
   }
 
   async update(

@@ -35,7 +35,7 @@ export class DepartmentsService {
     return this.departmentRepository.save(department);
   }
 
-  async findAll(): Promise<Department[]> {
+  async findAll(): Promise<(Department & { childCount: number })[]> {
     const departments = await this.departmentRepository.find({
       order: { name: 'ASC' },
     });
@@ -45,7 +45,7 @@ export class DepartmentsService {
       const childCount = departments.filter(
         (d) => d.parentId === dept.id,
       ).length;
-      return { ...dept, childCount };
+      return { ...dept, childCount } as Department & { childCount: number };
     });
   }
 
