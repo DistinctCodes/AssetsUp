@@ -61,3 +61,10 @@ export class MaintenanceRecord {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
+
+export interface MaintenanceAlert {
+  assetId: string;
+  message: string;
+  scheduledDate: Date;
+  type: MaintenanceType;
+}
