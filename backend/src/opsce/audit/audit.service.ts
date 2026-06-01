@@ -42,4 +42,28 @@ export class AuditService {
       order: { createdAt: 'DESC' },
     });
   }
+
+  async findAll(dto: QueryAuditDto) {
+    const { userId, resourceType, resourceId, from, to, page = 1, limit = 20 } = dto;
+
+    const where: FindOptionsWhere<AuditLog> = {};
+    if (userId) where.userId = userId;
+    if (resourceType) where.resourceType = resourceType;
+    if (resourceId) where.resourceId = resourceId;
+    if (from || to) {
+      where.createdAt = Between(
+        from ? new Date(from) : new Date(0),
+        to ? new Date(to) : new Date(),
+      );
+    }
+
+    const [data, total] = await this.auditRepository.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { total, page, data };
+  }
 }

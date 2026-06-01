@@ -5,6 +5,7 @@ import { AuditModule } from './audit/audit.module';
 import { UsersModule } from './users/users.module';
 import { LocationsModule } from './locations/locations.module';
 import { StellarModule } from './stellar/stellar.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 
 /**
  * OpsceModule
@@ -29,7 +30,8 @@ import { StellarModule } from './stellar/stellar.module';
     AuditModule,
     DepartmentsModule,
     AssetsModule,
-    StellarModule,
+    StellarModule,    MaintenanceModule,
+
   ],
 })
 export class OpsceModule {}
