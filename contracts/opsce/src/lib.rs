@@ -14,11 +14,13 @@ pub mod error;
 pub mod maintenance_alerts;
 pub mod maintenance_record;
 pub mod multisig_revoke;
+pub mod transfer_rules;
 pub mod types;
 
 #[cfg(test)]
 mod tests;
 
+pub use transfer_rules::TransferRulesContract;
 pub use crate::error::ContractError;
 pub use crate::types::{
     AlertSeverity, AlertType, DataKey, MaintenanceAlert, MaintenanceRecord, MaintenanceRecordType,

@@ -5,6 +5,7 @@ members = [
   "assetsup",
   "opsce",
   "contrib",
+  "opsce",
   "multisig-wallet",
   "multisig_transfer",
   "./opsce",

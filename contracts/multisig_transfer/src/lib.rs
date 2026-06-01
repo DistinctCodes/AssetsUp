@@ -1,5 +1,6 @@
 #![no_std]
 
+use opsce::transfer_rules::validate_transfer;
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
 
 mod approvals;
@@ -281,6 +282,8 @@ impl MultiSigTransferContract {
                 return Err(MultiSigError::ExecuteTooEarly);
             }
         }
+        validate_transfer(&e, &req.current_owner, &req.new_owner, &req.asset_id, 1i128)
+            .map_err(|_| MultiSigError::Unauthorized)?;
 
         let assetsup_contract = storage::get_assetsup_contract(&e)
             .ok_or(MultiSigError::AssetsUpContractNotConfigured)?;
