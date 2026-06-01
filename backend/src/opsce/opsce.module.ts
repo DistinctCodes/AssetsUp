@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { LocationsModule } from './locations/locations.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { StellarModule } from './stellar/stellar.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 import { MailerModule } from './mailer/mailer.module';
 
 /**
@@ -41,6 +42,8 @@ import { MailerModule } from './mailer/mailer.module';
     AuditModule,
     DepartmentsModule,
     AssetsModule,
+    StellarModule,    MaintenanceModule,
+
     StellarModule,
     MailerModule,
   ],
