@@ -5,6 +5,9 @@ pub mod whitelist;
 
 pub use whitelist::*;
 
+pub mod cross_contract;
+
+pub use cross_contract::AssetsUpClient;
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Vec};
 
 pub mod error;

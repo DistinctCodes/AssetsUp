@@ -13,6 +13,7 @@ mod utils;
 
 use approvals::*;
 use errors::MultiSigError;
+use opsce::AssetsUpClient;
 use types::{ApprovalRule, RequestStatus, TransferRequest};
 
 #[contract]
@@ -49,6 +50,16 @@ impl MultiSigTransferContract {
         Ok(())
     }
 
+    pub fn configure_assetsup_contract(
+        e: Env,
+        caller: Address,
+        assetsup_contract_id: Address,
+    ) -> Result<(), MultiSigError> {
+        utils::require_admin(&e, &caller)?;
+        storage::set_assetsup_contract(&e, &assetsup_contract_id);
+        Ok(())
+    }
+
     // ----------------------------
     // Create transfer request
     // ----------------------------
@@ -58,6 +69,8 @@ impl MultiSigTransferContract {
         caller: Address,
         asset_id: BytesN<32>,
         asset_category: BytesN<32>,
+        token_id: u64,
+        amount: i128,
         new_owner: Address,
         notes_hash: BytesN<32>,
         expires_at: u64,
@@ -104,6 +117,8 @@ impl MultiSigTransferContract {
             request_id,
             asset_id: asset_id.clone(),
             asset_category: asset_category.clone(),
+            token_id,
+            amount,
             current_owner: caller.clone(), // placeholder until registry owner wired
             new_owner: new_owner.clone(),
             initiator: caller.clone(),
@@ -267,6 +282,14 @@ impl MultiSigTransferContract {
             }
         }
 
+        let assetsup_contract = storage::get_assetsup_contract(&e)
+            .ok_or(MultiSigError::AssetsUpContractNotConfigured)?;
+
+        let assetsup_client = AssetsUpClient::new(&e, &assetsup_contract);
+        assetsup_client
+            .transfer_tokens(req.token_id, req.current_owner.clone(), req.new_owner.clone(), req.amount)
+            .map_err(|_| MultiSigError::AssetTransferFailed)?;
+
         // registry transfer ownership
         registry::transfer_owner(&e, &registry_addr, &req.asset_id, &req.new_owner)?;
 
@@ -361,3 +384,6 @@ impl MultiSigTransferContract {
         Ok(rule.approvers)
     }
 }
+
+#[cfg(test)]
+mod tests;

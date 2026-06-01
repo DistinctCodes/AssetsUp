@@ -19,6 +19,8 @@ pub enum Error {
     InvalidTokenSupply = 12,
     InvalidTokenDecimals = 13,
     InsufficientBalance = 14,
+    MaxSupplyExceeded = 15,
+    InvalidTokenTransfer = 16,
     InsufficientLockedTokens = 15,
     TokensAreLocked = 16,
     TransferRestrictionFailed = 17,
