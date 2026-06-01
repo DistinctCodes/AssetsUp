@@ -4,6 +4,7 @@ import { DepartmentsModule } from './departments/departments.module';
 import { AuditModule } from './audit/audit.module';
 import { UsersModule } from './users/users.module';
 import { LocationsModule } from './locations/locations.module';
+import { AuthModule } from './auth/auth.module';
 import { StellarModule } from './stellar/stellar.module';
 
 /**
@@ -14,6 +15,8 @@ import { StellarModule } from './stellar/stellar.module';
  * every sub-module can inject ConfigService without re-importing it here.
  */
 @Module({
+  imports: [AuthModule, AssetsModule, UsersModule, LocationsModule, AuditModule, DepartmentsModule],
+  exports: [AuthModule, AssetsModule, UsersModule, LocationsModule, AuditModule, DepartmentsModule],
   imports: [
     UsersModule,
     LocationsModule,
