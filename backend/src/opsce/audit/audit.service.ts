@@ -26,7 +26,10 @@ export class AuditService {
     return this.repo.save(entry);
   }
 
-  async findByResource(resourceType: string, resourceId: string): Promise<AuditLog[]> {
+  async findByResource(
+    resourceType: string,
+    resourceId: string,
+  ): Promise<AuditLog[]> {
     return this.repo.find({
       where: { resourceType, resourceId },
       order: { createdAt: 'DESC' },

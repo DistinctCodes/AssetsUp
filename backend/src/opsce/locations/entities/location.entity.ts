@@ -17,6 +17,26 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 
+
+export const LOCATION_CODE_PATTERN = /^[A-Z0-9-]{2,30}$/;
+
+export enum LocationType {
+  CAMPUS = 'campus',
+  BUILDING = 'building',
+  FLOOR = 'floor',
+  WING = 'wing',
+  ROOM = 'room',
+  ZONE = 'zone',
+  DESK = 'desk',
+  OUTDOOR = 'outdoor',
+}
+
+export enum LocationStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  UNDER_MAINTENANCE = 'under_maintenance',
+  RESERVED = 'reserved',
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const MAX_LOCATION_DEPTH = 6;
@@ -45,10 +65,17 @@ export enum LocationStatus {
 }
 
 export enum AccessLevel {
+
+  PUBLIC = 'public',
+  RESTRICTED = 'restricted',
+  PRIVATE = 'private',
+  SECURE = 'secure',
+
   PUBLIC      = 'public',
   RESTRICTED  = 'restricted',
   PRIVATE     = 'private',
   SECURE      = 'secure',
+
 }
 
 // ─── Embedded value objects ───────────────────────────────────────────────────
@@ -80,6 +107,7 @@ export interface OperatingHours {
   days: number[];
   /** IANA timezone, e.g. "Africa/Lagos" */
   timezone: string;
+
 }
 
 export interface LocationDimensions {
@@ -93,12 +121,32 @@ export interface LocationDimensions {
   areaM2?: number;
 }
 
+
+}
+
+export interface LocationDimensions {
+  /** Width in metres */
+  widthM?: number;
+  /** Length in metres */
+  lengthM?: number;
+  /** Height in metres */
+  heightM?: number;
+  /** Total area in square metres (may be set independently of width/length) */
+  areaM2?: number;
+}
+
+
 // ─── Entity ───────────────────────────────────────────────────────────────────
 
 @Entity('locations')
 @Index('IDX_LOC_PARENT_STATUS', ['parentId', 'status'])
+
+@Index('IDX_LOC_TYPE_ACTIVE', ['type', 'isActive'])
+@Index('IDX_LOC_DELETED_AT', ['deletedAt'])
+
 @Index('IDX_LOC_TYPE_ACTIVE',   ['type', 'isActive'])
 @Index('IDX_LOC_DELETED_AT',    ['deletedAt'])
+
 @Check(`"name" <> ''`)
 @Check(`"capacity" IS NULL OR "capacity" >= 0`)
 @Check(`"currentOccupancy" IS NULL OR "currentOccupancy" >= 0`)
@@ -106,6 +154,7 @@ export interface LocationDimensions {
   `"currentOccupancy" IS NULL OR "capacity" IS NULL OR "currentOccupancy" <= "capacity"`,
 )
 export class Location {
+
 
   // ─── Identity ───────────────────────────────────────────────────────────────
 
@@ -120,11 +169,22 @@ export class Location {
   @Column({ length: 200 })
   name: string;
 
+
+  @Column({ nullable: true })
+  description?: string;
+
+
   /**
    * Short, uppercase location code for signage / integrations.
    * e.g. "B3-F2-R14". Must match LOCATION_CODE_PATTERN.
    */
+
+  @Index('IDX_LOC_CODE_ACTIVE', {
+    where: '"deletedAt" IS NULL AND "code" IS NOT NULL',
+  })
+
   @Index('IDX_LOC_CODE_ACTIVE', { where: '"deletedAt" IS NULL AND "code" IS NOT NULL' })
+
   @Column({ length: 30, nullable: true })
   code?: string;
 
@@ -138,6 +198,11 @@ export class Location {
   })
   status: LocationStatus;
 
+
+  @Column({ nullable: true })
+  address?: string;
+
+
   @Column({
     type: 'enum',
     enum: AccessLevel,
@@ -145,12 +210,16 @@ export class Location {
   })
   accessLevel: AccessLevel;
 
+
+  @Column({ nullable: true })
+
   @Column({ type: 'text', nullable: true })
   description?: string;
 
   // ─── Hierarchy / materialized path ─────────────────────────────────────────
 
   @Column({ type: 'uuid', nullable: true })
+
   parentId?: string;
 
   /**
@@ -177,9 +246,11 @@ export class Location {
 
   // ─── Physical attributes ────────────────────────────────────────────────────
 
+
   /** Physical mailing / street address (buildings / campus level). */
   @Column({ type: 'text', nullable: true })
   address?: string;
+
 
   /** Floor number within a building (relevant for FLOOR / ROOM / ZONE / DESK). */
   @Column({ type: 'int', nullable: true })
@@ -243,8 +314,13 @@ export class Location {
   @ManyToMany(() => User, { cascade: false, eager: false })
   @JoinTable({
     name: 'location_managers',
+
+    joinColumn: { name: 'locationId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
+
     joinColumn:        { name: 'locationId', referencedColumnName: 'id' },
     inverseJoinColumn: { name: 'userId',     referencedColumnName: 'id' },
+
   })
   managers: User[];
 
@@ -267,7 +343,16 @@ export class Location {
   @Column({ type: 'jsonb', nullable: true })
   metadata?: Record<string, unknown>;
 
+
+  /**
+   * Materialized path for efficient tree queries.
+   * Format: "/{rootId}/{childId}/{...}/{thisId}/"
+   */
+  @Column({ length: 500, nullable: true })
+  path?: string;
+
   // ─── Legacy compatibility ───────────────────────────────────────────────────
+
 
   /**
    * Kept for backwards compatibility — prefer `status` for new code.
@@ -316,7 +401,14 @@ export class Location {
    */
   get occupancyPct(): number | null {
     if (this.capacity == null || this.capacity === 0) return null;
+s
+    return Math.min(
+      100,
+      Math.round(((this.currentOccupancy ?? 0) / this.capacity) * 100),
+    );
+
     return Math.min(100, Math.round(((this.currentOccupancy ?? 0) / this.capacity) * 100));
+
   }
 
   /**
@@ -341,9 +433,15 @@ export class Location {
   @BeforeUpdate()
   normalizeFields(): void {
     // Trim strings
+
+    if (this.name) this.name = this.name.trim();
+    if (this.description) this.description = this.description.trim();
+    if (this.address) this.address = this.address.trim();
+
     if (this.name)        this.name        = this.name.trim();
     if (this.description) this.description = this.description.trim();
     if (this.address)     this.address     = this.address.trim();
+
 
     // Uppercase + trim code
     if (this.code) {
@@ -359,8 +457,17 @@ export class Location {
     this.isActive = this.status === LocationStatus.ACTIVE;
 
     // Deduplicate tags and amenities
+
+    if (this.tags)
+      this.tags = [...new Set(this.tags.map((t) => t.toLowerCase().trim()))];
+    if (this.amenities)
+      this.amenities = [
+        ...new Set(this.amenities.map((a) => a.toLowerCase().trim())),
+      ];
+
     if (this.tags)      this.tags      = [...new Set(this.tags.map((t) => t.toLowerCase().trim()))];
     if (this.amenities) this.amenities = [...new Set(this.amenities.map((a) => a.toLowerCase().trim()))];
+
   }
 
   @BeforeInsert()
@@ -372,8 +479,18 @@ export class Location {
         throw new Error(`Invalid latitude ${lat}: must be between -90 and 90`);
       }
       if (lng < -180 || lng > 180) {
+
+        throw new Error(
+          `Invalid longitude ${lng}: must be between -180 and 180`,
+        );
+      }
+    }
+  }
+}
+
         throw new Error(`Invalid longitude ${lng}: must be between -180 and 180`);
       }
     }
   }
 }
+
