@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { AssetsModule } from '../assets/assets.module';
-import { DepartmentsModule } from '../departments/departments.module';
-import { AuditModule } from '../audit/audit.module';
-import { UsersModule } from '../users/users.module';
-import { LocationsModule } from '../locations/locations.module';
+import { AssetsModule } from './assets/assets.module';
+import { DepartmentsModule } from './departments/departments.module';
+import { AuditModule } from './audit/audit.module';
+import { UsersModule } from './users/users.module';
+import { LocationsModule } from './locations/locations.module';
+import { AuthModule } from './auth/auth.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 /**
  * OpsceModule
@@ -15,23 +16,22 @@ import { LocationsModule } from '../locations/locations.module';
  */
 @Module({
   imports: [
-    // ConfigModule is global — listed here for explicit documentation only.
-    // Remove this import if it causes duplicate-module warnings in your version
-    // of @nestjs/config.
-    ConfigModule,
-
+    AuthModule,
     UsersModule,
     LocationsModule,
     AuditModule,
     DepartmentsModule,
     AssetsModule,
+    UploadsModule,
   ],
   exports: [
+    AuthModule,
     UsersModule,
     LocationsModule,
     AuditModule,
     DepartmentsModule,
     AssetsModule,
+    UploadsModule,
   ],
 })
 export class OpsceModule {}
