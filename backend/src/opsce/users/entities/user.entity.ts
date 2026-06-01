@@ -26,6 +26,10 @@ export class User {
   @Column()
   passwordHash: string;
 
+  /** Hashed refresh token for one active device/session (nullable) */
+  @Column({ nullable: true })
+  refreshTokenHash?: string;
+
   @Column()
   fullName: string;
 
