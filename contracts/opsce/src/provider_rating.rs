@@ -14,9 +14,29 @@
 //!   `{ average_rating, total_reviews }`
 //! - Emits a `provider_rated` event carrying the rating value and record id
 
-use soroban_sdk::{contracttype, Address, Env, String, Symbol};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype, Address, Env, String, Symbol,
+};
 
-pub use crate::error::ContractError;
+/// Errors returned by this contract.
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ContractError {
+    NotInitialized = 1,
+    AlreadyInitialized = 2,
+    Unauthorized = 3,
+    /// Rating is outside the allowed 1..=5 range.
+    InvalidRating = 4,
+    /// The maintenance record was already rated.
+    AlreadyRated = 5,
+    /// Maintenance record id was not found.
+    RecordNotFound = 6,
+    /// Maintenance record exists but is not yet marked complete.
+    RecordNotComplete = 7,
+    /// Provider profile is not registered.
+    ProviderNotFound = 8,
+}
 
 /// Provider profile with cumulative rating fields.
 ///
