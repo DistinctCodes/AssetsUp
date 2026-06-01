@@ -378,6 +378,32 @@ export class Asset {
   @Column({ type: 'timestamptz', nullable: true })
   statusChangedAt?: Date;
 
+  // ─── Tokenization ──────────────────────────────────────────────────────────────
+
+  /** Stellar contract ID for tokenized assets */
+  @Column({ type: 'text', nullable: true })
+  stellarContractId?: string;
+
+  /** Total number of shares for tokenized assets */
+  @Column({ type: 'decimal', precision: 20, scale: 0, nullable: true })
+  totalShares?: number;
+
+  /** Whether this asset has been tokenized on Stellar */
+  @Column({ default: false })
+  isTokenized: boolean;
+
+  /** Transaction hash of the tokenization transaction */
+  @Column({ type: 'text', nullable: true })
+  tokenizationTxHash?: string;
+
+  /** Timestamp when the asset was tokenized */
+  @Column({ type: 'timestamptz', nullable: true })
+  tokenizedAt?: Date;
+
+  /** Token symbol on Stellar network */
+  @Column({ length: 50, nullable: true })
+  tokenSymbol?: string;
+
   // ─── Computed helpers ────────────────────────────────────────────────────────
 
   get isDeleted(): boolean {
