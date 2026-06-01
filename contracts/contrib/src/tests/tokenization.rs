@@ -98,7 +98,8 @@ fn test_transfer_tokens_blacklisted_recipient() {
     tokenize(&client, &env, 1, &from);
 
     // Add only `allowed` to whitelist — `blocked` is not listed
-    client.add_to_whitelist(&1u64, &allowed);
+    // The tokenizer (from) is the admin for whitelist management
+    client.add_to_whitelist(&1u64, &from, &allowed);
 
     // Transfer to non-whitelisted address should panic with TransferRestrictionFailed (#17)
     client.transfer_tokens(&1u64, &from, &blocked, &100_000i128);

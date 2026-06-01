@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "./asset-maintenance",
   "assetsup",
+  "opsce",
   "contrib",
   "multisig-wallet",
   "multisig_transfer",
