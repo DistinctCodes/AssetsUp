@@ -83,8 +83,7 @@ export class AssetsController {
     description: 'Insufficient role — ADMIN required.',
   })
   create(@Body() createAssetDto: CreateAssetDto, @Req() req: Request) {
-    const user = this.getUser(req);
-    return this.assetsService.create(createAssetDto, user.id);
+    return this.assetsService.create(createAssetDto);
   }
 
   // ─── Bulk operations ────────────────────────────────────────────────────────
