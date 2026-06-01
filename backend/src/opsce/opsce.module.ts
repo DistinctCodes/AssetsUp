@@ -6,6 +6,13 @@ import { UsersModule } from './users/users.module';
 import { LocationsModule } from './locations/locations.module';
 import { StellarModule } from './stellar/stellar.module';
 
+/**
+ * OpsceModule
+ *
+ * Aggregates all operational sub-modules: users, locations, audit, and
+ * departments. ConfigModule is already global (registered in AppModule), so
+ * every sub-module can inject ConfigService without re-importing it here.
+ */
 @Module({
   imports: [
     UsersModule,
