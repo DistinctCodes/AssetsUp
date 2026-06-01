@@ -23,6 +23,7 @@ import { StellarModule } from './stellar/stellar.module';
     StellarModule,
   ],
   exports: [
+    AuthModule,
     UsersModule,
     LocationsModule,
     AuditModule,
