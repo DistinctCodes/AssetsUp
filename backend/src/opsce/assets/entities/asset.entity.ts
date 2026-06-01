@@ -6,9 +6,6 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
   ManyToOne,
-
-  OneToMany,
-
   JoinColumn,
   Index,
   Check,
@@ -110,9 +107,9 @@ export enum AssetCondition {
 }
 
 export enum DepreciationMethod {
-  STRAIGHT_LINE      = 'straight_line',
-  DECLINING_BALANCE  = 'declining_balance',
-  NONE               = 'none',
+  STRAIGHT_LINE     = 'straight_line',
+  DECLINING_BALANCE = 'declining_balance',
+  NONE              = 'none',
 }
 
 export enum MaintenanceFrequency {
@@ -183,27 +180,13 @@ export interface AssetCheckout {
 // ─── Entity ───────────────────────────────────────────────────────────────────
 
 @Entity('assets')
-
 @Index('IDX_ASSET_STATUS_CATEGORY', ['status', 'category'])
-@Index('IDX_ASSET_DEPT_STATUS', ['departmentId', 'status'])
+@Index('IDX_ASSET_DEPT_STATUS',     ['departmentId', 'status'])
 @Index('IDX_ASSET_LOCATION_STATUS', ['locationId', 'status'])
-@Index('IDX_ASSET_ASSIGNED_USER', ['assignedToUserId'])
-@Index('IDX_ASSET_DELETED_AT', ['deletedAt'])
-
-@Index('IDX_ASSET_STATUS_CATEGORY',    ['status', 'category'])
-@Index('IDX_ASSET_DEPT_STATUS',        ['departmentId', 'status'])
-@Index('IDX_ASSET_LOCATION_STATUS',    ['locationId', 'status'])
-@Index('IDX_ASSET_ASSIGNED_USER',      ['assignedToUserId'])
-@Index('IDX_ASSET_DELETED_AT',         ['deletedAt'])
-
+@Index('IDX_ASSET_ASSIGNED_USER',   ['assignedToUserId'])
+@Index('IDX_ASSET_DELETED_AT',      ['deletedAt'])
 @Check(`"name" <> ''`)
-@Check(`"purchaseValue"  IS NULL OR "purchaseValue"  >= 0`)
-@Check(`"currentValue"   IS NULL OR "currentValue"   >= 0`)
-@Check(`"residualValue"  IS NULL OR "residualValue"  >= 0`)
-@Check(`"usefulLifeYears" IS NULL OR "usefulLifeYears" > 0`)
-@Check(
-  `"warrantyExpiryDate" IS NULL OR "purchaseDate" IS NULL OR "warrantyExpiryDate" >= "purchaseDate"`,
-)
+@Check(`"warrantyExpiryDate" IS NULL OR "purchaseDate" IS NULL OR "warrantyExpiryDate" >= "purchaseDate"`)
 export class Asset {
 
   // ─── Identity ───────────────────────────────────────────────────────────────
@@ -441,14 +424,6 @@ export class Asset {
   @Column({ type: 'date', nullable: true })
   expectedReturnDate?: Date;
 
-  /**
-   * Rolling checkout history (last 50 entries).
-   * Full history should be stored in a dedicated `asset_checkouts` table
-   * for high-volume assets.
-   */
-  @Column({ type: 'jsonb', nullable: true, default: [] })
-  checkoutHistory?: AssetCheckout[];
-
   // ─── Placement ───────────────────────────────────────────────────────────────
 
   @Column({ type: 'uuid', nullable: true })
@@ -575,44 +550,6 @@ export class Asset {
 
 
     return Math.max(0, parseFloat(total.toFixed(2)));
-  }
-
-  /**
-   * Estimated current book value based on straight-line depreciation.
-   * Returns currentValue when explicitly set, falls back to computed value.
-   */
-  get estimatedBookValue(): number | null {
-    if (this.currentValue != null) return Number(this.currentValue);
-
-    if (this.accruedDepreciation == null || this.purchaseValue == null)
-      return null;
-    return Math.max(
-      this.residualValue ?? 0,
-      parseFloat(
-        (Number(this.purchaseValue) - this.accruedDepreciation).toFixed(2),
-      ),
-
-    if (this.accruedDepreciation == null || this.purchaseValue == null) return null;
-    return Math.max(
-      this.residualValue ?? 0,
-      parseFloat((Number(this.purchaseValue) - this.accruedDepreciation).toFixed(2)),
-
-    );
-  }
-
-  get isWarrantyExpired(): boolean {
-    if (!this.warrantyExpiryDate) return false;
-    return new Date(this.warrantyExpiryDate) < new Date();
-  }
-
-  get isInsuranceExpired(): boolean {
-    if (!this.insuranceExpiryDate) return false;
-    return new Date(this.insuranceExpiryDate) < new Date();
-  }
-
-  get isMaintenanceOverdue(): boolean {
-    if (!this.nextMaintenanceDue) return false;
-    return new Date(this.nextMaintenanceDue) < new Date();
   }
 
   // ─── Lifecycle hooks ─────────────────────────────────────────────────────────

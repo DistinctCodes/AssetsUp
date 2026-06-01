@@ -9,7 +9,6 @@ import {
   BeforeInsert,
   BeforeUpdate,
   Check,
-  OneToMany,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcrypt';
@@ -41,6 +40,7 @@ const MAX_FAILED_ATTEMPTS = 5;
 @Check(`"failedLoginAttempts" >= 0`)
 @Check(`"failedLoginAttempts" <= ${MAX_FAILED_ATTEMPTS}`)
 export class User {
+
   // ─── Identity ──────────────────────────────────────────────────────────
 
   @PrimaryGeneratedColumn('uuid')
@@ -135,13 +135,9 @@ export class User {
   @Column({ nullable: true, length: 64 })
   timezone?: string;
 
-  // ─── Preferences (JSON) ────────────────────────────────────────────────
+  // ─── Preferences ───────────────────────────────────────────────────────
 
-  /**
-   * Arbitrary user preferences stored as a JSON column.
-   * Using `simple-json` avoids a separate table for simple key-value pairs.
-   */
-  @Column({ type: 'simple-json', nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   preferences?: Record<string, unknown>;
 
   // ─── Timestamps ────────────────────────────────────────────────────────
@@ -154,6 +150,15 @@ export class User {
 
   @DeleteDateColumn({ type: 'timestamptz' })
   deletedAt?: Date;
+
+  // ─── Transient / virtual fields ────────────────────────────────────────
+
+  /**
+   * Transient plain-text password. Set via `setPassword()` — never persisted.
+   * Excluded from serialisation by class-transformer.
+   */
+  @Exclude()
+  private _plainPassword?: string;
 
   // ─── Lifecycle hooks ───────────────────────────────────────────────────
 
@@ -179,15 +184,6 @@ export class User {
     }
   }
 
-  // ─── Transient / virtual fields ────────────────────────────────────────
-
-  /**
-   * Transient plain-text password. Set via `setPassword()` — never persisted.
-   * Excluded from serialisation by class-transformer.
-   */
-  @Exclude()
-  private _plainPassword?: string;
-
   // ─── Domain methods ────────────────────────────────────────────────────
 
   /**
@@ -209,9 +205,7 @@ export class User {
     return bcrypt.compare(candidate, this.passwordHash);
   }
 
-  /**
-   * Record a successful login, resetting the failure counter and lock.
-   */
+  /** Record a successful login, resetting the failure counter and lock. */
   recordLoginSuccess(ip?: string): void {
     this.failedLoginAttempts = 0;
     this.lockedUntil         = undefined;
@@ -266,25 +260,5 @@ export class User {
       !!this.passwordResetExpiresAt &&
       this.passwordResetExpiresAt > new Date()
     );
-  }
-
-  /**
-   * Resolve a user's display name in priority order:
-   * username → first word of fullName → email local-part.
-   */
-  get displayName(): string {
-    if (this.username) return this.username;
-    if (this.fullName) return this.fullName.split(' ')[0];
-    return this.email.split('@')[0];
-  }
-
-  /** Guard: only ADMIN users may perform privileged operations. */
-  isAdmin(): boolean {
-    return this.role === UserRole.ADMIN;
-  }
-
-  /** Guard: ADMIN or MANAGER may perform management operations. */
-  canManage(): boolean {
-    return this.role === UserRole.ADMIN || this.role === UserRole.MANAGER;
   }
 }
