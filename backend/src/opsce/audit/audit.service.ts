@@ -8,8 +8,8 @@ export interface LogDto {
   action: string;
   resourceType: string;
   resourceId: string;
-  oldValue?: Record<string, unknown>;
-  newValue?: Record<string, unknown>;
+  oldValue?: unknown;
+  newValue?: unknown;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -22,8 +22,8 @@ export class AuditService {
   ) {}
 
   async log(dto: LogDto): Promise<AuditLog> {
-    const entry = this.repo.create(dto);
-    return this.repo.save(entry);
+    const entry = this.repo.create(dto as any);
+    return this.repo.save(entry as any);
   }
 
   async findByResource(resourceType: string, resourceId: string): Promise<AuditLog[]> {
