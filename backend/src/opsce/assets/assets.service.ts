@@ -1,8 +1,3 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Asset } from './entities/asset.entity';
-import { FilterAssetsDto } from './dto/filter-assets.dto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -16,59 +11,17 @@ import {
 } from './dto/bulk-asset-operation.dto';
 import { PaginationDto, PaginatedResponseDto, paginate } from '../common';
 import { AuditService } from '../audit/audit.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class AssetsService {
   constructor(
     @InjectRepository(Asset)
-    private readonly assetRepo: Repository<Asset>,
-  ) {}
-
-  async findAll(filter: FilterAssetsDto, page = 1, perPage = 20) {
-    const query = this.assetRepo.createQueryBuilder('asset').where('asset.deletedAt IS NULL');
-
-    if (filter.search) {
-      const search = `%${filter.search}%`;
-      query.andWhere('(asset.name ILIKE :search OR asset.serialNumber ILIKE :search)', { search });
-    }
-
-    if (filter.status) {
-      query.andWhere('asset.status = :status', { status: filter.status });
-    }
-    if (filter.condition) {
-      query.andWhere('asset.condition = :condition', { condition: filter.condition });
-    }
-    if (filter.category) {
-      query.andWhere('asset.category = :category', { category: filter.category });
-    }
-    if (filter.departmentId) {
-      query.andWhere('asset.departmentId = :departmentId', { departmentId: filter.departmentId });
-    }
-    if (filter.locationId) {
-      query.andWhere('asset.locationId = :locationId', { locationId: filter.locationId });
-    }
-    if (filter.assignedTo) {
-      query.andWhere('asset.assignedToUserId = :assignedTo', { assignedTo: filter.assignedTo });
-    }
-    if (filter.dateFrom) {
-      query.andWhere('asset.createdAt >= :dateFrom', { dateFrom: filter.dateFrom });
-    }
-    if (filter.dateTo) {
-      query.andWhere('asset.createdAt <= :dateTo', { dateTo: filter.dateTo });
-    }
-
-    const sortBy = filter.sortBy ?? 'createdAt';
-    const sortOrder = filter.sortOrder ?? 'DESC';
-    query.orderBy(`asset.${sortBy}`, sortOrder);
-
-    const [items, total] = await query
-      .skip((page - 1) * perPage)
-      .take(perPage)
-      .getManyAndCount();
-
-    return { items, total };
     private readonly assetRepository: Repository<Asset>,
     private readonly auditService: AuditService,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   async create(createAssetDto: CreateAssetDto): Promise<Asset> {
@@ -125,6 +78,13 @@ export class AssetsService {
   ): Promise<Asset> {
     const asset = await this.findOne(id);
     const oldValue = { ...asset } as unknown as Record<string, unknown>;
+    const changedFields: string[] = [];
+
+    for (const key of Object.keys(updateAssetDto)) {
+      if (asset[key] !== updateAssetDto[key]) {
+        changedFields.push(key);
+      }
+    }
 
     Object.assign(asset, updateAssetDto);
     const saved = await this.assetRepository.save(asset);
@@ -137,6 +97,11 @@ export class AssetsService {
       oldValue,
       newValue: updateAssetDto as unknown as Record<string, unknown>,
     });
+
+    if (changedFields.length > 0) {
+      this.notificationsGateway.emitAssetUpdated(id, changedFields);
+      this.eventEmitter.emit('asset.updated', { assetId: id, changedFields });
+    }
 
     return saved;
   }
@@ -153,13 +118,58 @@ export class AssetsService {
     });
   }
 
-  /**
-   * Apply a single operation to multiple assets in one request.
-   * Each asset is processed independently — failures do not roll back
-   * successful operations. Returns per-asset success/failure results.
-   *
-   * Maximum 100 IDs per request (enforced at the DTO layer).
-   */
+  async softRemove(id: string, userId?: string): Promise<void> {
+    const asset = await this.findOne(id);
+    await this.assetRepository.softRemove(asset);
+
+    await this.auditService.log({
+      userId,
+      action: 'SOFT_DELETE',
+      resourceType: 'Asset',
+      resourceId: id,
+    });
+  }
+
+  async transfer(
+    id: string,
+    dto: { assignedTo?: string; departmentId?: string; locationId?: string },
+    userId?: string,
+  ): Promise<Asset> {
+    const asset = await this.findOne(id);
+    const oldValue = { ...asset } as unknown as Record<string, unknown>;
+    const changedFields: string[] = [];
+
+    if (dto.assignedTo !== undefined && asset.assignedToUserId !== dto.assignedTo) {
+      asset.assignedToUserId = dto.assignedTo;
+      asset.assignedAt = new Date();
+      changedFields.push('assignedToUserId', 'assignedAt');
+    }
+    if (dto.departmentId !== undefined && asset.departmentId !== dto.departmentId) {
+      asset.departmentId = dto.departmentId;
+      changedFields.push('departmentId');
+    }
+    if (dto.locationId !== undefined && asset.locationId !== dto.locationId) {
+      asset.locationId = dto.locationId;
+      changedFields.push('locationId');
+    }
+
+    const saved = await this.assetRepository.save(asset);
+
+    await this.auditService.log({
+      userId,
+      action: 'TRANSFER',
+      resourceType: 'Asset',
+      resourceId: id,
+      oldValue,
+      newValue: dto as unknown as Record<string, unknown>,
+    });
+
+    this.notificationsGateway.emitAssetUpdated(id, changedFields);
+    this.eventEmitter.emit('asset.updated', { assetId: id, changedFields });
+
+    return saved;
+  }
+
   async bulkOperation(
     dto: BulkAssetOperationDto,
     userId?: string,
@@ -180,8 +190,6 @@ export class AssetsService {
 
     return result;
   }
-
-  // ─── Private helpers ────────────────────────────────────────────────────────
 
   private async applyBulkOperation(
     id: string,
