@@ -17,8 +17,6 @@ pub struct TransferRequest {
 
     pub asset_id: BytesN<32>,
     pub asset_category: BytesN<32>,
-    pub token_id: u64,
-    pub amount: i128,
 
     pub current_owner: Address,
     pub new_owner: Address,

@@ -9,7 +9,6 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-opsce = { path = "../opsce" }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

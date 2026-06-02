@@ -9,11 +9,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth.store';
-import { useLoginMutation } from '@/lib/query/mutations/auth';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -21,41 +20,34 @@ type FormValues = z.infer<typeof schema>;
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isLoading = useAuthStore((s) => s.isLoading);
+  const { login, isLoading } = useAuthStore();
 
   const {
     register,
     handleSubmit,
     setError,
     formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onBlur',
-  });
+  } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
-  const { mutateAsync: login } = useLoginMutation({
-    onSuccess() {
+  const onSubmit = async (values: FormValues) => {
+    try {
+      await login(values);
       const redirect = searchParams.get('redirect') || '/dashboard';
       router.push(redirect);
-    },
-    onError(err) {
-      const status = err.response?.status;
+    } catch (err: unknown) {
       const message =
-        status === 401
-          ? 'Invalid email or password'
-          : (err.response?.data?.message ?? 'Something went wrong. Please try again.');
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Something went wrong. Please try again.';
       setError('root', { message });
-    },
-  });
-
-  const onSubmit = (values: FormValues) => login(values);
+    }
+  };
 
   return (
     <>
       <h2 className="text-xl font-semibold text-gray-900 mb-1">Welcome back</h2>
       <p className="text-sm text-gray-500 mb-6">Sign in to your account to continue</p>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input
           id="email"
           label="Email address"
@@ -86,7 +78,7 @@ function LoginForm() {
         </div>
 
         {errors.root && (
-          <p role="alert" className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
             {errors.root.message}
           </p>
         )}

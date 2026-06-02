@@ -313,7 +313,7 @@ impl ContribContract {
         let owner_key = DataKey::OwnerAssets(owner.clone());
         let mut owner_assets: Vec<BytesN<32>> =
             store.get(&owner_key).unwrap_or_else(|| Vec::new(env));
-        if !owner_assets.iter().any(|x| x == *asset_id) {
+        if owner_assets.iter().position(|x| x == *asset_id).is_none() {
             owner_assets.push_back(asset_id.clone());
         }
         store.set(&owner_key, &owner_assets);

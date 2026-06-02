@@ -1,7 +1,7 @@
 // frontend/app/(dashboard)/assets/[id]/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -12,24 +12,23 @@ import {
   FolderOpen,
   StickyNote,
   Pencil,
+  Trash2,
   ArrowRightLeft,
   RefreshCw,
   CheckCircle,
   Upload,
   Plus,
-  Trash2,
+  Printer,
+  QrCode,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { AssetQRCode } from "@/opsce/features/assets/AssetQRCode";
-import { AssetHistoryTimeline } from "@/opsce/features/assets/AssetHistoryTimeline";
-import { DeleteAssetDialog } from "@/opsce/features/assets/DeleteAssetDialog";
-import { DownloadAssetReportButton } from "@/opsce/features/assets/DownloadAssetReportButton";
 import {
   useAsset,
+  useAssetHistory,
   useAssetDocuments,
   useMaintenanceRecords,
   useAssetNotes,
@@ -67,6 +66,26 @@ function DetailRow({
       <dt className="text-gray-500">{label}</dt>
       <dd className="text-gray-900 font-medium text-right">{value || fallback}</dd>
     </div>
+  );
+}
+
+// ── ActionBadge ──────────────────────────────────────────────────────────────
+const actionColors: Record<string, string> = {
+  CREATED: "bg-green-100 text-green-700",
+  UPDATED: "bg-blue-100 text-blue-700",
+  STATUS_CHANGED: "bg-yellow-100 text-yellow-700",
+  TRANSFERRED: "bg-purple-100 text-purple-700",
+  MAINTENANCE: "bg-orange-100 text-orange-700",
+  NOTE_ADDED: "bg-gray-100 text-gray-600",
+  DOCUMENT_UPLOADED: "bg-teal-100 text-teal-700",
+};
+
+function ActionBadge({ action }: { action: string }) {
+  const cls = actionColors[action] ?? "bg-gray-100 text-gray-600";
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${cls}`}>
+      {action.replace(/_/g, " ")}
+    </span>
   );
 }
 
@@ -236,8 +255,10 @@ export default function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
+  const [qrCodeDataUri, setQrCodeDataUri] = useState<string | null>(null);
 
   // Confirm dialogs
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<string | null>(null);
   const [confirmDeleteNote, setConfirmDeleteNote] = useState<string | null>(null);
 
@@ -250,16 +271,59 @@ export default function AssetDetailPage() {
 
   // Queries
   const { data: asset, isLoading } = useAsset(id);
+  const { data: history = [], isLoading: historyLoading } = useAssetHistory(id);
   const { data: maintenance = [], isLoading: maintenanceLoading } = useMaintenanceRecords(id);
   const { data: documents = [], isLoading: documentsLoading } = useAssetDocuments(id);
   const { data: notes = [], isLoading: notesLoading } = useAssetNotes(id);
 
   // Mutations
+  const { mutate: deleteAsset, isPending: deletingAsset } = useDeleteAsset(id, {
+    onSuccess: () => router.push("/assets"),
+  });
   const { mutate: deleteDoc, isPending: deletingDoc } = useDeleteDocument(id);
   const { mutate: deleteNote, isPending: deletingNote } = useDeleteNote(id);
+  const { mutate: markComplete, isPending: markingComplete } = useUpdateMaintenanceStatus(id);
   const { mutate: addNote, isPending: addingNote } = useCreateNote(id, {
     onSuccess: () => setNoteContent(""),
   });
+
+  // Fetch QR code when asset loads
+  useEffect(() => {
+    if (!asset?.id) return;
+
+    const fetchQRCode = async () => {
+      try {
+        const response = await fetch(`/api/assets/${asset.id}/qr`);
+        if (response.ok) {
+          const blob = await response.blob();
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setQrCodeDataUri(reader.result as string);
+          };
+          reader.readAsDataURL(blob);
+        }
+      } catch (error) {
+        console.error('Failed to fetch QR code:', error);
+      }
+    };
+
+    fetchQRCode();
+  }, [asset?.id]);
+
+  // Print handler
+  const handlePrint = () => {
+    if (!asset) return;
+    
+    // Set page title to asset name
+    const originalTitle = document.title;
+    document.title = asset.name;
+    
+    // Trigger print
+    window.print();
+    
+    // Restore original title
+    document.title = originalTitle;
+  };
 
   if (isLoading) {
     return (
@@ -329,8 +393,21 @@ export default function AssetDetailPage() {
             <Button size="sm" variant="outline">
               <Pencil size={14} className="mr-1.5" /> Edit
             </Button>
-            <DeleteAssetDialog assetId={id} assetName={asset.name} variant="button" />
-            <DownloadAssetReportButton assetId={id} assetName={asset.name} />
+            <Button
+              size="sm"
+              variant="outline"
+              className="!text-red-600 !border-red-200 hover:!bg-red-50"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 size={14} className="mr-1.5" /> Delete
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handlePrint}
+            >
+              <Printer size={14} className="mr-1.5" /> Print
+            </Button>
           </div>
         </div>
       </div>
@@ -420,8 +497,19 @@ export default function AssetDetailPage() {
             </dl>
           </div>
 
-          {/* QR Code */}
-          <AssetQRCode assetId={id} assetName={asset.name} />
+          {/* QR Code - visible in print */}
+          {qrCodeDataUri && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5 print:border-0 print:p-0">
+              <h2 className="text-sm font-semibold text-gray-900 mb-4 print:hidden">QR Code</h2>
+              <div className="flex justify-center print:justify-start">
+                <img
+                  src={qrCodeDataUri}
+                  alt={`QR Code for ${asset.name}`}
+                  className="w-32 h-32 print:w-40 print:h-40"
+                />
+              </div>
+            </div>
+          )}
 
           {(asset.tags?.length || asset.notes) && (
             <div className="bg-white rounded-xl border border-gray-200 p-5 lg:col-span-2">
@@ -453,43 +541,208 @@ export default function AssetDetailPage() {
 
       {/* ── History ── */}
       {tab === "history" && (
-        <AssetHistoryTimeline assetId={id} />
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Change History</h2>
+          {historyLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : history.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No history recorded yet.</p>
+          ) : (
+            <ol className="relative border-l border-gray-200 ml-3 space-y-6">
+              {history.map((event) => (
+                <li key={event.id} className="ml-4">
+                  <div className="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-gray-300 border-2 border-white" />
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <ActionBadge action={event.action} />
+                  </div>
+                  <p className="text-sm text-gray-900">{event.description}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {format(new Date(event.createdAt), "MMM d, yyyy · h:mm a")}
+                    {event.performedBy && ` · ${event.performedBy.name}`}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       )}
 
       {/* ── Maintenance ── */}
       {tab === "maintenance" && (
-        <MaintenanceTabContent
-          assetId={id}
-          maintenance={maintenance}
-          loading={maintenanceLoading}
-          onSchedule={() => setShowScheduleMaintenance(true)}
-        />
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">Maintenance Records</h2>
+            <Button size="sm" onClick={() => setShowScheduleMaintenance(true)}>
+              <Plus size={14} className="mr-1.5" /> Schedule Maintenance
+            </Button>
+          </div>
+          {maintenanceLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+            </div>
+          ) : maintenance.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No maintenance records.</p>
+          ) : (
+            <div className="space-y-3">
+              {maintenance.map((record) => (
+                <div
+                  key={record.id}
+                  className="flex items-start justify-between border border-gray-100 rounded-lg p-4"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900">{record.type}</span>
+                      <MaintenanceStatusBadge status={record.status} />
+                    </div>
+                    <p className="text-sm text-gray-600">{record.description}</p>
+                    <p className="text-xs text-gray-400">
+                      Scheduled: {format(new Date(record.scheduledDate), "MMM d, yyyy")}
+                      {record.cost != null && ` · $${Number(record.cost).toLocaleString()}`}
+                    </p>
+                  </div>
+                  {record.status !== "COMPLETED" && record.status !== "CANCELLED" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={markingComplete}
+                      onClick={() =>
+                        markComplete({ maintenanceId: record.id, status: "COMPLETED" })
+                      }
+                    >
+                      <CheckCircle size={14} className="mr-1.5" /> Mark Complete
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── Documents ── */}
       {tab === "documents" && (
-        <DocumentsTabContent
-          documents={documents}
-          loading={documentsLoading}
-          onUpload={() => setShowUploadDoc(true)}
-          onDelete={(docId) => setConfirmDeleteDoc(docId)}
-        />
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">Documents</h2>
+            <Button size="sm" onClick={() => setShowUploadDoc(true)}>
+              <Upload size={14} className="mr-1.5" /> Upload Document
+            </Button>
+          </div>
+          {documentsLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+            </div>
+          ) : documents.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No documents uploaded.</p>
+          ) : (
+            <div className="space-y-2">
+              {documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between border border-gray-100 rounded-lg px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{doc.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {doc.type} · {(doc.size / 1024).toFixed(1)} KB ·{" "}
+                      {format(new Date(doc.createdAt), "MMM d, yyyy")}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="!text-red-500"
+                    onClick={() => setConfirmDeleteDoc(doc.id)}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── Notes ── */}
       {tab === "notes" && (
-        <NotesTabContent
-          notes={notes}
-          loading={notesLoading}
-          noteContent={noteContent}
-          onNoteContentChange={setNoteContent}
-          addingNote={addingNote}
-          onAddNote={() => addNote({ content: noteContent.trim() })}
-          onDeleteNote={(noteId) => setConfirmDeleteNote(noteId)}
-        />
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">Add Note</h2>
+            <textarea
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+              rows={3}
+              placeholder="Write a note..."
+              value={noteContent}
+              onChange={(e) => setNoteContent(e.target.value)}
+            />
+            <div className="flex justify-end mt-2">
+              <Button
+                size="sm"
+                loading={addingNote}
+                disabled={!noteContent.trim()}
+                onClick={() => addNote({ content: noteContent.trim() })}
+              >
+                Add Note
+              </Button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">Notes</h2>
+            {notesLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+              </div>
+            ) : notes.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No notes yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {notes.map((note) => (
+                  <div
+                    key={note.id}
+                    className="border border-gray-100 rounded-lg p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap flex-1">
+                        {note.content}
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="!text-red-500 shrink-0"
+                        onClick={() => setConfirmDeleteNote(note.id)}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      {note.createdBy.name} ·{" "}
+                      {format(new Date(note.createdAt), "MMM d, yyyy · h:mm a")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── Confirm Dialogs ── */}
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete Asset"
+          message="This will permanently delete the asset and all associated records. This action cannot be undone."
+          confirmLabel="Delete"
+          loading={deletingAsset}
+          onConfirm={() => deleteAsset()}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+
       {confirmDeleteDoc && (
         <ConfirmDialog
           title="Delete Document"
@@ -532,209 +785,3 @@ export default function AssetDetailPage() {
     </div>
   );
 }
-
-// ── Maintenance Tab ───────────────────────────────────────────
-function MaintenanceTabContent({
-  assetId,
-  maintenance,
-  loading,
-  onSchedule,
-}: {
-  assetId: string;
-  maintenance: any[];
-  loading: boolean;
-  onSchedule: () => void;
-}) {
-  const { mutate: markComplete, isPending: markingComplete } = useUpdateMaintenanceStatus(assetId);
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-gray-900">Maintenance Records</h2>
-        <Button size="sm" onClick={onSchedule}>
-          <Plus size={14} className="mr-1.5" /> Schedule Maintenance
-        </Button>
-      </div>
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
-        </div>
-      ) : maintenance.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-8">No maintenance records.</p>
-      ) : (
-        <div className="space-y-3">
-          {maintenance.map((record) => (
-            <div
-              key={record.id}
-              className="flex items-start justify-between border border-gray-100 rounded-lg p-4"
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900">{record.type}</span>
-                  <MaintenanceStatusBadge status={record.status} />
-                </div>
-                <p className="text-sm text-gray-600">{record.description}</p>
-                <p className="text-xs text-gray-400">
-                  Scheduled: {format(new Date(record.scheduledDate), "MMM d, yyyy")}
-                  {record.cost != null && ` · $${Number(record.cost).toLocaleString()}`}
-                </p>
-              </div>
-              {record.status !== "COMPLETED" && record.status !== "CANCELLED" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  loading={markingComplete}
-                  onClick={() =>
-                    markComplete({ maintenanceId: record.id, status: "COMPLETED" })
-                  }
-                >
-                  <CheckCircle size={14} className="mr-1.5" /> Mark Complete
-                </Button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Documents Tab ─────────────────────────────────────────────
-function DocumentsTabContent({
-  documents,
-  loading,
-  onUpload,
-  onDelete,
-}: {
-  documents: any[];
-  loading: boolean;
-  onUpload: () => void;
-  onDelete: (docId: string) => void;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-gray-900">Documents</h2>
-        <Button size="sm" onClick={onUpload}>
-          <Upload size={14} className="mr-1.5" /> Upload Document
-        </Button>
-      </div>
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
-        </div>
-      ) : documents.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-8">No documents uploaded.</p>
-      ) : (
-        <div className="space-y-2">
-          {documents.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex items-center justify-between border border-gray-100 rounded-lg px-4 py-3"
-            >
-              <div>
-                <p className="text-sm font-medium text-gray-900">{doc.name}</p>
-                <p className="text-xs text-gray-400">
-                  {doc.type} · {(doc.size / 1024).toFixed(1)} KB ·{" "}
-                  {format(new Date(doc.createdAt), "MMM d, yyyy")}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="!text-red-500"
-                onClick={() => onDelete(doc.id)}
-              >
-                <Trash2 size={14} />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Notes Tab ─────────────────────────────────────────────────
-function NotesTabContent({
-  notes,
-  loading,
-  noteContent,
-  onNoteContentChange,
-  addingNote,
-  onAddNote,
-  onDeleteNote,
-}: {
-  notes: any[];
-  loading: boolean;
-  noteContent: string;
-  onNoteContentChange: (content: string) => void;
-  addingNote: boolean;
-  onAddNote: () => void;
-  onDeleteNote: (noteId: string) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">Add Note</h2>
-        <textarea
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
-          rows={3}
-          placeholder="Write a note..."
-          value={noteContent}
-          onChange={(e) => onNoteContentChange(e.target.value)}
-        />
-        <div className="flex justify-end mt-2">
-          <Button
-            size="sm"
-            loading={addingNote}
-            disabled={!noteContent.trim()}
-            onClick={onAddNote}
-          >
-            Add Note
-          </Button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Notes</h2>
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
-          </div>
-        ) : notes.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No notes yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {notes.map((note) => (
-              <div
-                key={note.id}
-                className="border border-gray-100 rounded-lg p-4"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap flex-1">
-                    {note.content}
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="!text-red-500 shrink-0"
-                    onClick={() => onDeleteNote(note.id)}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-                <p className="text-xs text-gray-400 mt-1.5">
-                  {note.createdBy.name} ·{" "}
-                  {format(new Date(note.createdAt), "MMM d, yyyy · h:mm a")}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export { default } from '@/opsce/features/reports/ReportsPage';

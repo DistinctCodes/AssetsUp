@@ -14,9 +14,8 @@ pub(crate) mod dividends;
 pub(crate) mod error;
 pub(crate) mod insurance;
 pub(crate) mod lease;
-pub mod tokenization;
+pub(crate) mod tokenization;
 pub(crate) mod transfer_restrictions;
-pub(crate) mod admin_transfer;
 pub(crate) mod types;
 pub(crate) mod voting;
 
@@ -34,7 +33,6 @@ pub enum DataKey {
     ContractMetadata,
     AuthorizedRegistrar(Address),
     ScheduledTransfer(BytesN<32>),
-    PendingAdmin,
     PendingApproval(BytesN<32>),
 }
 
@@ -758,72 +756,24 @@ impl AssetUpContract {
         )
     }
 
-    /// Add address to whitelist (admin only)
-    pub fn add_to_whitelist(
-        env: Env,
-        asset_id: u64,
-        admin: Address,
-        address: Address,
-    ) -> Result<(), Error> {
-        admin.require_auth();
-        let token = tokenization::get_tokenized_asset(&env, asset_id)?;
-        if token.tokenizer != admin {
-            return Err(Error::Unauthorized);
-        }
-
-        opsce::whitelist::add_to_whitelist(&env, asset_id, address.clone());
-        env.events()
-            .publish(("transfer", "whitelist_added"), (asset_id, address));
-        Ok(())
+    /// Add address to whitelist
+    pub fn add_to_whitelist(env: Env, asset_id: u64, address: Address) -> Result<(), Error> {
+        transfer_restrictions::add_to_whitelist(&env, asset_id, address)
     }
 
-    /// Remove address from whitelist (admin only)
-    pub fn remove_from_whitelist(
-        env: Env,
-        asset_id: u64,
-        admin: Address,
-        address: Address,
-    ) -> Result<(), Error> {
-        admin.require_auth();
-        let token = tokenization::get_tokenized_asset(&env, asset_id)?;
-        if token.tokenizer != admin {
-            return Err(Error::Unauthorized);
-        }
-
-        opsce::whitelist::remove_from_whitelist(&env, asset_id, address.clone());
-        env.events()
-            .publish(("transfer", "whitelist_removed"), (asset_id, address));
-        Ok(())
+    /// Remove address from whitelist
+    pub fn remove_from_whitelist(env: Env, asset_id: u64, address: Address) -> Result<(), Error> {
+        transfer_restrictions::remove_from_whitelist(&env, asset_id, address)
     }
 
     /// Check if address is whitelisted
     pub fn is_whitelisted(env: Env, asset_id: u64, address: Address) -> Result<bool, Error> {
-        Ok(opsce::whitelist::is_whitelisted(&env, asset_id, address))
+        transfer_restrictions::is_whitelisted(&env, asset_id, address)
     }
 
     /// Get whitelist
     pub fn get_whitelist(env: Env, asset_id: u64) -> Result<Vec<Address>, Error> {
-        Ok(opsce::whitelist::get_whitelist(&env, asset_id))
-    }
-
-    /// Enable or disable whitelist enforcement for an asset (admin only)
-    pub fn set_whitelist_enabled(
-        env: Env,
-        asset_id: u64,
-        admin: Address,
-        enabled: bool,
-    ) -> Result<(), Error> {
-        admin.require_auth();
-        let token = tokenization::get_tokenized_asset(&env, asset_id)?;
-        if token.tokenizer != admin {
-            return Err(Error::Unauthorized);
-        }
-
-        opsce::whitelist::set_whitelist_enabled(&env, asset_id, enabled);
-        env.events()
-            .publish(("transfer", "whitelist_enabled"), (asset_id, enabled));
-
-        Ok(())
+        transfer_restrictions::get_whitelist(&env, asset_id)
     }
 
     // =====================

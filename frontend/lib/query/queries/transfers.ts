@@ -40,7 +40,7 @@ export enum TransferStatus {
   REJECTED = 'rejected',
   CANCELLED = 'cancelled',
   EXECUTED = 'executed',
-  SCHEDULED = 'scheduled',
+  SCHEDULED = 'scheduled'
 }
 
 export interface CreateTransferDto {
@@ -81,47 +81,61 @@ export interface TransferFilterDto {
 // API Functions
 const transferApi = {
   createTransfer: async (data: CreateTransferDto) => {
-    const response = await apiClient.post<AssetTransfer>('/transfers', data);
-    return response.data;
+    return apiClient.request<AssetTransfer>('/transfers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   getTransfers: async (filters?: TransferFilterDto) => {
-    const response = await apiClient.get<{ transfers: AssetTransfer[]; totalCount: number }>(
-      '/transfers',
-      { params: filters },
-    );
-    return response.data;
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, value.toString());
+        }
+      });
+    }
+    
+    const queryString = params.toString();
+    const url = `/transfers${queryString ? `?${queryString}` : ''}`;
+    
+    return apiClient.request<{ transfers: AssetTransfer[]; totalCount: number }>(url);
   },
 
   getTransferById: async (id: string) => {
-    const response = await apiClient.get<AssetTransfer>(`/transfers/${id}`);
-    return response.data;
+    return apiClient.request<AssetTransfer>(`/transfers/${id}`);
   },
 
   approveTransfer: async (id: string, data: ApproveTransferDto) => {
-    const response = await apiClient.put<AssetTransfer>(`/transfers/${id}/approve`, data);
-    return response.data;
+    return apiClient.request<AssetTransfer>(`/transfers/${id}/approve`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   },
 
   rejectTransfer: async (id: string, data: RejectTransferDto) => {
-    const response = await apiClient.put<AssetTransfer>(`/transfers/${id}/reject`, data);
-    return response.data;
+    return apiClient.request<AssetTransfer>(`/transfers/${id}/reject`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   },
 
   cancelTransfer: async (id: string) => {
-    const response = await apiClient.delete<AssetTransfer>(`/transfers/${id}`);
-    return response.data;
+    return apiClient.request<AssetTransfer>(`/transfers/${id}`, {
+      method: 'DELETE',
+    });
   },
 
   getNotifications: async () => {
-    const response = await apiClient.get<unknown[]>('/notifications');
-    return response.data;
+    return apiClient.request<any[]>('/notifications');
   },
 
   markNotificationAsRead: async (id: string) => {
-    const response = await apiClient.put<unknown>(`/notifications/${id}/read`);
-    return response.data;
-  },
+    return apiClient.request<any>(`/notifications/${id}/read`, {
+      method: 'PUT',
+    });
+  }
 };
 
 // Query Keys
@@ -137,9 +151,9 @@ export const transferKeys = {
 // Hooks
 export const useTransfers = (filters?: TransferFilterDto) => {
   return useQuery({
-    queryKey: transferKeys.list(filters ?? {}),
+    queryKey: transferKeys.list(filters || {}),
     queryFn: () => transferApi.getTransfers(filters),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 
@@ -153,7 +167,7 @@ export const useTransfer = (id: string) => {
 
 export const useCreateTransfer = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
     mutationFn: transferApi.createTransfer,
     onSuccess: () => {
@@ -164,9 +178,9 @@ export const useCreateTransfer = () => {
 
 export const useApproveTransfer = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: ApproveTransferDto }) =>
+    mutationFn: ({ id, data }: { id: string; data: ApproveTransferDto }) => 
       transferApi.approveTransfer(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: transferKeys.detail(variables.id) });
@@ -177,9 +191,9 @@ export const useApproveTransfer = () => {
 
 export const useRejectTransfer = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: RejectTransferDto }) =>
+    mutationFn: ({ id, data }: { id: string; data: RejectTransferDto }) => 
       transferApi.rejectTransfer(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: transferKeys.detail(variables.id) });
@@ -190,7 +204,7 @@ export const useRejectTransfer = () => {
 
 export const useCancelTransfer = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
     mutationFn: transferApi.cancelTransfer,
     onSuccess: (_, id) => {
@@ -204,13 +218,13 @@ export const useNotifications = () => {
   return useQuery({
     queryKey: transferKeys.notifications,
     queryFn: transferApi.getNotifications,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 };
 
 export const useMarkNotificationAsRead = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
     mutationFn: transferApi.markNotificationAsRead,
     onSuccess: () => {

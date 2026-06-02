@@ -7,7 +7,6 @@ use soroban_sdk::{Address, Env, String};
 
 use crate::tokenization;
 use crate::transfer_restrictions;
-use crate::AssetUpContractClient;
 use crate::types::{AssetType, TransferRestriction};
 use crate::AssetUpContract;
 
@@ -69,28 +68,20 @@ fn test_whitelist_operations() {
 
     let (is_wl_after_add, list_len, is_wl_after_remove) = env.as_contract(&contract_id, || {
         setup_tokenized_asset(&env, asset_id, &tokenizer);
-        env.mock_all_auths();
-        let client = AssetUpContractClient::new(&env, &contract_id);
 
-        // Add to whitelist (admin/tokenizer)
-        client
-            .add_to_whitelist(&asset_id, &tokenizer, &whitelisted)
-            .unwrap();
+        // Add to whitelist
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
 
-        let is_wl_add = client
-            .is_whitelisted(&asset_id, &whitelisted)
-            .unwrap();
-        let whitelist = client.get_whitelist(&asset_id).unwrap();
+        let is_wl_add =
+            transfer_restrictions::is_whitelisted(&env, asset_id, whitelisted.clone()).unwrap();
+        let whitelist = transfer_restrictions::get_whitelist(&env, asset_id).unwrap();
         let len = whitelist.len();
 
         // Remove from whitelist
-        client
-            .remove_from_whitelist(&asset_id, &tokenizer, &whitelisted)
-            .unwrap();
+        transfer_restrictions::remove_from_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
 
-        let is_wl_rem = client
-            .is_whitelisted(&asset_id, &whitelisted)
-            .unwrap();
+        let is_wl_rem =
+            transfer_restrictions::is_whitelisted(&env, asset_id, whitelisted.clone()).unwrap();
         (is_wl_add, len, is_wl_rem)
     });
 
@@ -109,19 +100,15 @@ fn test_whitelist_duplicate_prevention() {
 
     let list_len = env.as_contract(&contract_id, || {
         setup_tokenized_asset(&env, asset_id, &tokenizer);
-        env.mock_all_auths();
-        let client = AssetUpContractClient::new(&env, &contract_id);
 
         // Add to whitelist twice
-        client
-            .add_to_whitelist(&asset_id, &tokenizer, &whitelisted)
-            .unwrap();
-        client
-            .add_to_whitelist(&asset_id, &tokenizer, &whitelisted)
-            .unwrap();
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
 
         // Should still have only 1 entry
-        client.get_whitelist(&asset_id).unwrap().len()
+        transfer_restrictions::get_whitelist(&env, asset_id)
+            .unwrap()
+            .len()
     });
 
     assert_eq!(list_len, 1);
@@ -191,13 +178,9 @@ fn test_validate_transfer_blocked_when_not_whitelisted() {
 
     let (allowed_result, blocked_result) = env.as_contract(&contract_id, || {
         setup_tokenized_asset(&env, asset_id, &tokenizer);
-        env.mock_all_auths();
-        let client = AssetUpContractClient::new(&env, &contract_id);
 
         // Add only `whitelisted` to the whitelist
-        client
-            .add_to_whitelist(&asset_id, &tokenizer, &whitelisted)
-            .unwrap();
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
 
         // Transfer to whitelisted address should be allowed
         let allowed = transfer_restrictions::validate_transfer(
@@ -264,11 +247,7 @@ fn test_validate_transfer_accredited_required_uses_whitelist() {
             geographic_allowed: soroban_sdk::Vec::new(&env),
         };
         transfer_restrictions::set_transfer_restriction(&env, asset_id, restriction).unwrap();
-        env.mock_all_auths();
-        let client = AssetUpContractClient::new(&env, &contract_id);
-        client
-            .add_to_whitelist(&asset_id, &tokenizer, &accredited)
-            .unwrap();
+        transfer_restrictions::add_to_whitelist(&env, asset_id, accredited.clone()).unwrap();
 
         let ok = transfer_restrictions::validate_transfer(
             &env,

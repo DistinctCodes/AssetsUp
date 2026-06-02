@@ -11,8 +11,6 @@ mod initialization;
 mod detokenization;
 mod dividends;
 mod tokenization;
-#[path = "../../../opsce/src/tokenization_tests.rs"]
-mod tokenization_tests;
 mod transfer_restrictions;
 mod voting;
 

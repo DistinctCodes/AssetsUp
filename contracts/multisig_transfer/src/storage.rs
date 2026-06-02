@@ -6,7 +6,6 @@ use crate::types::{ApprovalRule, TransferRequest};
 pub enum DataKey {
     Admin,               // Address
     AssetRegistry,       // Address
-    AssetsUpContract,    // Address
     NextRequestId,       // u64
     Requests,            // Map<u64, TransferRequest>
     Rules,               // Map<BytesN<32>, ApprovalRule>
@@ -33,16 +32,6 @@ pub fn set_registry(e: &Env, registry: &Address) {
     e.storage()
         .persistent()
         .set(&DataKey::AssetRegistry, registry);
-}
-
-pub fn get_assetsup_contract(e: &Env) -> Option<Address> {
-    e.storage().persistent().get(&DataKey::AssetsUpContract)
-}
-
-pub fn set_assetsup_contract(e: &Env, contract_id: &Address) {
-    e.storage()
-        .persistent()
-        .set(&DataKey::AssetsUpContract, contract_id);
 }
 
 pub fn next_request_id(e: &Env) -> u64 {

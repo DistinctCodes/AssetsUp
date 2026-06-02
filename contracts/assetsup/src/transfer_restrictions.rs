@@ -1,7 +1,6 @@
 use crate::error::Error;
 use crate::types::{TokenDataKey, TransferRestriction};
 use soroban_sdk::{Address, Env, Vec};
-use opsce::whitelist as ops_whitelist;
 
 /// Set transfer restrictions for an asset
 pub fn set_transfer_restriction(
@@ -26,8 +25,18 @@ pub fn set_transfer_restriction(
 
 /// Add an address to the whitelist
 pub fn add_to_whitelist(env: &Env, asset_id: u64, address: Address) -> Result<(), Error> {
-    // Delegate storage to opsce whitelist module
-    ops_whitelist::add_to_whitelist(env, asset_id, address.clone());
+    let store = env.storage().persistent();
+
+    let key = TokenDataKey::Whitelist(asset_id);
+    let mut whitelist: Vec<Address> = store.get(&key).flatten().unwrap_or_else(|| Vec::new(env));
+
+    // Check if already in whitelist
+    if whitelist.iter().any(|a| a == address) {
+        return Ok(());
+    }
+
+    whitelist.push_back(address.clone());
+    store.set(&key, &whitelist);
 
     // Emit event: (asset_id, address)
     env.events()
@@ -38,41 +47,61 @@ pub fn add_to_whitelist(env: &Env, asset_id: u64, address: Address) -> Result<()
 
 /// Remove an address from the whitelist
 pub fn remove_from_whitelist(env: &Env, asset_id: u64, address: Address) -> Result<(), Error> {
-    ops_whitelist::remove_from_whitelist(env, asset_id, address.clone());
+    let store = env.storage().persistent();
 
-    // Emit event: (asset_id, address)
-    env.events()
-        .publish(("transfer", "whitelist_removed"), (asset_id, address));
+    let key = TokenDataKey::Whitelist(asset_id);
+    let mut whitelist: Vec<Address> = store.get(&key).flatten().unwrap_or_else(|| Vec::new(env));
+
+    // Find and remove address
+    if let Some(index) = whitelist.iter().position(|a| a == address) {
+        whitelist.remove(index as u32);
+        store.set(&key, &whitelist);
+
+        // Emit event: (asset_id, address)
+        env.events()
+            .publish(("transfer", "whitelist_removed"), (asset_id, address));
+    }
 
     Ok(())
 }
 
 /// Check if an address is whitelisted
 pub fn is_whitelisted(env: &Env, asset_id: u64, address: Address) -> Result<bool, Error> {
-    Ok(ops_whitelist::is_whitelisted(env, asset_id, address))
+    let store = env.storage().persistent();
+
+    let key = TokenDataKey::Whitelist(asset_id);
+    let whitelist: Vec<Address> = store.get(&key).flatten().unwrap_or_else(|| Vec::new(env));
+
+    Ok(whitelist.iter().any(|a| a == address))
 }
 
 /// Get whitelist for an asset
 pub fn get_whitelist(env: &Env, asset_id: u64) -> Result<Vec<Address>, Error> {
-    Ok(ops_whitelist::get_whitelist(env, asset_id))
+    let store = env.storage().persistent();
+
+    let key = TokenDataKey::Whitelist(asset_id);
+    Ok(store.get(&key).flatten().unwrap_or_else(|| Vec::new(env)))
 }
 
 /// Validate if a transfer is allowed based on restrictions
 pub fn validate_transfer(
     env: &Env,
     asset_id: u64,
-    from: Address,
+    _from: Address,
     to: Address,
 ) -> Result<bool, Error> {
     let store = env.storage().persistent();
-    // If whitelist enforcement is enabled for this asset, require both sender and recipient be whitelisted
-    if ops_whitelist::is_whitelist_enabled(env, asset_id) {
-        // Check recipient
-        if !ops_whitelist::is_whitelisted(env, asset_id, to.clone()) {
-            return Err(Error::TransferRestrictionFailed);
-        }
-        // Check sender
-        if !ops_whitelist::is_whitelisted(env, asset_id, from.clone()) {
+
+    // Check whitelist: if non-empty, `to` must be whitelisted
+    let whitelist_key = TokenDataKey::Whitelist(asset_id);
+    let whitelist: Vec<Address> = store
+        .get(&whitelist_key)
+        .flatten()
+        .unwrap_or_else(|| Vec::new(env));
+
+    if !whitelist.is_empty() {
+        let is_listed = whitelist.iter().any(|a| a == to);
+        if !is_listed {
             return Err(Error::TransferRestrictionFailed);
         }
     }
@@ -89,7 +118,8 @@ pub fn validate_transfer(
 
     // If accredited investor required, check whitelist as MVP proxy
     if restriction.require_accredited {
-        if !ops_whitelist::is_whitelisted(env, asset_id, to.clone()) {
+        let is_listed = whitelist.iter().any(|a| a == to);
+        if !is_listed {
             return Err(Error::AccreditedInvestorRequired);
         }
     }
