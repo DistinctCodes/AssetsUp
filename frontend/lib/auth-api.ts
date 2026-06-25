@@ -14,6 +14,13 @@ export interface AuthResponse {
   refreshToken: string;
 }
 
+export interface TwoFactorRequiredResponse {
+  requiresTwoFactor: true;
+  tempToken: string;
+}
+
+export type LoginResponse = AuthResponse | TwoFactorRequiredResponse;
+
 export interface RegisterPayload {
   firstName: string;
   lastName: string;
@@ -26,14 +33,30 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface ResetPasswordPayload {
+  token: string;
+  newPassword: string;
+}
+
+export interface VerifyTwoFactorPayload {
+  tempToken: string;
+  code: string;
+}
+
 export const authApi = {
   register: (data: RegisterPayload) =>
     api.post<AuthResponse>('/auth/register', data).then((r) => r.data),
 
   login: (data: LoginPayload) =>
-    api.post<AuthResponse>('/auth/login', data).then((r) => r.data),
+    api.post<LoginResponse>('/auth/login', data).then((r) => r.data),
 
   logout: () => api.post('/auth/logout'),
 
   me: () => api.get<AuthUser>('/auth/me').then((r) => r.data),
+
+  resetPassword: (data: ResetPasswordPayload) =>
+    api.post('/auth/reset-password', data).then((r) => r.data),
+
+  verifyTwoFactor: (data: VerifyTwoFactorPayload) =>
+    api.post<AuthResponse>('/auth/2fa/verify', data).then((r) => r.data),
 };
