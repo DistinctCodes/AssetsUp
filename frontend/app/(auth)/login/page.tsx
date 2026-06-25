@@ -10,12 +10,11 @@ import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth.store';
-import { useLoginMutation } from '@/lib/query/mutations/auth';
 
 // ── Step 1: Email + password ─────────────────────────────────────────────────
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string().min(1, 'Password is required'),
 });
 type LoginValues = z.infer<typeof loginSchema>;
 
@@ -174,7 +173,7 @@ function LoginStep({
       <h2 className="text-xl font-semibold text-gray-900 mb-1">Welcome back</h2>
       <p className="text-sm text-gray-500 mb-6">Sign in to your account to continue</p>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input
           id="email"
           label="Email address"
@@ -205,7 +204,7 @@ function LoginStep({
         </div>
 
         {errors.root && (
-          <p role="alert" className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
             {errors.root.message}
           </p>
         )}

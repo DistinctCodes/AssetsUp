@@ -1,146 +1,27 @@
-import axios, {
-  AxiosInstance,
-  AxiosRequestConfig,
-  InternalAxiosRequestConfig,
-  AxiosError,
-} from 'axios';
-import { useAuthStore } from '@/store/auth.store';
+import { api } from '../api';
+import type { AuthResponse, LoginInput, RegisterInput } from '../query/types';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface RefreshResponse {
-  accessToken: string;
+// Generic request method for fetch-style calls used in existing query hooks
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? 'GET').toLowerCase() as
+    | 'get'
+    | 'post'
+    | 'put'
+    | 'patch'
+    | 'delete';
+  const body = init?.body ? JSON.parse(init.body as string) : undefined;
+  const response = await api[method]<T>(path, body);
+  return response.data;
 }
 
-interface QueueEntry {
-  resolve: (token: string) => void;
-  reject: (err: unknown) => void;
-}
+export const apiClient = {
+  request,
 
-// ---------------------------------------------------------------------------
-// Cookie helper (mirrors auth.store — needed for middleware)
-// ---------------------------------------------------------------------------
+  register: (data: RegisterInput): Promise<AuthResponse> =>
+    api.post<AuthResponse>('/auth/register', data).then((r) => r.data),
 
-function setAuthCookie(token: string) {
-  if (typeof document === 'undefined') return;
-  document.cookie = `accessToken=${token}; path=/; max-age=${15 * 60}; SameSite=Lax`;
-}
+  login: (data: LoginInput): Promise<AuthResponse> =>
+    api.post<AuthResponse>('/auth/login', data).then((r) => r.data),
 
-function clearAuthStorage() {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  document.cookie = 'accessToken=; path=/; max-age=0';
-}
-
-// ---------------------------------------------------------------------------
-// Module-level refresh state
-// ---------------------------------------------------------------------------
-
-let isRefreshing = false;
-let failedQueue: QueueEntry[] = [];
-
-function processQueue(error: unknown, token: string | null) {
-  failedQueue.forEach((entry) => {
-    if (error) {
-      entry.reject(error);
-    } else {
-      entry.resolve(token!);
-    }
-  });
-  failedQueue = [];
-}
-
-// ---------------------------------------------------------------------------
-// Axios instance
-// ---------------------------------------------------------------------------
-
-export const apiClient: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? '/api',
-  headers: { 'Content-Type': 'application/json' },
-});
-
-// ---------------------------------------------------------------------------
-// Request interceptor — attach access token from localStorage
-// ---------------------------------------------------------------------------
-
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token =
-    typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-
-  if (token && config.headers) {
-    config.headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return config;
-});
-
-// ---------------------------------------------------------------------------
-// Response interceptor — handle 401 / token refresh
-// ---------------------------------------------------------------------------
-
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
-
-    if (error.response?.status !== 401 || originalRequest._retry) {
-      return Promise.reject(error);
-    }
-
-    if (isRefreshing) {
-      return new Promise<string>((resolve, reject) => {
-        failedQueue.push({ resolve, reject });
-      })
-        .then((newToken) => {
-          if (originalRequest.headers) {
-            (originalRequest.headers as Record<string, string>)['Authorization'] =
-              `Bearer ${newToken}`;
-          }
-          return apiClient(originalRequest);
-        })
-        .catch(Promise.reject.bind(Promise));
-    }
-
-    originalRequest._retry = true;
-    isRefreshing = true;
-
-    try {
-      const refreshToken =
-        typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-
-      const { data } = await axios.post<RefreshResponse>(
-        `${process.env.NEXT_PUBLIC_API_URL ?? '/api'}/auth/refresh`,
-        { refreshToken },
-      );
-
-      const newToken = data.accessToken;
-
-      localStorage.setItem('accessToken', newToken);
-      setAuthCookie(newToken);
-
-      if (originalRequest.headers) {
-        (originalRequest.headers as Record<string, string>)['Authorization'] =
-          `Bearer ${newToken}`;
-      }
-
-      processQueue(null, newToken);
-      return apiClient(originalRequest);
-    } catch (refreshError) {
-      processQueue(refreshError, null);
-
-      clearAuthStorage();
-      useAuthStore.getState().setUser(null);
-
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
-
-      return Promise.reject(refreshError);
-    } finally {
-      isRefreshing = false;
-    }
-  },
-);
+  logout: () => api.post('/auth/logout'),
+};

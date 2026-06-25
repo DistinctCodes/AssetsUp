@@ -1,63 +1,39 @@
 import { useMutation, UseMutationOptions } from '@tanstack/react-query';
-import { useAuthStore } from '@/store/auth.store';
-import type { LoginPayload, RegisterPayload } from '@/lib/auth-api';
+import { apiClient } from '@/lib/api/client';
+import { queryKeys } from '../keys';
+import {
+  RegisterInput,
+  LoginInput,
+  AuthResponse,
+  ApiError,
+} from '../types';
 
-// ---------------------------------------------------------------------------
-// Shared error type
-// ---------------------------------------------------------------------------
-
-export interface ApiError {
-  response?: {
-    status: number;
-    data?: { message?: string };
-  };
-  message: string;
-}
-
-// ---------------------------------------------------------------------------
-// useLoginMutation
-// Delegates to store.login() so localStorage, cookie, and Zustand state
-// are all updated in one place — exactly as the store already does.
-// ---------------------------------------------------------------------------
-
-export function useLoginMutation(
-  options?: UseMutationOptions<void, ApiError, LoginPayload>,
-) {
-  const login = useAuthStore((s) => s.login);
-
-  return useMutation<void, ApiError, LoginPayload>({
-    mutationFn: (payload) => login(payload),
-    ...options,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// useRegisterMutation
-// ---------------------------------------------------------------------------
-
+/**
+ * Mutation hook for user registration
+ * @param options - Optional mutation options for callbacks and config
+ * @returns Mutation object with mutate, isPending, isError, etc.
+ */
 export function useRegisterMutation(
-  options?: UseMutationOptions<void, ApiError, RegisterPayload>,
+  options?: UseMutationOptions<AuthResponse, ApiError, RegisterInput>
 ) {
-  const register = useAuthStore((s) => s.register);
-
-  return useMutation<void, ApiError, RegisterPayload>({
-    mutationFn: (payload) => register(payload),
+  return useMutation<AuthResponse, ApiError, RegisterInput>({
+    mutationKey: queryKeys.auth.register,
+    mutationFn: (data: RegisterInput) => apiClient.register(data),
     ...options,
   });
 }
 
-// ---------------------------------------------------------------------------
-// useLogoutMutation
-// ---------------------------------------------------------------------------
-
-export function useLogoutMutation(
-  options?: UseMutationOptions<void, ApiError, void>,
+/**
+ * Mutation hook for user login
+ * @param options - Optional mutation options for callbacks and config
+ * @returns Mutation object with mutate, isPending, isError, etc.
+ */
+export function useLoginMutation(
+  options?: UseMutationOptions<AuthResponse, ApiError, LoginInput>
 ) {
-  const logout = useAuthStore((s) => s.logout);
-
-  return useMutation<void, ApiError, void>({
-    mutationFn: () => logout(),
+  return useMutation<AuthResponse, ApiError, LoginInput>({
+    mutationKey: queryKeys.auth.login,
+    mutationFn: (data: LoginInput) => apiClient.login(data),
     ...options,
   });
 }
-
