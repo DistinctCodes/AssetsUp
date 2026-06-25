@@ -1,0 +1,191 @@
+# AssetsUp — Soroban Contracts
+
+This directory contains the two Soroban smart contracts that power the AssetsUp asset-management platform, plus deployment tooling and documentation.
+
+```
+contracts/
+├── assetsup/             # Core asset registry contract (SC-01)
+├── multisig_transfer/    # Multi-signature transfer workflow contract
+├── scripts/
+│   ├── deploy-testnet.sh     # Deploy both contracts to Stellar testnet
+│   ├── deploy-mainnet.sh     # Deploy both contracts to Stellar mainnet
+│   └── upgrade-contract.sh   # Upgrade a deployed contract to a new WASM
+├── types/
+│   ├── assetsup.ts           # TypeScript bindings for assetsup
+│   └── multisig_transfer.ts  # TypeScript bindings for multisig_transfer
+├── INTERFACE.md          # Full ABI reference + Node.js code examples
+├── EVENTS.md             # All emitted events + indexer code examples
+├── .env.testnet          # Auto-generated: testnet contract IDs (git-ignored)
+└── .env.mainnet          # Auto-generated: mainnet contract IDs (git-ignored)
+```
+
+---
+
+## Prerequisites
+
+### 1. Rust + Wasm target
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+rustup target add wasm32-unknown-unknown
+```
+
+### 2. Stellar CLI
+
+```bash
+cargo install --locked stellar-cli --features opt
+
+# Verify
+stellar --version
+```
+
+### 3. Make scripts executable (one-time)
+
+```bash
+chmod +x contracts/scripts/*.sh
+```
+
+---
+
+## Deploying to Testnet
+
+```bash
+# Deploy with a fresh auto-generated keypair (simplest for first-time dev setup)
+./contracts/scripts/deploy-testnet.sh
+
+# Deploy with your own keypair (recommended for persistent deployments)
+export STELLAR_DEPLOYER_SECRET=S...yoursecretkey...
+./contracts/scripts/deploy-testnet.sh
+
+# Optionally set a different admin address (defaults to the deployer's public key)
+export ADMIN_ADDRESS=G...youradminaddress...
+./contracts/scripts/deploy-testnet.sh
+```
+
+After a successful run, contract IDs are written to `contracts/.env.testnet`:
+
+```
+ASSETSUP_CONTRACT_ID=C...
+MULTISIG_TRANSFER_CONTRACT_ID=C...
+STELLAR_NETWORK=testnet
+STELLAR_RPC_URL=https://soroban-testnet.stellar.org
+STELLAR_NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+```
+
+Load these into the backend:
+
+```bash
+# In backend/.env or your CI environment
+source contracts/.env.testnet
+```
+
+---
+
+## Deploying to Mainnet
+
+> **⚠ This costs real XLM. The script requires explicit confirmation before proceeding.**
+
+```bash
+export STELLAR_DEPLOYER_SECRET=S...yourmainnetsecretkey...
+export ADMIN_ADDRESS=G...youradminaddress...    # optional, defaults to deployer
+./contracts/scripts/deploy-mainnet.sh
+```
+
+The deployer account must be funded with sufficient XLM for transaction fees before running the script.
+
+---
+
+## Upgrading a Deployed Contract
+
+Use this after modifying a contract's Rust source:
+
+```bash
+# Upgrade assetsup on testnet
+export STELLAR_DEPLOYER_SECRET=S...adminkey...
+./contracts/scripts/upgrade-contract.sh assetsup testnet
+
+# Upgrade multisig_transfer on mainnet (will prompt for confirmation)
+./contracts/scripts/upgrade-contract.sh multisig_transfer mainnet
+```
+
+The script:
+1. Rebuilds the WASM
+2. Uploads the new WASM to the Stellar ledger
+3. Calls `upgrade(new_wasm_hash)` on the deployed contract
+4. Updates the WASM hash in the relevant `.env` file
+
+The contract's storage and ID remain unchanged — only the executable code is replaced.
+
+---
+
+## Building Without Deploying
+
+```bash
+cd contracts
+stellar contract build
+
+# Compiled WASMs land in:
+# target/wasm32-unknown-unknown/release/assetsup.wasm
+# target/wasm32-unknown-unknown/release/multisig_transfer.wasm
+```
+
+---
+
+## Regenerating TypeScript Bindings
+
+After any contract ABI change, regenerate the TypeScript types:
+
+```bash
+cd contracts
+
+# Build first
+stellar contract build
+
+# Regenerate bindings
+stellar contract bindings typescript \
+  --wasm target/wasm32-unknown-unknown/release/assetsup.wasm \
+  --network testnet \
+  --output-dir types \
+  --contract-name assetsup
+
+stellar contract bindings typescript \
+  --wasm target/wasm32-unknown-unknown/release/multisig_transfer.wasm \
+  --network testnet \
+  --output-dir types \
+  --contract-name multisig_transfer
+```
+
+Then manually re-add the `AssetsUpClient` / `MultisigTransferClient` helper classes from `types/assetsup.ts` and `types/multisig_transfer.ts`.
+
+---
+
+## Running Tests
+
+```bash
+cd contracts
+cargo test
+```
+
+---
+
+## Documentation
+
+| File | Contents |
+|---|---|
+| `INTERFACE.md` | Every public function: parameters, types, access control, Node.js examples |
+| `EVENTS.md` | Every emitted event: fields, triggers, backend indexer code |
+| `types/assetsup.ts` | TypeScript types + `AssetsUpClient` for the NestJS backend |
+| `types/multisig_transfer.ts` | TypeScript types + `MultisigTransferClient` |
+
+---
+
+## Environment Files
+
+`contracts/.env.testnet` and `contracts/.env.mainnet` are auto-generated by the deploy scripts and **must not be committed to version control** (add to `.gitignore`):
+
+```gitignore
+contracts/.env.testnet
+contracts/.env.mainnet
+```
+
+Pass them into your CI environment as secrets, or load them from a secrets manager.
