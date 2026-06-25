@@ -13,6 +13,10 @@ import type {
   Department,
   AssetCategory,
   AssetUser,
+  TokenHolder,
+  TokenSummary,
+  TransferTokensInput,
+  TokenLockStatus,
 } from '../query/types/asset';
 
 export interface DepartmentWithCount extends Department {
@@ -153,4 +157,23 @@ export const assetApiClient = {
     api
       .patch<MaintenanceRecord>(`/assets/${assetId}/maintenance/${maintenanceId}`, { status })
       .then((r) => r.data),
+
+  // Stellar token operations
+  getTokenHolders: (assetId: string): Promise<TokenHolder[]> =>
+    api.get<TokenHolder[]>(`/stellar/assets/${assetId}/tokens`).then((r) => r.data),
+
+  getTokenSummary: (assetId: string): Promise<TokenSummary> =>
+    api.get<TokenSummary>(`/stellar/assets/${assetId}/tokens/summary`).then((r) => r.data),
+
+  transferTokens: (assetId: string, data: TransferTokensInput): Promise<void> =>
+    api.post(`/stellar/assets/${assetId}/tokens/transfer`, data).then(() => undefined),
+
+  lockTokens: (assetId: string): Promise<TokenLockStatus> =>
+    api.post<TokenLockStatus>(`/stellar/assets/${assetId}/tokens/lock`).then((r) => r.data),
+
+  unlockTokens: (assetId: string): Promise<TokenLockStatus> =>
+    api.post<TokenLockStatus>(`/stellar/assets/${assetId}/tokens/unlock`).then((r) => r.data),
+
+  getTokenLockStatus: (assetId: string): Promise<TokenLockStatus> =>
+    api.get<TokenLockStatus>(`/stellar/assets/${assetId}/tokens/lock-status`).then((r) => r.data),
 };
