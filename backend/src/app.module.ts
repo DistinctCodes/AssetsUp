@@ -3,6 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-store';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { AcceptLanguageResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
+import * as path from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -45,15 +49,41 @@ import { CacheService } from './cache/cache.service';
           host,
           port,
           ttl,
-          // Guard/Fallback: Non-crashing error mitigation loop for missing/offline redis engines
           retry_strategy: (options: any) => {
             if (options.error && options.error.code === 'ECONNREFUSED') {
               return new Error('Redis connection refused. Operating with inline graceful fallback.');
             }
-            return Math.min(options.attempt * 100, 3000); // Backoff connection retry
+            return Math.min(options.attempt * 100, 3000);
           },
         };
       },
+    }),
+
+    // #881 [BE-08] Configure rate limiting to protect all API endpoints
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        throttlers: [
+          {
+            ttl: 60000,
+            limit: parseInt(configService.get<string>('THROTTLE_LIMIT', '60'), 10),
+          },
+        ],
+      }),
+    }),
+
+    // #882 [BE-09] Wire up nestjs-i18n for internationalization support
+    I18nModule.forRoot({
+      fallbackLanguage: 'en',
+      loaderOptions: {
+        path: path.join(__dirname, '/i18n/'),
+        watch: true,
+      },
+      resolvers: [
+        { use: QueryResolver, options: ['lang'] },
+        AcceptLanguageResolver,
+      ],
     }),
 
     UsersModule,
@@ -62,10 +92,14 @@ import { CacheService } from './cache/cache.service';
   controllers: [AppController],
   providers: [
     AppService,
-    CacheService, // Registering the shared custom cache service utility directly within global context
+    CacheService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
   exports: [
-    CacheService, // Exporting CacheService so modules implementing custom invalidation can resolve it cleanly
+    CacheService,
   ],
 })
 export class AppModule {}
