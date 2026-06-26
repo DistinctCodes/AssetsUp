@@ -11,6 +11,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { QueueModule } from './queue/queue.module';
+import { StorageModule } from './storage/storage.module';
 import { CacheService } from './cache/cache.service';
 
 @Module({
@@ -58,34 +60,8 @@ import { CacheService } from './cache/cache.service';
         };
       },
     }),
-
-    // #881 [BE-08] Configure rate limiting to protect all API endpoints
-    ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        throttlers: [
-          {
-            ttl: 60000,
-            limit: parseInt(configService.get<string>('THROTTLE_LIMIT', '60'), 10),
-          },
-        ],
-      }),
-    }),
-
-    // #882 [BE-09] Wire up nestjs-i18n for internationalization support
-    I18nModule.forRoot({
-      fallbackLanguage: 'en',
-      loaderOptions: {
-        path: path.join(__dirname, '/i18n/'),
-        watch: true,
-      },
-      resolvers: [
-        { use: QueryResolver, options: ['lang'] },
-        AcceptLanguageResolver,
-      ],
-    }),
-
+    QueueModule,
+    StorageModule,
     UsersModule,
     AuthModule,
   ],
