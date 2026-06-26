@@ -152,6 +152,30 @@ export interface AssetHistoryFilters {
   search?: string;
 }
 
+// Token-related types for Stellar integration
+export interface TokenHolder {
+  address: string;
+  balance: string;
+  percentage: number;
+  sinceDate: string;
+}
+
+export interface TokenSummary {
+  totalTokens: string;
+  circulatingTokens: string;
+  numberOfHolders: number;
+  tokenPrice: number | null;
+}
+
+export interface TransferTokensInput {
+  recipientAddress: string;
+  amount: string;
+}
+
+export interface TokenLockStatus {
+  isLocked: boolean;
+  lockedBy: string | null;
+  lockedAt: string | null;
 export interface Category {
   id: string;
   name: string;

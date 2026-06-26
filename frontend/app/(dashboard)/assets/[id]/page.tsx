@@ -19,6 +19,11 @@ import {
   Upload,
   Plus,
   Printer,
+  QrCode,
+  Coins,
+  Lock,
+  Unlock,
+  ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -38,6 +43,15 @@ import {
   useUpdateMaintenanceStatus,
   useCreateNote,
   useDeleteNote,
+  useTokenHolders,
+  useTokenSummary,
+  useTokenLockStatus,
+  useTransferTokens,
+  useLockTokens,
+  useUnlockTokens,
+} from "@/lib/query/hooks/useAsset";
+import type { MaintenanceType } from "@/lib/query/types/asset";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
   useUpdateAssetStatus,  
 } from "@/lib/query/hooks/useAsset";
 import type { AssetStatus, MaintenanceType } from "@/lib/query/types/asset";
@@ -49,7 +63,7 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
   RETIRED:     [], // terminal — no transitions
 };
 
-type Tab = "overview" | "history" | "maintenance" | "documents" | "notes";
+type Tab = "overview" | "history" | "maintenance" | "documents" | "notes" | "tokens";
 
 // ── Skeleton ────────────────────────────────────────────────────────────────
 function Skeleton({ className }: { className?: string }) {
@@ -257,6 +271,20 @@ function UploadDocumentModal({
   );
 }
 
+// ── TransferTokensModal ───────────────────────────────────────────────────────
+function TransferTokensModal({
+  assetId,
+  onClose,
+}: {
+  assetId: string;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState({
+    recipientAddress: "",
+    amount: "",
+  });
+  const { mutate: transfer, isPending: transferring } = useTransferTokens(assetId, {
+    onSuccess: onClose,
 // ── ChangeStatusModal ────────────────────────────────────────────────────────
 function ChangeStatusModal({
   assetId,
@@ -284,6 +312,31 @@ function ChangeStatusModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <h3 className="text-base font-semibold text-gray-900 mb-4">Transfer Tokens</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Recipient Stellar Address</label>
+            <input
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="G..."
+              value={form.recipientAddress}
+              onChange={(e) => setForm({ ...form, recipientAddress: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Amount</label>
+            <input
+              type="number"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="0.00"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-5">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
         <h3 className="text-base font-semibold text-gray-900 mb-1">Change Asset Status</h3>
         <p className="text-sm text-gray-500 mb-4">
@@ -321,6 +374,11 @@ function ChangeStatusModal({
           </Button>
           <Button
             className="flex-1"
+            loading={transferring}
+            disabled={!form.recipientAddress || !form.amount}
+            onClick={() => transfer({ recipientAddress: form.recipientAddress, amount: form.amount })}
+          >
+            Transfer
             loading={isPending}
             disabled={!selectedStatus}
             onClick={() => updateStatus({ status: selectedStatus as AssetStatus })}
@@ -354,12 +412,22 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
   // Note form
   const [noteContent, setNoteContent] = useState("");
 
+  // Token-related state
+  const [showTransferTokens, setShowTransferTokens] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    recipientAddress: "",
+    amount: "",
+  });
+
   // Queries
   const { data: asset, isLoading } = useAsset(id);
   const { data: history = [], isLoading: historyLoading } = useAssetHistory(id);
   const { data: maintenance = [], isLoading: maintenanceLoading } = useMaintenanceRecords(id);
   const { data: documents = [], isLoading: documentsLoading } = useAssetDocuments(id);
   const { data: notes = [], isLoading: notesLoading } = useAssetNotes(id);
+  const { data: tokenHolders = [], isLoading: tokenHoldersLoading, refetch: refetchTokenHolders } = useTokenHolders(id);
+  const { data: tokenSummary, isLoading: tokenSummaryLoading } = useTokenSummary(id);
+  const { data: tokenLockStatus, isLoading: tokenLockStatusLoading } = useTokenLockStatus(id);
 
   // Mutations
   const { mutate: deleteAsset, isPending: deletingAsset } = useDeleteAsset(id, {
@@ -370,6 +438,23 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
   const { mutate: markComplete, isPending: markingComplete } = useUpdateMaintenanceStatus(id);
   const { mutate: addNote, isPending: addingNote } = useCreateNote(id, {
     onSuccess: () => setNoteContent(""),
+  });
+  const { mutate: transferTokens, isPending: transferringTokens } = useTransferTokens(id, {
+    onSuccess: () => {
+      setShowTransferTokens(false);
+      setTransferForm({ recipientAddress: "", amount: "" });
+      refetchTokenHolders();
+    },
+  });
+  const { mutate: lockTokens, isPending: lockingTokens } = useLockTokens(id, {
+    onSuccess: () => {
+      refetchTokenHolders();
+    },
+  });
+  const { mutate: unlockTokens, isPending: unlockingTokens } = useUnlockTokens(id, {
+    onSuccess: () => {
+      refetchTokenHolders();
+    },
   });
 
   // Fetch QR code when asset loads
@@ -437,6 +522,7 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
     { key: "maintenance", label: "Maintenance", icon: <Wrench size={15} /> },
     { key: "documents", label: "Documents", icon: <FolderOpen size={15} /> },
     { key: "notes", label: "Notes", icon: <StickyNote size={15} /> },
+    { key: "tokens", label: "Token Holders", icon: <Coins size={15} /> },
   ];
 
   return (
@@ -817,6 +903,151 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Token Holders ── */}
+      {tab === "tokens" && (
+        <div className="space-y-4">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <p className="text-xs text-gray-500 mb-1">Total Tokens</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {tokenSummaryLoading ? "—" : tokenSummary?.totalTokens || "0"}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <p className="text-xs text-gray-500 mb-1">Circulating Tokens</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {tokenSummaryLoading ? "—" : tokenSummary?.circulatingTokens || "0"}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <p className="text-xs text-gray-500 mb-1">Number of Holders</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {tokenSummaryLoading ? "—" : tokenSummary?.numberOfHolders || 0}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <p className="text-xs text-gray-500 mb-1">Token Price</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {tokenSummaryLoading ? "—" : tokenSummary?.tokenPrice ? `$${tokenSummary.tokenPrice.toFixed(2)}` : "N/A"}
+              </p>
+            </div>
+          </div>
+
+          {/* Pie Chart and Holders Table */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Pie Chart */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className="text-sm font-semibold text-gray-900 mb-4">Ownership Distribution</h2>
+              {tokenHoldersLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : tokenHolders.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">No token holders yet.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={tokenHolders.map((h, i) => ({
+                        name: `${h.address.slice(0, 6)}...${h.address.slice(-4)}`,
+                        value: h.percentage,
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {tokenHolders.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={`hsl(${(index * 360) / tokenHolders.length}, 70%, 50%)`} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Holders Table */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-900">Token Holders</h2>
+                <Button size="sm" onClick={() => setShowTransferTokens(true)}>
+                  <ArrowRightLeft size={14} className="mr-1.5" /> Transfer Tokens
+                </Button>
+              </div>
+              {tokenHoldersLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+                </div>
+              ) : tokenHolders.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">No token holders yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {tokenHolders.map((holder) => (
+                    <div
+                      key={holder.address}
+                      className="flex items-center justify-between border border-gray-100 rounded-lg px-4 py-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`https://stellar.expert/explorer/${process.env.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet'}/account/${holder.address}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                        >
+                          {holder.address.slice(0, 6)}...{holder.address.slice(-4)}
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-900">{holder.balance}</p>
+                        <p className="text-xs text-gray-500">{holder.percentage.toFixed(2)}%</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Lock/Unlock Buttons (Admin Only) */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">Token Lock Status</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  {tokenLockStatusLoading ? "Loading..." : tokenLockStatus?.isLocked ? "Tokens are locked" : "Tokens are unlocked"}
+                  {tokenLockStatus?.lockedAt && ` since ${format(new Date(tokenLockStatus.lockedAt), "MMM d, yyyy")}`}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {tokenLockStatus?.isLocked ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={unlockingTokens}
+                    onClick={() => unlockTokens()}
+                  >
+                    <Unlock size={14} className="mr-1.5" /> Unlock Tokens
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={lockingTokens}
+                    onClick={() => lockTokens()}
+                  >
+                    <Lock size={14} className="mr-1.5" /> Lock Tokens
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

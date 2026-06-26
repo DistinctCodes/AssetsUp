@@ -20,6 +20,10 @@ import {
   AssetHistoryFilters,
   Department,
   AssetUser,
+  TokenHolder,
+  TokenSummary,
+  TransferTokensInput,
+  TokenLockStatus,
 } from '../types/asset';
 import { ApiError } from '../types';
 
@@ -243,6 +247,89 @@ export function useUpdateMaintenanceStatus(
       assetApiClient.updateMaintenanceStatus(assetId, maintenanceId, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.maintenance(assetId) });
+    },
+    ...options,
+  });
+}
+
+// Token-related queries and mutations
+export function useTokenHolders(
+  assetId: string,
+  options?: Omit<UseQueryOptions<TokenHolder[], ApiError>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery<TokenHolder[], ApiError>({
+    queryKey: ['tokenHolders', assetId],
+    queryFn: () => assetApiClient.getTokenHolders(assetId),
+    enabled: !!assetId,
+    ...options,
+  });
+}
+
+export function useTokenSummary(
+  assetId: string,
+  options?: Omit<UseQueryOptions<TokenSummary, ApiError>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery<TokenSummary, ApiError>({
+    queryKey: ['tokenSummary', assetId],
+    queryFn: () => assetApiClient.getTokenSummary(assetId),
+    enabled: !!assetId,
+    ...options,
+  });
+}
+
+export function useTokenLockStatus(
+  assetId: string,
+  options?: Omit<UseQueryOptions<TokenLockStatus, ApiError>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery<TokenLockStatus, ApiError>({
+    queryKey: ['tokenLockStatus', assetId],
+    queryFn: () => assetApiClient.getTokenLockStatus(assetId),
+    enabled: !!assetId,
+    ...options,
+  });
+}
+
+export function useTransferTokens(
+  assetId: string,
+  options?: UseMutationOptions<void, ApiError, TransferTokensInput>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, ApiError, TransferTokensInput>({
+    mutationFn: (data) => assetApiClient.transferTokens(assetId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tokenHolders', assetId] });
+      queryClient.invalidateQueries({ queryKey: ['tokenSummary', assetId] });
+    },
+    ...options,
+  });
+}
+
+export function useLockTokens(
+  assetId: string,
+  options?: UseMutationOptions<TokenLockStatus, ApiError, void>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<TokenLockStatus, ApiError, void>({
+    mutationFn: () => assetApiClient.lockTokens(assetId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tokenLockStatus', assetId] });
+    },
+    ...options,
+  });
+}
+
+export function useUnlockTokens(
+  assetId: string,
+  options?: UseMutationOptions<TokenLockStatus, ApiError, void>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<TokenLockStatus, ApiError, void>({
+    mutationFn: () => assetApiClient.unlockTokens(assetId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tokenLockStatus', assetId] });
     },
     ...options,
   });
