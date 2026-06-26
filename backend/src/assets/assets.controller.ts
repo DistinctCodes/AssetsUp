@@ -41,4 +41,9 @@ export class AssetsController {
   async updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusDto, @Req() req: any) {
     return this.assetsService.updateStatus(id, dto, req.user?.id);
   }
+
+  @Post(':id/dispose')
+  async dispose(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.assetsService.dispose(id, body, req.user?.id);
+  }
 }

@@ -73,5 +73,21 @@ export class CreateAssetDto {
 
   @IsOptional()
   @IsString()
+  disposalDate?: string;
+
+  @IsOptional()
+  @IsString()
+  disposalMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  disposalReason?: string;
+
+  @IsOptional()
+  @IsString()
+  disposalApprovedById?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 }

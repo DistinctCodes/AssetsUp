@@ -18,13 +18,12 @@ import { AssetsModule } from './assets/assets.module';
 import { QueueModule } from './queue/queue.module';
 import { StorageModule } from './storage/storage.module';
 import { CacheService } from './cache/cache.service';
+import { ReportingModule } from './reporting/reporting.module';
 
 @Module({
   imports: [
-    // Global environment configuration provider
     ConfigModule.forRoot({ isGlobal: true }),
 
-    // Asynchronous Database Configuration Management
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -40,7 +39,6 @@ import { CacheService } from './cache/cache.service';
       inject: [ConfigService],
     }),
 
-    // #878 [BE-05] Asynchronous Redis Cache Layer Registration
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
@@ -73,6 +71,7 @@ import { CacheService } from './cache/cache.service';
     StorageModule,
     UsersModule,
     AuthModule,
+    ReportingModule,
   ],
   controllers: [AppController],
   providers: [

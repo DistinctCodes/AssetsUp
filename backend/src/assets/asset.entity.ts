@@ -73,6 +73,22 @@ export class Asset {
   @Column({ nullable: true })
   qrCode: string;
 
+  @Column({ type: 'date', nullable: true })
+  disposalDate: string;
+
+  @Column({ nullable: true })
+  disposalMethod: string;
+
+  @Column({ nullable: true, type: 'text' })
+  disposalReason: string;
+
+  @Column({ nullable: true })
+  disposalApprovedById: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'disposalApprovedById' })
+  disposalApprovedBy: User;
+
   @Column({ nullable: true, type: 'text' })
   notes: string;
 
