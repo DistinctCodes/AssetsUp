@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { AssetsExtendedModule } from './assets/assets-extended.module';
 import { CacheService } from './cache/cache.service';
 
 @Module({
@@ -56,6 +57,7 @@ import { CacheService } from './cache/cache.service';
       },
     }),
 
+    AssetsExtendedModule,
     UsersModule,
     AuthModule,
   ],
