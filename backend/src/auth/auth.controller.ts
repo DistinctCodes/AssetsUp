@@ -73,4 +73,16 @@ export class AuthController {
   async googleAuthRedirect(@Req() req: any) {
     return req.user;
   }
+
+  @Get('microsoft')
+  @UseGuards(AuthGuard('microsoft'))
+  async microsoftAuth() {
+    // Initiates the Microsoft OAuth flow
+  }
+
+  @Get('microsoft/callback')
+  @UseGuards(AuthGuard('microsoft'))
+  async microsoftAuthRedirect(@Req() req: any) {
+    return req.user;
+  }
 }

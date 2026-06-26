@@ -1,3 +1,4 @@
+import { Controller, Post, Delete, Param, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { Controller, Post, Delete, Param, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageService } from './storage.service';
