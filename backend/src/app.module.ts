@@ -18,6 +18,7 @@ import { AssetsModule } from './assets/assets.module';
 import { QueueModule } from './queue/queue.module';
 import { StorageModule } from './storage/storage.module';
 import { CacheService } from './cache/cache.service';
+import { LocationsModule } from './locations/locations.module';
 
 @Module({
   imports: [
@@ -73,6 +74,8 @@ import { CacheService } from './cache/cache.service';
     StorageModule,
     UsersModule,
     AuthModule,
+  ],
+    LocationsModule,
   ],
   controllers: [AppController],
   providers: [
