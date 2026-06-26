@@ -10,10 +10,44 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
+import { RegisterDto } from './dtos/register.dto';
+import { LoginDto } from './dtos/login.dto';
+import { RefreshDto } from './dtos/refresh.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  async register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() dto: LoginDto) {
+    return this.authService.login(dto);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() dto: RefreshDto) {
+    return this.authService.refresh(dto.refreshToken);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard('jwt'))
+  async logout(@Req() req: any) {
+    await this.authService.logout(req.user.id);
+    return { message: 'Logged out successfully' };
+  }
+
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'))
+  async getProfile(@Req() req: any) {
+    return this.authService.getProfile(req.user.id);
+  }
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
@@ -32,13 +66,11 @@ export class AuthController {
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth() {
-    // Initiates the Google OAuth flow
   }
 
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req: any) {
-    // user is attached to req by the strategy
     return req.user;
   }
 
