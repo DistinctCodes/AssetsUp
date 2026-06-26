@@ -4,10 +4,11 @@ import { Asset } from './entities/asset.entity';
 import { AssetNote } from './entities/asset-note.entity';
 import { AssetsOpsService } from './assets-ops.service';
 import { AssetsOpsController } from './assets-ops.controller';
+import { BulkController } from './bulk.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Asset, AssetNote])],
-  controllers: [AssetsOpsController],
+  controllers: [AssetsOpsController, BulkController],
   providers: [AssetsOpsService],
   exports: [AssetsOpsService],
 })

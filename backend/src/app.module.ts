@@ -18,6 +18,9 @@ import { AssetsModule } from './assets/assets.module';
 import { QueueModule } from './queue/queue.module';
 import { StorageModule } from './storage/storage.module';
 import { CacheService } from './cache/cache.service';
+import { InventoryModule } from './inventory/inventory.module';
+import { VendorsModule } from './vendors/vendors.module';
+import { DashboardModule } from './assets/dashboard.module';
 
 @Module({
   imports: [
@@ -73,6 +76,10 @@ import { CacheService } from './cache/cache.service';
     StorageModule,
     UsersModule,
     AuthModule,
+  ],
+    InventoryModule,
+    VendorsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [
