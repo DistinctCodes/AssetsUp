@@ -10,12 +10,12 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  @Get()
+  @Get('health')
   getHealth() {
     return {
       status: 'OK',
       message: 'Server is running',
-      Timestamp: Date.now(),
+      timestamp: Date.now(),
     };
   }
 }
