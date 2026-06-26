@@ -6,6 +6,11 @@ export class MailService {
 
   async sendPasswordResetEmail(email: string, resetLink: string) {
     this.logger.log(`[MailService] Sending password reset email to ${email}. Link: ${resetLink}`);
-    // In a real application, implement NodeMailer or similar here.
+    // Inn a real application, implement NodeMailer or similar here.
   }
 }
+//   async sendPasswordResetEmail(email: string, resetLink: string) {
+//     this.logger.log(`[MailService] Sending password reset email to ${email}. Link: ${resetLink}`);
+//     // Inn a real application, implement NodeMailer or similar here.
+//   }
+// }
