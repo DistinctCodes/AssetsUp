@@ -127,7 +127,8 @@ export interface UpdateAssetStatusInput {
 }
 
 export interface TransferAssetInput {
-  departmentId: string;
+  toUserId?: string;
+  toDepartmentId?: string;
   assignedToId?: string;
   location?: string;
   notes?: string;
@@ -149,4 +150,28 @@ export interface AssetHistoryFilters {
   startDate?: string;
   endDate?: string;
   search?: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+}
+
+export interface UpdateAssetInput {
+  name?: string;
+  description?: string;
+  categoryId?: string;
+  departmentId?: string;
+  serialNumber?: string;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  currentValue?: number;
+  warrantyExpiration?: string;
+  status?: string;
+  condition?: string;
+  location?: string;
+  assignedToId?: string;
+  manufacturer?: string;
+  model?: string;
+  notes?: string;
 }
