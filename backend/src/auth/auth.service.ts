@@ -1,12 +1,16 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { RefreshToken } from './entities/refresh-token.entity';
+import { RegisterDto } from './dtos/register.dto';
+import { LoginDto } from './dtos/login.dto';
 
 @Injectable()
 export class AuthService {
@@ -14,20 +18,93 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
     @InjectRepository(PasswordResetToken)
     private readonly tokenRepository: Repository<PasswordResetToken>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepository: Repository<RefreshToken>,
   ) {}
+
+  async register(dto: RegisterDto) {
+    const existing = await this.usersService.findByEmail(dto.email);
+    if (existing) {
+      throw new BadRequestException('Email already registered');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const user = await this.usersService.create({
+      email: dto.email,
+      passwordHash,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+    });
+
+    return this.generateTokens(user.id, user.email);
+  }
+
+  async login(dto: LoginDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isValid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return this.generateTokens(user.id, user.email);
+  }
+
+  async refresh(refreshToken: string) {
+    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    const tokens = await this.refreshTokenRepository.find({
+      where: { revokedAt: null },
+      relations: ['user'],
+    });
+
+    let validToken: RefreshToken | null = null;
+    for (const token of tokens) {
+      if (token.expiresAt < new Date()) {
+        continue;
+      }
+      const isValid = await bcrypt.compare(refreshToken, token.tokenHash);
+      if (isValid) {
+        validToken = token;
+        break;
+      }
+    }
+
+    if (!validToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    validToken.revokedAt = new Date();
+    await this.refreshTokenRepository.save(validToken);
+
+    return this.generateTokens(validToken.userId, validToken.user.email);
+  }
+
+  async logout(userId: string) {
+    await this.refreshTokenRepository.update(
+      { userId, revokedAt: null },
+      { revokedAt: new Date() },
+    );
+  }
+
+  async getProfile(userId: string) {
+    return this.usersService.findById(userId);
+  }
 
   async forgotPassword(email: string): Promise<void> {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
-      // Always return 200 without revealing if email exists
       return;
     }
 
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = await bcrypt.hash(rawToken, 10);
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
     const resetToken = this.tokenRepository.create({
       userId: user.id,
@@ -37,29 +114,12 @@ export class AuthService {
     await this.tokenRepository.save(resetToken);
 
     const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
-    const resetLink = `${frontendUrl}/auth/reset-password?token=${rawToken}`;
-    
+    const resetLink = `${frontendUrl}/auth/reset-password?token=${resetToken.id}.${rawToken}`;
+
     await this.mailService.sendPasswordResetEmail(email, resetLink);
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    // We don't have the plain token stored, we must compare hashes.
-    // However, to find the token we would typically pass a user id or token id.
-    // Since the acceptance criteria only says "POST /auth/reset-password body: { token, newPassword }",
-    // and raw tokens are typically purely random strings, finding the token requires either embedding the id in the token or scanning.
-    // A common practice is token format: `${tokenId}.${rawTokenString}`.
-    // For simplicity, we'll assume the client sends the raw token. To find it, we need to iterate over unused tokens or format it.
-    // Let's implement the standard approach: scan valid unused tokens or we should have generated the token as `${tokenId}:${rawToken}`.
-    // I'll update the forgotPassword to just use the raw token as the lookup key, but the instructions say "stores hashed version".
-    // If it stores the hashed version, we can't look it up by raw token efficiently without the ID.
-    // Let's assume the token passed IS the raw token, but we will find ALL unused valid tokens and compare.
-    // Or better: the token is just securely hashed. Wait, if it's bcrypt, we can't query by hash.
-    // Let's use crypto.createHash('sha256') for fast querying! Bcrypt is for passwords.
-    // But acceptance criteria: "tokenHash (bcrypt hash of the raw token)". 
-    // If it's a bcrypt hash, we MUST fetch tokens and use bcrypt.compare.
-    // Fetching all tokens in DB is bad. We must append userId or tokenId to the token sent to user.
-    // Let's assume the token sent to user is `${resetToken.id}.${rawToken}`!
-    
     const parts = token.split('.');
     if (parts.length !== 2) {
       throw new BadRequestException('Invalid token format');
@@ -67,7 +127,7 @@ export class AuthService {
     const [tokenId, rawToken] = parts;
 
     const resetToken = await this.tokenRepository.findOne({ where: { id: tokenId } });
-    
+
     if (!resetToken) {
       throw new BadRequestException('Token not found, expired, or already used');
     }
@@ -103,11 +163,22 @@ export class AuthService {
       });
     }
 
-    // Generate tokens (dummy for now)
-    return {
-      accessToken: 'dummy-access-token',
-      refreshToken: 'dummy-refresh-token',
-      user,
-    };
+    return this.generateTokens(user.id, user.email);
+  }
+
+  private async generateTokens(userId: string, email: string) {
+    const accessToken = this.jwtService.sign({ sub: userId, email });
+    const refreshTokenRaw = crypto.randomBytes(48).toString('hex');
+    const refreshTokenHash = await bcrypt.hash(refreshTokenRaw, 10);
+
+    await this.refreshTokenRepository.save(
+      this.refreshTokenRepository.create({
+        userId,
+        tokenHash: refreshTokenHash,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      }),
+    );
+
+    return { accessToken, refreshToken: refreshTokenRaw };
   }
 }
