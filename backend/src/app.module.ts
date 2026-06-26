@@ -11,6 +11,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { AssetsExtendedModule } from './assets/assets-extended.module';
 import { AssetsOpsModule } from './assets/assets-ops.module';
 import { CheckinModule } from './checkin/checkin.module';
 import { AssetsModule } from './assets/assets.module';
@@ -64,6 +65,7 @@ import { CacheService } from './cache/cache.service';
       },
     }),
 
+    AssetsExtendedModule,
     AssetsOpsModule,
     CheckinModule,
     AssetsModule,

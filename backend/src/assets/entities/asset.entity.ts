@@ -21,6 +21,18 @@ export class Asset {
   @Column({ nullable: true })
   serialNumber: string;
 
+  @Column({ nullable: true, type: 'date' })
+  purchaseDate: string;
+
+  @Column({ nullable: true, type: 'decimal', precision: 12, scale: 2 })
+  purchasePrice: number;
+
+  @Column({ nullable: true, type: 'decimal', precision: 12, scale: 2 })
+  currentValue: number;
+
+  @Column({ nullable: true, type: 'date' })
+  warrantyExpiration: string;
+
   @Column({ default: 'ACTIVE' })
   status: string;
 
@@ -35,6 +47,25 @@ export class Asset {
 
   @Column({ nullable: true })
   assignedToId: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'assignedToId' })
+  assignedTo: User;
+
+  @Column({ nullable: true, type: 'jsonb' })
+  imageUrls: string[];
+
+  @Column({ nullable: true, type: 'jsonb' })
+  customFields: Record<string, unknown>;
+
+  @Column({ nullable: true, type: 'jsonb' })
+  tags: string[];
+
+  @Column({ nullable: true })
+  manufacturer: string;
+
+  @Column({ nullable: true })
+  model: string;
 
   @Column({ nullable: true })
   barcode: string;
