@@ -46,6 +46,10 @@ export class UsersService {
     return this.userRepository.findOne({ where: { id } });
   }
 
+  async findById(id: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { id } });
+  }
+
   async findByGoogleId(googleId: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { googleId } });
   }
