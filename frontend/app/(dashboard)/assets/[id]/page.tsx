@@ -52,6 +52,16 @@ import {
 } from "@/lib/query/hooks/useAsset";
 import type { MaintenanceType } from "@/lib/query/types/asset";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+  useUpdateAssetStatus,  
+} from "@/lib/query/hooks/useAsset";
+import type { AssetStatus, MaintenanceType } from "@/lib/query/types/asset";
+
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  ACTIVE:      ["INACTIVE", "MAINTENANCE", "RETIRED"],
+  INACTIVE:    ["ACTIVE", "RETIRED"],
+  MAINTENANCE: ["ACTIVE", "INACTIVE", "RETIRED"],
+  RETIRED:     [], // terminal — no transitions
+};
 
 type Tab = "overview" | "history" | "maintenance" | "documents" | "notes" | "tokens";
 
@@ -275,6 +285,28 @@ function TransferTokensModal({
   });
   const { mutate: transfer, isPending: transferring } = useTransferTokens(assetId, {
     onSuccess: onClose,
+// ── ChangeStatusModal ────────────────────────────────────────────────────────
+function ChangeStatusModal({
+  assetId,
+  currentStatus,
+  onClose,
+}: {
+  assetId: string;
+  currentStatus: string;
+  onClose: () => void;
+}) {
+  const allowedTransitions = STATUS_TRANSITIONS[currentStatus] ?? [];
+  const [selectedStatus, setSelectedStatus] = useState(allowedTransitions[0] ?? "");
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  const { mutate: updateStatus, isPending } = useUpdateAssetStatus(assetId, {
+    onSuccess: (updated) => {
+      // toast is handled in the parent via onSuccess callback
+      onClose();
+    },
+    onError: (err) => {
+      setApiError(err?.message ?? "Failed to update status. Please try again.");
+    },
   });
 
   return (
@@ -305,6 +337,39 @@ function TransferTokensModal({
         </div>
         <div className="flex gap-3 mt-5">
           <Button variant="outline" className="flex-1" onClick={onClose}>
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h3 className="text-base font-semibold text-gray-900 mb-1">Change Asset Status</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Current status:{" "}
+          <span className="font-medium text-gray-700">{currentStatus}</span>
+        </p>
+
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-600 mb-1">New Status</label>
+          <select
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+            value={selectedStatus}
+            onChange={(e) => {
+              setSelectedStatus(e.target.value);
+              setApiError(null);
+            }}
+          >
+            {allowedTransitions.map((s) => (
+              <option key={s} value={s}>
+                {s.charAt(0) + s.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {apiError && (
+          <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+            {apiError}
+          </p>
+        )}
+
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={onClose} disabled={isPending}>
             Cancel
           </Button>
           <Button
@@ -314,6 +379,11 @@ function TransferTokensModal({
             onClick={() => transfer({ recipientAddress: form.recipientAddress, amount: form.amount })}
           >
             Transfer
+            loading={isPending}
+            disabled={!selectedStatus}
+            onClick={() => updateStatus({ status: selectedStatus as AssetStatus })}
+          >
+            Confirm
           </Button>
         </div>
       </div>
@@ -327,6 +397,8 @@ export default function AssetDetailPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
   const [qrCodeDataUri, setQrCodeDataUri] = useState<string | null>(null);
+  const [showChangeStatus, setShowChangeStatus] = useState(false);
+const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
 
   // Confirm dialogs
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -486,16 +558,21 @@ export default function AssetDetailPage() {
             <Button size="sm" variant="outline">
               <ArrowRightLeft size={14} className="mr-1.5" /> Transfer
             </Button>
-            <Button size="sm" variant="outline">
-              <RefreshCw size={14} className="mr-1.5" /> Update Status
-            </Button>
+            <Button
+  size="sm"
+  variant="outline"
+  disabled={STATUS_TRANSITIONS[asset.status]?.length === 0}
+  onClick={() => setShowChangeStatus(true)}
+>
+  <RefreshCw size={14} className="mr-1.5" /> Update Status
+</Button>
             <Button size="sm" variant="outline">
               <Pencil size={14} className="mr-1.5" /> Edit
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="!text-red-600 !border-red-200 hover:!bg-red-50"
+              className="text-red-600 border-red-200 hover:bg-red-50"
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 size={14} className="mr-1.5" /> Delete
@@ -754,7 +831,7 @@ export default function AssetDetailPage() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="!text-red-500"
+                    className="text-red-500"
                     onClick={() => setConfirmDeleteDoc(doc.id)}
                   >
                     <Trash2 size={14} />
@@ -812,7 +889,7 @@ export default function AssetDetailPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="!text-red-500 shrink-0"
+                        className="text-red-500 shrink-0"
                         onClick={() => setConfirmDeleteNote(note.id)}
                       >
                         <Trash2 size={14} />
@@ -1022,7 +1099,13 @@ export default function AssetDetailPage() {
           onClose={() => setShowScheduleMaintenance(false)}
         />
       )}
-
+{showChangeStatus && (
+  <ChangeStatusModal
+    assetId={id}
+    currentStatus={asset.status}
+    onClose={() => setShowChangeStatus(false)}
+  />
+)}
       {showUploadDoc && (
         <UploadDocumentModal assetId={id} onClose={() => setShowUploadDoc(false)} />
       )}

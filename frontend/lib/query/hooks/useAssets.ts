@@ -14,8 +14,9 @@ import {
   CategoryWithCount,
 } from "@/lib/api/assets";
 import { queryKeys } from "../keys";
-import { Asset, AssetUser, UpdateAssetStatusInput, TransferAssetInput } from "../types/asset";
-import { ApiError } from "../types";
+import { Asset, AssetUser, UpdateAssetStatusInput, TransferAssetInput, UpdateAssetInput } from "../types/asset";
+import { ApiError, Category } from "../types";
+import { api } from "@/lib/api";
 
 export function useAssets(
   filters?: AssetListFilters,
@@ -81,9 +82,9 @@ export function useUpdateDepartment() {
 // ── Categories ───────────────────────────────────────────────
 
 export function useCategories() {
-  return useQuery<CategoryWithCount[], ApiError>({
-    queryKey: queryKeys.categories.list(),
-    queryFn: () => assetApiClient.getCategories(),
+  return useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.get<Category[]>('/categories').then((r) => r.data),
   });
 }
 
@@ -137,13 +138,18 @@ export function useCreateAsset() {
   });
 }
 
-export function useUpdateAsset(id: string) {
+export function useUpdateAsset(
+  assetId: string,
+  options?: { onSuccess?: () => void },
+) {
   const queryClient = useQueryClient();
-  return useMutation<Asset, ApiError, Partial<CreateAssetInput>>({
-    mutationFn: (data) => assetApiClient.updateAsset(id, data),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.assets.detail(id), updated);
-      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all });
+  return useMutation({
+    mutationFn: (data: UpdateAssetInput) =>
+      api.patch<Asset>(`/assets/${assetId}`, data).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ['asset', assetId] });
+      options?.onSuccess?.();
     },
   });
 }
