@@ -1,22 +1,38 @@
-import * as React from "react"
+import { InputHTMLAttributes, forwardRef } from 'react';
+import { clsx } from 'clsx';
 
-import { cn } from "@/lib/utils"
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
+  error?: string;
+}
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ className, label, error, id, ...props }, ref) => {
+    return (
+      <div className="flex flex-col gap-1">
+        {label && (
+          <label htmlFor={id} className="text-sm font-medium text-gray-700">
+            {label}
+          </label>
+        )}
+        <input
+          ref={ref}
+          id={id}
+          className={clsx(
+            'w-full rounded-lg border px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400',
+            'focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent',
+            'disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed',
+            error
+              ? 'border-red-400 focus:ring-red-400'
+              : 'border-gray-300',
+            className,
+          )}
+          {...props}
+        />
+        {error && <p className="text-xs text-red-500">{error}</p>}
+      </div>
+    );
+  },
+);
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, type, ...props }, ref) => {
-  return (
-    <input
-      type={type}
-      className={cn(
-        "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-        className,
-      )}
-      ref={ref}
-      {...props}
-    />
-  )
-})
-Input.displayName = "Input"
-
-export { Input }
+Input.displayName = 'Input';

@@ -1,98 +1,56 @@
-import { NestFactory } from "@nestjs/core"
-import { AppModule } from "./app.module"
-import { ValidationPipe, Logger } from "@nestjs/common"
-import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger"
-import { join } from "path"
-import * as express from "express"
-import * as compression from "compression"
-import helmet from "helmet"
-import rateLimit from "express-rate-limit"
-// Removed missing imports
-// import { HttpExceptionFilter } from "./common/filters/http-exception.filter"
-// import { TransformInterceptor } from "./common/interceptors/transform.interceptor"
-// import { LoggingInterceptor } from "./common/interceptors/logging.interceptor"
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const logger = new Logger("Bootstrap")
-  const app = await NestFactory.create(AppModule, {
-    logger: ["error", "warn", "log", "debug", "verbose"],
-  })
+  const app = await NestFactory.create(AppModule);
 
-  // Security middleware
-  app.use(
-    helmet({
-      crossOriginResourcePolicy: { policy: "cross-origin" },
-      contentSecurityPolicy: false,
-    }),
-  )
-
-  // Compression
-  app.use(compression())
-
-  // Rate limiting
-  app.use(
-    rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100, // limit each IP to 100 requests per windowMs
-      message: "Too many requests from this IP, please try again later.",
-    }),
-  )
-
-  // Enable CORS
+  // Enable CORS for frontend
   app.enableCors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  })
+  });
 
-  // Global validation pipe
+  // Set global API prefix
+  app.setGlobalPrefix('api');
+
+  // Enable validation globally
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
     }),
-  )
+  );
 
-  // Removed global filters/interceptors that don't exist
-  // app.useGlobalFilters(new HttpExceptionFilter())
-  // app.useGlobalInterceptors(new LoggingInterceptor(), new TransformInterceptor())
-
-  // Serve static files
-  app.use("/uploads", express.static(join(__dirname, "..", "uploads")))
-
-  // API prefix
-  app.setGlobalPrefix("api", {
-    exclude: ["health", "metrics"],
-  })
-
-  // Swagger documentation
+  // Swagger Configuration
   const config = new DocumentBuilder()
-    .setTitle("ManageAssets API")
-    .setDescription("API documentation for the ManageAssets application")
-    .setVersion("1.0")
-    .addBearerAuth()
-    .addTag("auth", "Authentication endpoints")
-    .addTag("users", "User management endpoints")
-    .addTag("assets", "Asset management endpoints")
-    .addTag("inventory", "Inventory management endpoints")
-    .addTag("maintenance", "Maintenance management endpoints")
-    .addTag("branches", "Branch management endpoints")
-    .addTag("reports", "Reporting endpoints")
-    .addTag("audit", "Audit trail endpoints")
-    .addTag("certificates", "Certificate management endpoints")
-    .build()
-  const document = SwaggerModule.createDocument(app, config)
-  SwaggerModule.setup("api/docs", app, document)
+    .setTitle('Your API Title')
+    .setDescription('Your API description with all available endpoints')
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controllers
+    )
+    .build();
 
-  const port = process.env.PORT || 3001
-  await app.listen(port)
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true, // Keeps auth token after page refresh
+    },
+  });
 
-  logger.log(`Application is running on: ${await app.getUrl()}`)
-  logger.log(`Swagger documentation available at: ${await app.getUrl()}/api/docs`)
+  const port = process.env.PORT ?? 6003;
+  await app.listen(port);
+  console.log(`Application is running on: http://localhost:${port}`);
+  console.log(`Swagger docs available at: http://localhost:${port}/api/docs`);
 }
-bootstrap()
+bootstrap();
