@@ -1,0 +1,41 @@
+{
+  "auth": {
+    "login": {
+      "success": "Login successful",
+      "invalid": "Invalid credentials"
+    },
+    "register": {
+      "success": "Registration successful",
+      "email_exists": "Email already registered"
+    },
+    "logout": {
+      "success": "Logged out successfully"
+    },
+    "forgot_password": {
+      "success": "If the email exists, a reset link has been sent."
+    },
+    "reset_password": {
+      "success": "Password has been reset successfully"
+    }
+  },
+  "users": {
+    "not_found": "User not found",
+    "created": "User created successfully",
+    "updated": "User updated successfully",
+    "deleted": "User deleted successfully"
+  },
+  "assets": {
+    "not_found": "Asset not found",
+    "created": "Asset created successfully",
+    "updated": "Asset updated successfully",
+    "deleted": "Asset deleted successfully",
+    "checked_out": "Asset checked out successfully",
+    "checked_in": "Asset checked in successfully"
+  },
+  "errors": {
+    "internal_server_error": "Internal server error",
+    "not_found": "Resource not found",
+    "forbidden": "Access denied",
+    "unauthorized": "Unauthorized"
+  }
+}
