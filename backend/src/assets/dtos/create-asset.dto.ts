@@ -73,5 +73,12 @@ export class CreateAssetDto {
 
   @IsOptional()
   @IsString()
+  endOfLife?: string;
+
+  @IsOptional()
+  endOfLifeNotificationSent?: boolean;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 }
