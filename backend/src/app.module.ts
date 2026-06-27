@@ -18,6 +18,9 @@ import { AssetsModule } from './assets/assets.module';
 import { QueueModule } from './queue/queue.module';
 import { StorageModule } from './storage/storage.module';
 import { CacheService } from './cache/cache.service';
+import { InventoryModule } from './inventory/inventory.module';
+import { VendorsModule } from './vendors/vendors.module';
+import { DashboardModule } from './assets/dashboard.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
 import { LocationsModule } from './locations/locations.module';
@@ -86,6 +89,10 @@ import { TasksModule } from './tasks/tasks.module';
     LocationsModule,
   ],
     ActivityLogModule,
+  ],
+    InventoryModule,
+    VendorsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [
