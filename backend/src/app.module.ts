@@ -3,10 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-store';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { AcceptLanguageResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
-import * as path from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -28,6 +26,7 @@ import { ContractsModule } from './contracts/contracts.module';
 import { LicensesModule } from './licenses/licenses.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { TasksModule } from './tasks/tasks.module';
+import { NotificationModule } from './notifications/notification.module';
 
 @Module({
   imports: [
@@ -54,7 +53,10 @@ import { TasksModule } from './tasks/tasks.module';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => {
         const host = configService.get<string>('REDIS_HOST', 'localhost');
-        const port = parseInt(configService.get<string>('REDIS_PORT', '6379'), 10);
+        const port = parseInt(
+          configService.get<string>('REDIS_PORT', '6379'),
+          10,
+        );
         const ttl = parseInt(configService.get<string>('CACHE_TTL', '300'), 10);
 
         return {
@@ -64,7 +66,9 @@ import { TasksModule } from './tasks/tasks.module';
           ttl,
           retry_strategy: (options: any) => {
             if (options.error && options.error.code === 'ECONNREFUSED') {
-              return new Error('Redis connection refused. Operating with inline graceful fallback.');
+              return new Error(
+                'Redis connection refused. Operating with inline graceful fallback.',
+              );
             }
             return Math.min(options.attempt * 100, 3000);
           },
@@ -85,14 +89,12 @@ import { TasksModule } from './tasks/tasks.module';
     LicensesModule,
     PurchaseOrdersModule,
     TasksModule,
-  ],
     LocationsModule,
-  ],
     ActivityLogModule,
-  ],
     InventoryModule,
     VendorsModule,
     DashboardModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [
@@ -103,8 +105,6 @@ import { TasksModule } from './tasks/tasks.module';
       useClass: ThrottlerGuard,
     },
   ],
-  exports: [
-    CacheService,
-  ],
+  exports: [CacheService],
 })
 export class AppModule {}

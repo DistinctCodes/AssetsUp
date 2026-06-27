@@ -19,8 +19,14 @@ export class AssetsOpsService {
     private readonly noteRepository: Repository<AssetNote>,
   ) {}
 
-  async createNote(assetId: string, dto: CreateNoteDto, userId?: string): Promise<AssetNote> {
-    const asset = await this.assetRepository.findOne({ where: { id: assetId } });
+  async createNote(
+    assetId: string,
+    dto: CreateNoteDto,
+    userId?: string,
+  ): Promise<AssetNote> {
+    const asset = await this.assetRepository.findOne({
+      where: { id: assetId },
+    });
     if (!asset) throw new NotFoundException('Asset not found');
 
     const note = this.noteRepository.create({
@@ -40,16 +46,24 @@ export class AssetsOpsService {
   }
 
   async deleteNote(assetId: string, noteId: string): Promise<void> {
-    const note = await this.noteRepository.findOne({ where: { id: noteId, assetId } });
+    const note = await this.noteRepository.findOne({
+      where: { id: noteId, assetId },
+    });
     if (!note) throw new NotFoundException('Note not found');
     await this.noteRepository.remove(note);
   }
 
   async generateQRCode(assetId: string): Promise<string> {
-    const asset = await this.assetRepository.findOne({ where: { id: assetId } });
+    const asset = await this.assetRepository.findOne({
+      where: { id: assetId },
+    });
     if (!asset) throw new NotFoundException('Asset not found');
 
-    const qrData = JSON.stringify({ id: asset.id, assetId: asset.assetId, name: asset.name });
+    const qrData = JSON.stringify({
+      id: asset.id,
+      assetId: asset.assetId,
+      name: asset.name,
+    });
     const qrCode = await QRCode.toDataURL(qrData);
 
     await this.assetRepository.update(assetId, { qrCode });
@@ -57,21 +71,26 @@ export class AssetsOpsService {
   }
 
   async generateBarcode(assetId: string): Promise<string> {
-    const asset = await this.assetRepository.findOne({ where: { id: assetId } });
+    const asset = await this.assetRepository.findOne({
+      where: { id: assetId },
+    });
     if (!asset) throw new NotFoundException('Asset not found');
 
     const barcode = await new Promise<string>((resolve, reject) => {
-      bwipjs.toBuffer({
-        bcid: 'code128',
-        text: asset.assetId,
-        scale: 3,
-        height: 10,
-        includetext: true,
-        textxalign: 'center',
-      }, (err: Error | null, buffer?: Buffer) => {
-        if (err) reject(err);
-        else resolve(`data:image/png;base64,${buffer.toString('base64')}`);
-      });
+      bwipjs.toBuffer(
+        {
+          bcid: 'code128',
+          text: asset.assetId,
+          scale: 3,
+          height: 10,
+          includetext: true,
+          textxalign: 'center',
+        },
+        (err: Error | null, buffer?: Buffer) => {
+          if (err) reject(err);
+          else resolve(`data:image/png;base64,${buffer.toString('base64')}`);
+        },
+      );
     });
 
     await this.assetRepository.update(assetId, { barcode });
@@ -106,6 +125,9 @@ export class AssetsOpsService {
 
   async bulkExport(ids?: string[]) {
     const where = ids ? { id: In(ids) } : {};
-    return this.assetRepository.find({ where, relations: ['assignedTo', 'createdBy'] });
+    return this.assetRepository.find({
+      where,
+      relations: ['assignedTo', 'createdBy'],
+    });
   }
 }

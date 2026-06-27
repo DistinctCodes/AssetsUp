@@ -13,13 +13,21 @@ export class MicrosoftStrategy extends PassportStrategy(Strategy, 'microsoft') {
     super({
       clientID: configService.get<string>('MICROSOFT_CLIENT_ID', ''),
       clientSecret: configService.get<string>('MICROSOFT_CLIENT_SECRET', ''),
-      callbackURL: configService.get<string>('MICROSOFT_CALLBACK_URL', 'http://localhost:3000/api/auth/microsoft/callback'),
+      callbackURL: configService.get<string>(
+        'MICROSOFT_CALLBACK_URL',
+        'http://localhost:3000/api/auth/microsoft/callback',
+      ),
       scope: ['user.read'],
       tenant: configService.get<string>('MICROSOFT_TENANT_ID', 'common'),
     });
   }
 
-  async validate(accessToken: string, refreshToken: string, profile: any, done: VerifyCallback): Promise<any> {
+  async validate(
+    accessToken: string,
+    refreshToken: string,
+    profile: any,
+    done: VerifyCallback,
+  ): Promise<any> {
     try {
       const result = await this.authService.validateOAuthLogin(profile);
       done(null, result);

@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { LicensesService } from './licenses.service';
 import { CreateLicenseDto } from './dtos/create-license.dto';
@@ -26,7 +37,11 @@ export class LicensesController {
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateLicenseDto, @Req() req: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateLicenseDto,
+    @Req() req: any,
+  ) {
     return this.licensesService.update(id, dto, req.user?.id);
   }
 
