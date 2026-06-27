@@ -18,6 +18,7 @@ import { AssetsModule } from './assets/assets.module';
 import { QueueModule } from './queue/queue.module';
 import { StorageModule } from './storage/storage.module';
 import { CacheService } from './cache/cache.service';
+import { LocationsModule } from './locations/locations.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { LicensesModule } from './licenses/licenses.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
@@ -78,6 +79,8 @@ import { TasksModule } from './tasks/tasks.module';
     LicensesModule,
     PurchaseOrdersModule,
     TasksModule,
+  ],
+    LocationsModule,
   ],
   controllers: [AppController],
   providers: [
