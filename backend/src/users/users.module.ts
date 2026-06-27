@@ -6,6 +6,7 @@ import { Department } from './entities/department.entity';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { RolesController } from './roles.controller';
+import { DepartmentsController } from './departments.controller';
 import { StorageModule } from '../storage/storage.module';
 
 @Module({
@@ -13,7 +14,7 @@ import { StorageModule } from '../storage/storage.module';
     TypeOrmModule.forFeature([User, Role, Department]),
     StorageModule,
   ],
-  controllers: [UsersController, RolesController],
+  controllers: [UsersController, RolesController, DepartmentsController],
   providers: [UsersService],
   exports: [UsersService],
 })

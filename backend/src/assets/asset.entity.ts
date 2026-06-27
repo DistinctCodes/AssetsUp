@@ -91,6 +91,12 @@ export class Asset {
   @Column({ nullable: true })
   qrCode: string;
 
+  @Column({ type: 'date', nullable: true })
+  endOfLife: string;
+
+  @Column({ default: false })
+  endOfLifeNotificationSent: boolean;
+
   @Column({ nullable: true, type: 'text' })
   notes: string;
 
