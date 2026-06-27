@@ -14,7 +14,15 @@ import {
   CategoryWithCount,
 } from "@/lib/api/assets";
 import { queryKeys } from "../keys";
-import { Asset, AssetUser, UpdateAssetStatusInput, TransferAssetInput, UpdateAssetInput } from "../types/asset";
+import {
+  Asset,
+  AssetUser,
+  UpdateAssetStatusInput,
+  TransferAssetInput,
+  UpdateAssetInput,
+  DisposalRequest,
+  CreateDisposalInput,
+} from "../types/asset";
 import { ApiError, Category } from "../types";
 import { api } from "@/lib/api";
 
@@ -83,8 +91,9 @@ export function useUpdateDepartment() {
 
 export function useCategories() {
   return useQuery({
-    queryKey: ['categories'],
-    queryFn: () => api.get<Category[]>('/categories').then((r) => r.data),
+    queryKey: ["categories"],
+    queryFn: () =>
+      api.get<CategoryWithCount[]>("/categories").then((r) => r.data),
   });
 }
 
@@ -147,8 +156,8 @@ export function useUpdateAsset(
     mutationFn: (data: UpdateAssetInput) =>
       api.patch<Asset>(`/assets/${assetId}`, data).then((r) => r.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
-      queryClient.invalidateQueries({ queryKey: ['asset', assetId] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset", assetId] });
       options?.onSuccess?.();
     },
   });
@@ -180,7 +189,76 @@ export function useTransferAsset(id: string) {
 
 export function useUsers() {
   return useQuery<AssetUser[], ApiError>({
-    queryKey: ['users'], // Wait, let's see if queryKeys has users
+    queryKey: ["users"], // Wait, let's see if queryKeys has users
     queryFn: () => assetApiClient.getUsers(),
+  });
+}
+
+// ── Asset Disposal ───────────────────────────────────────────
+
+export function useCreateDisposalRequest(
+  assetId: string,
+  options?: { onSuccess?: () => void },
+) {
+  const queryClient = useQueryClient();
+  return useMutation<DisposalRequest, ApiError, CreateDisposalInput>({
+    mutationFn: (data) => assetApiClient.createDisposalRequest(assetId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.assets.detail(assetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.disposals.pending(),
+      });
+      options?.onSuccess?.();
+    },
+  });
+}
+
+export function useApproveDisposal(
+  assetId: string,
+  disposalId: string,
+  options?: { onSuccess?: () => void },
+) {
+  const queryClient = useQueryClient();
+  return useMutation<DisposalRequest, ApiError, void>({
+    mutationFn: () => assetApiClient.approveDisposal(assetId, disposalId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.assets.detail(assetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.disposals.pending(),
+      });
+      options?.onSuccess?.();
+    },
+  });
+}
+
+export function useRejectDisposal(
+  assetId: string,
+  disposalId: string,
+  options?: { onSuccess?: () => void },
+) {
+  const queryClient = useQueryClient();
+  return useMutation<DisposalRequest, ApiError, { reason: string }>({
+    mutationFn: ({ reason }) =>
+      assetApiClient.rejectDisposal(assetId, disposalId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.assets.detail(assetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.disposals.pending(),
+      });
+      options?.onSuccess?.();
+    },
+  });
+}
+
+export function usePendingDisposals() {
+  return useQuery<DisposalRequest[], ApiError>({
+    queryKey: queryKeys.disposals.pending(),
+    queryFn: () => assetApiClient.getPendingDisposals(),
   });
 }
