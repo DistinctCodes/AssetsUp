@@ -46,6 +46,24 @@ export class Asset {
   location: string;
 
   @Column({ nullable: true })
+  city: string;
+
+  @Column({ nullable: true })
+  state: string;
+
+  @Column({ nullable: true })
+  building: string;
+
+  @Column({ nullable: true })
+  room: string;
+
+  @Column({ nullable: true })
+  aisle: string;
+
+  @Column({ nullable: true })
+  shelf: string;
+
+  @Column({ nullable: true })
   assignedToId: string;
 
   @ManyToOne(() => User, { nullable: true })

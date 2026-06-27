@@ -19,13 +19,16 @@ import { QueueModule } from './queue/queue.module';
 import { StorageModule } from './storage/storage.module';
 import { CacheService } from './cache/cache.service';
 import { ActivityLogModule } from './activity-log/activity-log.module';
+import { LocationsModule } from './locations/locations.module';
+import { ContractsModule } from './contracts/contracts.module';
+import { LicensesModule } from './licenses/licenses.module';
+import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
-    // Global environment configuration provider
     ConfigModule.forRoot({ isGlobal: true }),
 
-    // Asynchronous Database Configuration Management
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -41,7 +44,6 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
       inject: [ConfigService],
     }),
 
-    // #878 [BE-05] Asynchronous Redis Cache Layer Registration
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
@@ -74,6 +76,12 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
     StorageModule,
     UsersModule,
     AuthModule,
+    ContractsModule,
+    LicensesModule,
+    PurchaseOrdersModule,
+    TasksModule,
+  ],
+    LocationsModule,
   ],
     ActivityLogModule,
   ],
