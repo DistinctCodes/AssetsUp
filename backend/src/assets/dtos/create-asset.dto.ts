@@ -50,6 +50,30 @@ export class CreateAssetDto {
 
   @IsOptional()
   @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  building?: string;
+
+  @IsOptional()
+  @IsString()
+  room?: string;
+
+  @IsOptional()
+  @IsString()
+  aisle?: string;
+
+  @IsOptional()
+  @IsString()
+  shelf?: string;
+
+  @IsOptional()
+  @IsString()
   assignedToId?: string;
 
   @IsOptional()
@@ -73,19 +97,10 @@ export class CreateAssetDto {
 
   @IsOptional()
   @IsString()
-  disposalDate?: string;
+  endOfLife?: string;
 
   @IsOptional()
-  @IsString()
-  disposalMethod?: string;
-
-  @IsOptional()
-  @IsString()
-  disposalReason?: string;
-
-  @IsOptional()
-  @IsString()
-  disposalApprovedById?: string;
+  endOfLifeNotificationSent?: boolean;
 
   @IsOptional()
   @IsString()

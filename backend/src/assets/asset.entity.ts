@@ -46,6 +46,24 @@ export class Asset {
   location: string;
 
   @Column({ nullable: true })
+  city: string;
+
+  @Column({ nullable: true })
+  state: string;
+
+  @Column({ nullable: true })
+  building: string;
+
+  @Column({ nullable: true })
+  room: string;
+
+  @Column({ nullable: true })
+  aisle: string;
+
+  @Column({ nullable: true })
+  shelf: string;
+
+  @Column({ nullable: true })
   assignedToId: string;
 
   @ManyToOne(() => User, { nullable: true })
@@ -74,20 +92,10 @@ export class Asset {
   qrCode: string;
 
   @Column({ type: 'date', nullable: true })
-  disposalDate: string;
+  endOfLife: string;
 
-  @Column({ nullable: true })
-  disposalMethod: string;
-
-  @Column({ nullable: true, type: 'text' })
-  disposalReason: string;
-
-  @Column({ nullable: true })
-  disposalApprovedById: string;
-
-  @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: 'disposalApprovedById' })
-  disposalApprovedBy: User;
+  @Column({ default: false })
+  endOfLifeNotificationSent: boolean;
 
   @Column({ nullable: true, type: 'text' })
   notes: string;
