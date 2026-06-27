@@ -3,8 +3,10 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { RefreshToken } from './entities/refresh-token.entity';
 
 const mockRepo = { create: jest.fn(), save: jest.fn(), findOne: jest.fn() };
 const mockUsersService = {
@@ -15,6 +17,10 @@ const mockUsersService = {
 const mockMailService = { sendPasswordResetEmail: jest.fn() };
 const mockConfig = {
   get: jest.fn((key: string, def?: string) => def ?? 'http://localhost:3000'),
+};
+const mockJwtService = {
+  sign: jest.fn(() => 'mock-jwt-token'),
+  verify: jest.fn(() => ({ sub: 'user-id', email: 'test@example.com' })),
 };
 
 describe('AuthService', () => {
@@ -27,7 +33,9 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: MailService, useValue: mockMailService },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: JwtService, useValue: mockJwtService },
         { provide: getRepositoryToken(PasswordResetToken), useValue: mockRepo },
+        { provide: getRepositoryToken(RefreshToken), useValue: mockRepo },
       ],
     }).compile();
     service = module.get<AuthService>(AuthService);
