@@ -21,13 +21,18 @@ import { CacheService } from './cache/cache.service';
 import { InventoryModule } from './inventory/inventory.module';
 import { VendorsModule } from './vendors/vendors.module';
 import { DashboardModule } from './assets/dashboard.module';
+import { ReportingModule } from './reporting/reporting.module';
+import { ActivityLogModule } from './activity-log/activity-log.module';
+import { LocationsModule } from './locations/locations.module';
+import { ContractsModule } from './contracts/contracts.module';
+import { LicensesModule } from './licenses/licenses.module';
+import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
-    // Global environment configuration provider
     ConfigModule.forRoot({ isGlobal: true }),
 
-    // Asynchronous Database Configuration Management
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -43,7 +48,6 @@ import { DashboardModule } from './assets/dashboard.module';
       inject: [ConfigService],
     }),
 
-    // #878 [BE-05] Asynchronous Redis Cache Layer Registration
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
@@ -76,6 +80,15 @@ import { DashboardModule } from './assets/dashboard.module';
     StorageModule,
     UsersModule,
     AuthModule,
+    ReportingModule,
+    ContractsModule,
+    LicensesModule,
+    PurchaseOrdersModule,
+    TasksModule,
+  ],
+    LocationsModule,
+  ],
+    ActivityLogModule,
   ],
     InventoryModule,
     VendorsModule,

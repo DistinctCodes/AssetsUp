@@ -46,6 +46,24 @@ export class Asset {
   location: string;
 
   @Column({ nullable: true })
+  city: string;
+
+  @Column({ nullable: true })
+  state: string;
+
+  @Column({ nullable: true })
+  building: string;
+
+  @Column({ nullable: true })
+  room: string;
+
+  @Column({ nullable: true })
+  aisle: string;
+
+  @Column({ nullable: true })
+  shelf: string;
+
+  @Column({ nullable: true })
   assignedToId: string;
 
   @ManyToOne(() => User, { nullable: true })
@@ -72,6 +90,12 @@ export class Asset {
 
   @Column({ nullable: true })
   qrCode: string;
+
+  @Column({ type: 'date', nullable: true })
+  endOfLife: string;
+
+  @Column({ default: false })
+  endOfLifeNotificationSent: boolean;
 
   @Column({ nullable: true, type: 'text' })
   notes: string;

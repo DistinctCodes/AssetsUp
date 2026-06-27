@@ -99,4 +99,15 @@ export class AssetsService {
     asset.updatedById = userId;
     return this.assetRepository.save(asset);
   }
+
+  async dispose(id: string, dto: { disposalMethod?: string; disposalReason?: string; disposalApprovedById?: string }, userId?: string): Promise<Asset> {
+    const asset = await this.findById(id);
+    asset.status = 'DISPOSED';
+    asset.disposalDate = new Date().toISOString().split('T')[0];
+    asset.disposalMethod = dto.disposalMethod;
+    asset.disposalReason = dto.disposalReason;
+    asset.disposalApprovedById = dto.disposalApprovedById || userId;
+    asset.updatedById = userId;
+    return this.assetRepository.save(asset);
+  }
 }

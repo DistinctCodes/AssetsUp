@@ -50,6 +50,30 @@ export class CreateAssetDto {
 
   @IsOptional()
   @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  building?: string;
+
+  @IsOptional()
+  @IsString()
+  room?: string;
+
+  @IsOptional()
+  @IsString()
+  aisle?: string;
+
+  @IsOptional()
+  @IsString()
+  shelf?: string;
+
+  @IsOptional()
+  @IsString()
   assignedToId?: string;
 
   @IsOptional()
@@ -70,6 +94,13 @@ export class CreateAssetDto {
   @IsOptional()
   @IsString()
   model?: string;
+
+  @IsOptional()
+  @IsString()
+  endOfLife?: string;
+
+  @IsOptional()
+  endOfLifeNotificationSent?: boolean;
 
   @IsOptional()
   @IsString()
