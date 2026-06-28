@@ -8,7 +8,13 @@ export class InitialSchema1700000000000 implements MigrationInterface {
       new Table({
         name: 'users',
         columns: [
-          { name: 'id', type: 'uuid', isPrimary: true, generationStrategy: 'uuid', default: 'uuid_generate_v4()' },
+          {
+            name: 'id',
+            type: 'uuid',
+            isPrimary: true,
+            generationStrategy: 'uuid',
+            default: 'uuid_generate_v4()',
+          },
           { name: 'email', type: 'varchar', isUnique: true },
           { name: 'password_hash', type: 'varchar', isNullable: true },
           { name: 'google_id', type: 'varchar', isNullable: true },

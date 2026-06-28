@@ -20,9 +20,7 @@ describe('Contracts (e2e)', () => {
   });
 
   it('GET /api/contracts returns 401 without auth', () => {
-    return request(app.getHttpServer())
-      .get('/api/contracts')
-      .expect(401);
+    return request(app.getHttpServer()).get('/api/contracts').expect(401);
   });
 
   it('POST /api/contracts returns 401 without auth', () => {

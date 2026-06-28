@@ -3,13 +3,25 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { RefreshToken } from './entities/refresh-token.entity';
 
 const mockRepo = { create: jest.fn(), save: jest.fn(), findOne: jest.fn() };
-const mockUsersService = { findByEmail: jest.fn(), update: jest.fn(), create: jest.fn() };
+const mockUsersService = {
+  findByEmail: jest.fn(),
+  update: jest.fn(),
+  create: jest.fn(),
+};
 const mockMailService = { sendPasswordResetEmail: jest.fn() };
-const mockConfig = { get: jest.fn((key: string, def?: string) => def ?? 'http://localhost:3000') };
+const mockConfig = {
+  get: jest.fn((key: string, def?: string) => def ?? 'http://localhost:3000'),
+};
+const mockJwtService = {
+  sign: jest.fn(() => 'mock-jwt-token'),
+  verify: jest.fn(() => ({ sub: 'user-id', email: 'test@example.com' })),
+};
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -21,7 +33,9 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: MailService, useValue: mockMailService },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: JwtService, useValue: mockJwtService },
         { provide: getRepositoryToken(PasswordResetToken), useValue: mockRepo },
+        { provide: getRepositoryToken(RefreshToken), useValue: mockRepo },
       ],
     }).compile();
     service = module.get<AuthService>(AuthService);
@@ -35,7 +49,9 @@ describe('AuthService', () => {
   describe('forgotPassword', () => {
     it('returns silently if user not found', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
-      await expect(service.forgotPassword('no@email.com')).resolves.toBeUndefined();
+      await expect(
+        service.forgotPassword('no@email.com'),
+      ).resolves.toBeUndefined();
       expect(mockMailService.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
 
@@ -47,18 +63,25 @@ describe('AuthService', () => {
       mockMailService.sendPasswordResetEmail.mockResolvedValue(undefined);
       await service.forgotPassword('test@example.com');
       expect(mockRepo.save).toHaveBeenCalled();
-      expect(mockMailService.sendPasswordResetEmail).toHaveBeenCalledWith('test@example.com', expect.stringContaining('reset-password'));
+      expect(mockMailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        expect.stringContaining('reset-password'),
+      );
     });
   });
 
   describe('resetPassword', () => {
     it('throws BadRequestException for invalid token format', async () => {
-      await expect(service.resetPassword('invalidtoken', 'newpass')).rejects.toThrow('Invalid token format');
+      await expect(
+        service.resetPassword('invalidtoken', 'newpass'),
+      ).rejects.toThrow('Invalid token format');
     });
 
     it('throws BadRequestException when token not found', async () => {
       mockRepo.findOne.mockResolvedValue(null);
-      await expect(service.resetPassword('id.rawtoken', 'newpass')).rejects.toThrow();
+      await expect(
+        service.resetPassword('id.rawtoken', 'newpass'),
+      ).rejects.toThrow();
     });
   });
 
@@ -66,7 +89,11 @@ describe('AuthService', () => {
     it('returns tokens and creates new user if not found', async () => {
       const profile = { id: 'g1', emails: [{ value: 'new@example.com' }] };
       mockUsersService.findByEmail.mockResolvedValue(null);
-      mockUsersService.create.mockResolvedValue({ id: 'u2', email: 'new@example.com', googleId: 'g1' });
+      mockUsersService.create.mockResolvedValue({
+        id: 'u2',
+        email: 'new@example.com',
+        googleId: 'g1',
+      });
       const result = await service.validateOAuthLogin(profile);
       expect(result).toHaveProperty('accessToken');
       expect(mockUsersService.create).toHaveBeenCalled();
@@ -74,10 +101,16 @@ describe('AuthService', () => {
 
     it('updates googleId on existing user without one', async () => {
       const profile = { id: 'g2', emails: [{ value: 'exists@example.com' }] };
-      mockUsersService.findByEmail.mockResolvedValue({ id: 'u3', email: 'exists@example.com', googleId: null });
+      mockUsersService.findByEmail.mockResolvedValue({
+        id: 'u3',
+        email: 'exists@example.com',
+        googleId: null,
+      });
       mockUsersService.update.mockResolvedValue({ id: 'u3', googleId: 'g2' });
       await service.validateOAuthLogin(profile);
-      expect(mockUsersService.update).toHaveBeenCalledWith('u3', { googleId: 'g2' });
+      expect(mockUsersService.update).toHaveBeenCalledWith('u3', {
+        googleId: 'g2',
+      });
     });
   });
 });

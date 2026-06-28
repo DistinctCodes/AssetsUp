@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { LocationsService } from './locations.service';
 import { CreateLocationDto } from './dtos/create-location.dto';
@@ -15,7 +25,9 @@ export class LocationsController {
   }
 
   @Get()
-  async findAll(@Query() query: { page?: number; limit?: number; isActive?: boolean }) {
+  async findAll(
+    @Query() query: { page?: number; limit?: number; isActive?: boolean },
+  ) {
     return this.locationsService.findAll(query);
   }
 

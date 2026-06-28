@@ -48,9 +48,15 @@ export class DashboardController {
   @Get('summary')
   async getSummary() {
     const totalAssets = await this.assetRepository.count();
-    const activeAssets = await this.assetRepository.count({ where: { status: 'ACTIVE' } });
-    const maintenanceAssets = await this.assetRepository.count({ where: { status: 'MAINTENANCE' } });
-    const retiredAssets = await this.assetRepository.count({ where: { status: 'RETIRED' } });
+    const activeAssets = await this.assetRepository.count({
+      where: { status: 'ACTIVE' },
+    });
+    const maintenanceAssets = await this.assetRepository.count({
+      where: { status: 'MAINTENANCE' },
+    });
+    const retiredAssets = await this.assetRepository.count({
+      where: { status: 'RETIRED' },
+    });
 
     return {
       totalAssets,

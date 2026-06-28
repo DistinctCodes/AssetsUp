@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AssetsService } from './assets.service';
 import { CreateAssetDto } from './dtos/create-asset.dto';
@@ -27,7 +39,11 @@ export class AssetsController {
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateAssetDto, @Req() req: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateAssetDto,
+    @Req() req: any,
+  ) {
     return this.assetsService.update(id, dto, req.user?.id);
   }
 
@@ -38,7 +54,11 @@ export class AssetsController {
   }
 
   @Patch(':id/status')
-  async updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusDto, @Req() req: any) {
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateStatusDto,
+    @Req() req: any,
+  ) {
     return this.assetsService.updateStatus(id, dto, req.user?.id);
   }
 

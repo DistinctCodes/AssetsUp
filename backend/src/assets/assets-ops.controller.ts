@@ -1,4 +1,14 @@
-import { Controller, Post, Get, Delete, Param, Body, Req, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Delete,
+  Param,
+  Body,
+  Req,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AssetsOpsService } from './assets-ops.service';
 import { CreateNoteDto } from './dtos/create-note.dto';
@@ -12,7 +22,11 @@ export class AssetsOpsController {
   constructor(private readonly assetsOpsService: AssetsOpsService) {}
 
   @Post(':id/notes')
-  async createNote(@Param('id') id: string, @Body() dto: CreateNoteDto, @Req() req: any) {
+  async createNote(
+    @Param('id') id: string,
+    @Body() dto: CreateNoteDto,
+    @Req() req: any,
+  ) {
     return this.assetsOpsService.createNote(id, dto, req.user?.id);
   }
 
@@ -41,7 +55,10 @@ export class AssetsOpsController {
 
   @Post('bulk/status')
   async bulkStatusUpdate(@Body() dto: BulkStatusDto, @Req() req: any) {
-    const count = await this.assetsOpsService.bulkStatusUpdate(dto, req.user?.id);
+    const count = await this.assetsOpsService.bulkStatusUpdate(
+      dto,
+      req.user?.id,
+    );
     return { updated: count };
   }
 

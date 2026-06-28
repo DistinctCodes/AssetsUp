@@ -12,12 +12,14 @@ import {
   Settings,
   LogOut,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/assets", label: "Assets", icon: Package },
+  { href: "/assets/disposals", label: "Disposals", icon: AlertTriangle },
   { href: "/users", label: "Users", icon: Users },
   { href: "/departments", label: "Organisation", icon: Building2 },
   { href: "/reports", label: "Reports", icon: BarChart3 },
@@ -73,10 +75,15 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 />
               </svg>
             </div>
-            <span className="font-semibold text-gray-900 text-sm">AssetsUp</span>
+            <span className="font-semibold text-gray-900 text-sm">
+              AssetsUp
+            </span>
           </div>
           {onClose && (
-            <button onClick={onClose} className="lg:hidden text-gray-400 hover:text-gray-600">
+            <button
+              onClick={onClose}
+              className="lg:hidden text-gray-400 hover:text-gray-600"
+            >
               <X size={18} />
             </button>
           )}

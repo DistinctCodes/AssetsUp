@@ -17,13 +17,17 @@ export class LocationsService {
     return this.locationRepository.save(location);
   }
 
-  async findAll(query: { page?: number; limit?: number; isActive?: boolean } = {}): Promise<{ data: Location[]; total: number }> {
+  async findAll(
+    query: { page?: number; limit?: number; isActive?: boolean } = {},
+  ): Promise<{ data: Location[]; total: number }> {
     const { page = 1, limit = 20, isActive } = query;
-    const qb = this.locationRepository.createQueryBuilder('location')
+    const qb = this.locationRepository
+      .createQueryBuilder('location')
       .skip((page - 1) * limit)
       .take(limit);
 
-    if (isActive !== undefined) qb.andWhere('location.isActive = :isActive', { isActive });
+    if (isActive !== undefined)
+      qb.andWhere('location.isActive = :isActive', { isActive });
 
     const [data, total] = await qb.getManyAndCount();
     return { data, total };

@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 @Injectable()
@@ -17,7 +22,10 @@ export class StorageService {
         secretAccessKey: configService.get<string>('AWS_SECRET_ACCESS_KEY', ''),
       },
     });
-    this.bucket = configService.get<string>('AWS_S3_BUCKET', 'assetsup-uploads');
+    this.bucket = configService.get<string>(
+      'AWS_S3_BUCKET',
+      'assetsup-uploads',
+    );
   }
 
   async upload(file: Express.Multer.File, key?: string): Promise<string> {
@@ -44,7 +52,7 @@ export class StorageService {
 
   async getSignedUrl(key: string, expiresIn = 3600): Promise<string> {
     return getSignedUrl(
-      this.s3,
+      this.s3 as any,
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
       { expiresIn },
     );
