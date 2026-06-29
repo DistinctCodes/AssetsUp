@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -12,17 +12,28 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  async findAll(query: { page?: number; limit?: number; roleId?: string; departmentId?: string; isActive?: boolean } = {}): Promise<{ data: User[]; total: number }> {
+  async findAll(
+    query: {
+      page?: number;
+      limit?: number;
+      roleId?: string;
+      departmentId?: string;
+      isActive?: boolean;
+    } = {},
+  ): Promise<{ data: User[]; total: number }> {
     const { page = 1, limit = 20, roleId, departmentId, isActive } = query;
-    const qb = this.userRepository.createQueryBuilder('user')
+    const qb = this.userRepository
+      .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
       .leftJoinAndSelect('user.department', 'department')
       .skip((page - 1) * limit)
       .take(limit);
 
     if (roleId) qb.andWhere('user.roleId = :roleId', { roleId });
-    if (departmentId) qb.andWhere('user.departmentId = :departmentId', { departmentId });
-    if (isActive !== undefined) qb.andWhere('user.isActive = :isActive', { isActive });
+    if (departmentId)
+      qb.andWhere('user.departmentId = :departmentId', { departmentId });
+    if (isActive !== undefined)
+      qb.andWhere('user.isActive = :isActive', { isActive });
 
     const [data, total] = await qb.getManyAndCount();
     return { data, total };
@@ -40,18 +51,6 @@ export class UsersService {
       where: { email },
       relations: ['role', 'department'],
     });
-  }
-
-  async findById(id: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { id } });
-  }
-
-  async findById(id: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { id } });
-  }
-
-  async findById(id: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { id } });
   }
 
   async findByGoogleId(googleId: string): Promise<User | null> {

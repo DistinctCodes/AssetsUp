@@ -9,7 +9,14 @@ import { AssetsExtendedController } from './assets-extended.controller';
 import { AssetAuditController } from './asset-audit.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Asset, AssetHistory, AssetDocument, MaintenanceRecord])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Asset,
+      AssetHistory,
+      AssetDocument,
+      MaintenanceRecord,
+    ]),
+  ],
   controllers: [AssetsExtendedController, AssetAuditController],
   providers: [AssetsExtendedService],
   exports: [AssetsExtendedService],

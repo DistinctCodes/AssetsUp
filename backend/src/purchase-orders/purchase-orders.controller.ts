@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { CreatePurchaseOrderDto } from './dtos/create-purchase-order.dto';
@@ -26,13 +38,25 @@ export class PurchaseOrdersController {
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdatePurchaseOrderDto, @Req() req: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePurchaseOrderDto,
+    @Req() req: any,
+  ) {
     return this.purchaseOrdersService.update(id, dto, req.user?.id);
   }
 
   @Patch(':id/status')
-  async updateStatus(@Param('id') id: string, @Body('status') status: string, @Req() req: any) {
-    return this.purchaseOrdersService.update(id, { status } as UpdatePurchaseOrderDto, req.user?.id);
+  async updateStatus(
+    @Param('id') id: string,
+    @Body('status') status: string,
+    @Req() req: any,
+  ) {
+    return this.purchaseOrdersService.update(
+      id,
+      { status } as UpdatePurchaseOrderDto,
+      req.user?.id,
+    );
   }
 
   @Delete(':id')

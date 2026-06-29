@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
@@ -20,18 +20,30 @@ export class MailService {
   }
 
   async sendPasswordResetEmail(email: string, resetLink: string) {
-    await this.sendTemplateEmail(email, 'Password Reset', 'password-reset', { resetLink });
+    await this.sendTemplateEmail(email, 'Password Reset', 'password-reset', {
+      resetLink,
+    });
   }
 
   async sendWelcomeEmail(email: string, name: string) {
-    await this.sendTemplateEmail(email, 'Welcome to AssetsUp', 'welcome', { name });
+    await this.sendTemplateEmail(email, 'Welcome to AssetsUp', 'welcome', {
+      name,
+    });
   }
 
-  async sendTemplateEmail(to: string, subject: string, template: string, context: Record<string, any>) {
+  async sendTemplateEmail(
+    to: string,
+    subject: string,
+    template: string,
+    context: Record<string, any>,
+  ) {
     const html = this.renderTemplate(template, context);
     try {
       await this.transporter.sendMail({
-        from: this.configService.get<string>('MAIL_FROM', 'noreply@assetsup.local'),
+        from: this.configService.get<string>(
+          'MAIL_FROM',
+          'noreply@assetsup.local',
+        ),
         to,
         subject,
         html,
@@ -42,7 +54,10 @@ export class MailService {
     }
   }
 
-  private renderTemplate(template: string, context: Record<string, any>): string {
+  private renderTemplate(
+    template: string,
+    context: Record<string, any>,
+  ): string {
     const templates: Record<string, (ctx: Record<string, any>) => string> = {
       'password-reset': (ctx) => `
         <h1>Password Reset</h1>
@@ -50,7 +65,7 @@ export class MailService {
         <a href="${ctx.resetLink}">${ctx.resetLink}</a>
         <p>This link expires in 1 hour.</p>
       `,
-      'welcome': (ctx) => `
+      welcome: (ctx) => `
         <h1>Welcome to AssetsUp!</h1>
         <p>Hello ${ctx.name},</p>
         <p>Your account has been created successfully.</p>
@@ -72,7 +87,7 @@ export class MailService {
     const render = templates[template];
     if (!render) {
       this.logger.warn(`Unknown email template: ${template}`);
-      return `<p>${subject}</p>`;
+      return `<p>Unknown template: ${template}</p>`;
     }
     return render(context);
   }

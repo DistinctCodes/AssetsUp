@@ -1,5 +1,12 @@
-import { Controller, Post, Delete, Param, UseInterceptors, UploadedFile } from '@nestjs/common';
-import { Controller, Post, Delete, Param, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Delete,
+  Param,
+  UseInterceptors,
+  UploadedFile,
+  Body,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageService } from './storage.service';
 
@@ -9,7 +16,10 @@ export class StorageController {
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+  async uploadFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() _body: any,
+  ) {
     const key = await this.storageService.upload(file);
     return { key, url: await this.storageService.getSignedUrl(key) };
   }

@@ -10,10 +10,7 @@ import { DepartmentsController } from './departments.controller';
 import { StorageModule } from '../storage/storage.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([User, Role, Department]),
-    StorageModule,
-  ],
+  imports: [TypeOrmModule.forFeature([User, Role, Department]), StorageModule],
   controllers: [UsersController, RolesController, DepartmentsController],
   providers: [UsersService],
   exports: [UsersService],

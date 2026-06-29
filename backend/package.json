@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.975.0",
+    "@aws-sdk/s3-request-presigner": "^3.1075.0",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/cache-manager": "^3.1.0",
     "@nestjs/common": "^10.0.0",
@@ -67,9 +68,9 @@
     "papaparse": "^5.5.3",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "passport-microsoft": "^1.0.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
+    "passport-microsoft": "^1.0.0",
     "pdfkit": "^0.17.2",
     "pg": "^8.11.3",
     "qrcode": "^1.5.4",

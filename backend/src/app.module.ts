@@ -28,6 +28,8 @@ import { ContractsModule } from './contracts/contracts.module';
 import { LicensesModule } from './licenses/licenses.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { TasksModule } from './tasks/tasks.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { StellarModule } from './stellar/stellar.module';
 
 @Module({
   imports: [
@@ -54,7 +56,10 @@ import { TasksModule } from './tasks/tasks.module';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => {
         const host = configService.get<string>('REDIS_HOST', 'localhost');
-        const port = parseInt(configService.get<string>('REDIS_PORT', '6379'), 10);
+        const port = parseInt(
+          configService.get<string>('REDIS_PORT', '6379'),
+          10,
+        );
         const ttl = parseInt(configService.get<string>('CACHE_TTL', '300'), 10);
 
         return {
@@ -64,12 +69,28 @@ import { TasksModule } from './tasks/tasks.module';
           ttl,
           retry_strategy: (options: any) => {
             if (options.error && options.error.code === 'ECONNREFUSED') {
-              return new Error('Redis connection refused. Operating with inline graceful fallback.');
+              return new Error(
+                'Redis connection refused. Operating with inline graceful fallback.',
+              );
             }
             return Math.min(options.attempt * 100, 3000);
           },
         };
       },
+    }),
+
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+
+    I18nModule.forRoot({
+      fallbackLanguage: 'en',
+      loaderOptions: {
+        path: path.join(__dirname, '/i18n/'),
+        watch: true,
+      },
+      resolvers: [
+        { use: QueryResolver, options: ['lang'] },
+        AcceptLanguageResolver,
+      ],
     }),
 
     AssetsExtendedModule,
@@ -85,14 +106,13 @@ import { TasksModule } from './tasks/tasks.module';
     LicensesModule,
     PurchaseOrdersModule,
     TasksModule,
-  ],
     LocationsModule,
-  ],
     ActivityLogModule,
-  ],
     InventoryModule,
     VendorsModule,
     DashboardModule,
+    ApiKeysModule,
+    StellarModule,
   ],
   controllers: [AppController],
   providers: [
@@ -103,8 +123,6 @@ import { TasksModule } from './tasks/tasks.module';
       useClass: ThrottlerGuard,
     },
   ],
-  exports: [
-    CacheService,
-  ],
+  exports: [CacheService],
 })
 export class AppModule {}

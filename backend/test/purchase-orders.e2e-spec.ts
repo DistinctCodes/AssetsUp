@@ -20,9 +20,7 @@ describe('PurchaseOrders (e2e)', () => {
   });
 
   it('GET /api/purchase-orders returns 401 without auth', () => {
-    return request(app.getHttpServer())
-      .get('/api/purchase-orders')
-      .expect(401);
+    return request(app.getHttpServer()).get('/api/purchase-orders').expect(401);
   });
 
   it('POST /api/purchase-orders returns 401 without auth', () => {

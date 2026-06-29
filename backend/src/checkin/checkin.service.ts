@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CheckinRecord } from './checkin.entity';
@@ -16,7 +20,9 @@ export class CheckinService {
   ) {}
 
   async checkout(dto: CheckoutDto, userId?: string): Promise<CheckinRecord> {
-    const asset = await this.assetRepository.findOne({ where: { id: dto.assetId } });
+    const asset = await this.assetRepository.findOne({
+      where: { id: dto.assetId },
+    });
     if (!asset) throw new NotFoundException('Asset not found');
 
     const active = await this.checkinRepository.findOne({

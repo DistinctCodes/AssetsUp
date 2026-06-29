@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -16,17 +16,25 @@ export class PurchaseOrdersService {
     private readonly poRepository: Repository<PurchaseOrder>,
     private readonly configService: ConfigService,
   ) {
-    this.nextNumber = parseInt(configService.get<string>('PO_ID_START', '1000'), 10);
+    this.nextNumber = parseInt(
+      configService.get<string>('PO_ID_START', '1000'),
+      10,
+    );
   }
 
-  async create(dto: CreatePurchaseOrderDto, userId?: string): Promise<PurchaseOrder> {
+  async create(
+    dto: CreatePurchaseOrderDto,
+    _userId?: string,
+  ): Promise<PurchaseOrder> {
     const prefix = this.configService.get<string>('PO_ID_PREFIX', 'PO');
     const poNumber = `${prefix}-${this.nextNumber++}`;
-    const items = dto.items?.map(item => ({
-      ...item,
-      total: item.total ?? item.quantity * item.unitPrice,
-    })) || [];
-    const subtotal = dto.subtotal ?? items.reduce((sum, item) => sum + item.total, 0);
+    const items =
+      dto.items?.map((item) => ({
+        ...item,
+        total: item.total ?? item.quantity * item.unitPrice,
+      })) || [];
+    const subtotal =
+      dto.subtotal ?? items.reduce((sum, item) => sum + item.total, 0);
     const total = dto.total ?? subtotal + (dto.tax ?? 0);
 
     const po = this.poRepository.create({
@@ -35,14 +43,17 @@ export class PurchaseOrdersService {
       poNumber,
       subtotal,
       total,
-      createdById: userId,
+      createdById: _userId,
     });
     return this.poRepository.save(po);
   }
 
-  async findAll(query: PurchaseOrderQueryDto): Promise<{ data: PurchaseOrder[]; total: number }> {
+  async findAll(
+    query: PurchaseOrderQueryDto,
+  ): Promise<{ data: PurchaseOrder[]; total: number }> {
     const { search, status, vendor, page, limit } = query;
-    const qb = this.poRepository.createQueryBuilder('po')
+    const qb = this.poRepository
+      .createQueryBuilder('po')
       .leftJoinAndSelect('po.createdBy', 'createdBy')
       .leftJoinAndSelect('po.approvedBy', 'approvedBy');
 
@@ -53,7 +64,8 @@ export class PurchaseOrdersService {
       );
     }
     if (status) qb.andWhere('po.status = :status', { status });
-    if (vendor) qb.andWhere('po.vendor ILIKE :vendor', { vendor: `%${vendor}%` });
+    if (vendor)
+      qb.andWhere('po.vendor ILIKE :vendor', { vendor: `%${vendor}%` });
 
     qb.orderBy('po.createdAt', 'DESC');
     qb.skip((page - 1) * limit).take(limit);
@@ -69,10 +81,14 @@ export class PurchaseOrdersService {
     return po;
   }
 
-  async update(id: string, dto: UpdatePurchaseOrderDto, userId?: string): Promise<PurchaseOrder> {
+  async update(
+    id: string,
+    dto: UpdatePurchaseOrderDto,
+    _userId?: string,
+  ): Promise<PurchaseOrder> {
     const po = await this.findById(id);
     if (dto.items) {
-      dto.items = dto.items.map(item => ({
+      dto.items = dto.items.map((item) => ({
         ...item,
         total: item.total ?? item.quantity * item.unitPrice,
       }));
