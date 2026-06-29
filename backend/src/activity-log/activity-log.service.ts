@@ -17,9 +17,21 @@ export class ActivityLogService {
     return this.activityLogRepository.save(log);
   }
 
-  async findAll(query: ActivityLogQueryDto): Promise<{ data: ActivityLog[]; total: number }> {
-    const { page = 1, limit = 20, userId, action, entityType, entityId, startDate, endDate } = query;
-    const qb = this.activityLogRepository.createQueryBuilder('log')
+  async findAll(
+    query: ActivityLogQueryDto,
+  ): Promise<{ data: ActivityLog[]; total: number }> {
+    const {
+      page = 1,
+      limit = 20,
+      userId,
+      action,
+      entityType,
+      entityId,
+      startDate,
+      endDate,
+    } = query;
+    const qb = this.activityLogRepository
+      .createQueryBuilder('log')
       .leftJoinAndSelect('log.user', 'user')
       .skip((page - 1) * limit)
       .take(limit)

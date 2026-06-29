@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Req, UseInterceptors, UploadedFile, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  Req,
+  UseInterceptors,
+  UploadedFile,
+  Query,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
@@ -54,7 +67,10 @@ export class UsersController {
 
   @Post('avatar')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadAvatar(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+  async uploadAvatar(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     const key = `avatars/${req.user.id}-${Date.now()}-${file.originalname}`;
     await this.storageService.upload(file, key);
     const avatarUrl = await this.storageService.getSignedUrl(key);

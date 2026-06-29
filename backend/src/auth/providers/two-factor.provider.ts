@@ -1,14 +1,15 @@
+import { Injectable } from '@nestjs/common';
 @Injectable()
 export class TwoFactorProvider {
-  async generateSecret(email: string) {}
+  async generateSecret(_email: string) {}
 
-  async generateQrCode(otpauthUrl: string) {}
+  async generateQrCode(_otpauthUrl: string) {}
 
-  verifyCode(secret: string, token: string) {}
+  verifyCode(_secret: string, _token: string) {}
 
   generateBackupCodes() {}
 
-  encryptSecret(secret: string) {}
+  encryptSecret(_secret: string) {}
 
-  decryptSecret(secret: string) {}
+  decryptSecret(_secret: string) {}
 }

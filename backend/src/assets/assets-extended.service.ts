@@ -23,8 +23,15 @@ export class AssetsExtendedService {
     private readonly maintenanceRepository: Repository<MaintenanceRecord>,
   ) {}
 
-  async transfer(id: string, dto: TransferAssetDto, userId?: string): Promise<Asset> {
-    const asset = await this.assetRepository.findOne({ where: { id }, relations: ['assignedTo'] });
+  async transfer(
+    id: string,
+    dto: TransferAssetDto,
+    userId?: string,
+  ): Promise<Asset> {
+    const asset = await this.assetRepository.findOne({
+      where: { id },
+      relations: ['assignedTo'],
+    });
     if (!asset) throw new NotFoundException('Asset not found');
 
     const previousValue: Record<string, unknown> = {
@@ -53,21 +60,34 @@ export class AssetsExtendedService {
   }
 
   async getHistory(assetId: string, query: HistoryQueryDto) {
-    const qb = this.historyRepository.createQueryBuilder('h')
+    const qb = this.historyRepository
+      .createQueryBuilder('h')
       .leftJoinAndSelect('h.performedBy', 'performedBy')
       .where('h.assetId = :assetId', { assetId })
       .orderBy('h.createdAt', 'DESC');
 
-    if (query.action) qb.andWhere('h.action = :action', { action: query.action });
-    if (query.startDate) qb.andWhere('h.createdAt >= :startDate', { startDate: query.startDate });
-    if (query.endDate) qb.andWhere('h.createdAt <= :endDate', { endDate: query.endDate });
-    if (query.search) qb.andWhere('h.description ILIKE :search', { search: `%${query.search}%` });
+    if (query.action)
+      qb.andWhere('h.action = :action', { action: query.action });
+    if (query.startDate)
+      qb.andWhere('h.createdAt >= :startDate', { startDate: query.startDate });
+    if (query.endDate)
+      qb.andWhere('h.createdAt <= :endDate', { endDate: query.endDate });
+    if (query.search)
+      qb.andWhere('h.description ILIKE :search', {
+        search: `%${query.search}%`,
+      });
 
     return qb.getMany();
   }
 
-  async addDocument(assetId: string, file: Express.Multer.File, userId?: string): Promise<AssetDocument> {
-    const asset = await this.assetRepository.findOne({ where: { id: assetId } });
+  async addDocument(
+    assetId: string,
+    file: Express.Multer.File,
+    userId?: string,
+  ): Promise<AssetDocument> {
+    const asset = await this.assetRepository.findOne({
+      where: { id: assetId },
+    });
     if (!asset) throw new NotFoundException('Asset not found');
 
     const doc = this.documentRepository.create({
@@ -102,13 +122,21 @@ export class AssetsExtendedService {
   }
 
   async deleteDocument(assetId: string, documentId: string): Promise<void> {
-    const doc = await this.documentRepository.findOne({ where: { id: documentId, assetId } });
+    const doc = await this.documentRepository.findOne({
+      where: { id: documentId, assetId },
+    });
     if (!doc) throw new NotFoundException('Document not found');
     await this.documentRepository.remove(doc);
   }
 
-  async createMaintenance(assetId: string, dto: CreateMaintenanceDto, userId?: string): Promise<MaintenanceRecord> {
-    const asset = await this.assetRepository.findOne({ where: { id: assetId } });
+  async createMaintenance(
+    assetId: string,
+    dto: CreateMaintenanceDto,
+    userId?: string,
+  ): Promise<MaintenanceRecord> {
+    const asset = await this.assetRepository.findOne({
+      where: { id: assetId },
+    });
     if (!asset) throw new NotFoundException('Asset not found');
 
     const record = this.maintenanceRepository.create({
@@ -138,8 +166,14 @@ export class AssetsExtendedService {
     });
   }
 
-  async updateMaintenance(assetId: string, recordId: string, dto: UpdateMaintenanceDto): Promise<MaintenanceRecord> {
-    const record = await this.maintenanceRepository.findOne({ where: { id: recordId, assetId } });
+  async updateMaintenance(
+    assetId: string,
+    recordId: string,
+    dto: UpdateMaintenanceDto,
+  ): Promise<MaintenanceRecord> {
+    const record = await this.maintenanceRepository.findOne({
+      where: { id: recordId, assetId },
+    });
     if (!record) throw new NotFoundException('Maintenance record not found');
     Object.assign(record, dto);
     return this.maintenanceRepository.save(record);

@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+﻿import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { User } from '../users/entities/user.entity';
 
 @Entity('assets')
@@ -119,4 +127,16 @@ export class Asset {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column({ nullable: true, type: 'date' })
+  disposalDate: string;
+
+  @Column({ nullable: true })
+  disposalMethod: string;
+
+  @Column({ nullable: true, type: 'text' })
+  disposalReason: string;
+
+  @Column({ nullable: true })
+  disposalApprovedById: string;
 }

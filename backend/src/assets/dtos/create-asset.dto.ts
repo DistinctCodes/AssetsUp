@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsArray, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsArray } from 'class-validator';
 
 export class CreateAssetDto {
   @IsString()

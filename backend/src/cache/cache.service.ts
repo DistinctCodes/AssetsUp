@@ -12,7 +12,9 @@ export class CacheService {
     try {
       return await this.cacheManager.get<T>(key);
     } catch (error) {
-      this.logger.warn(`Failed to fetch key "${key}" from cache: ${error.message}`);
+      this.logger.warn(
+        `Failed to fetch key "${key}" from cache: ${error.message}`,
+      );
       return null; // Graceful fallback
     }
   }
@@ -22,7 +24,9 @@ export class CacheService {
       // Pass configurations safely matching your cache-manager library specification
       await this.cacheManager.set(key, value, ttl);
     } catch (error) {
-      this.logger.warn(`Failed to set key "${key}" into cache: ${error.message}`);
+      this.logger.warn(
+        `Failed to set key "${key}" into cache: ${error.message}`,
+      );
     }
   }
 
@@ -30,7 +34,9 @@ export class CacheService {
     try {
       await this.cacheManager.del(key);
     } catch (error) {
-      this.logger.warn(`Failed to delete key "${key}" from cache: ${error.message}`);
+      this.logger.warn(
+        `Failed to delete key "${key}" from cache: ${error.message}`,
+      );
     }
   }
 }

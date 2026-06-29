@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Tree, TreeParent, TreeChildren } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Tree,
+  TreeParent,
+  TreeChildren,
+} from 'typeorm';
 
 @Entity('departments')
 @Tree('closure-table')

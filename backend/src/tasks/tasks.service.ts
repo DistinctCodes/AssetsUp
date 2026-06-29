@@ -21,15 +21,21 @@ export class TasksService {
   @Cron(CronExpression.EVERY_WEEKDAY)
   async sendDepartmentAssetSummaries() {
     this.logger.log('Starting daily department asset summary task');
-    const departments = await this.departmentRepository.find({ relations: ['children'] });
+    const departments = await this.departmentRepository.find({
+      relations: ['children'],
+    });
     for (const dept of departments) {
       const [assets, total] = await this.assetRepository.findAndCount({
         where: { departmentId: dept.id },
       });
-      const active = assets.filter(a => a.status === 'ACTIVE').length;
-      const assigned = assets.filter(a => a.status === 'ASSIGNED').length;
-      const maintenance = assets.filter(a => a.status === 'MAINTENANCE').length;
-      this.logger.log(`Department ${dept.name}: ${total} assets (${active} active, ${assigned} assigned, ${maintenance} maintenance)`);
+      const active = assets.filter((a) => a.status === 'ACTIVE').length;
+      const assigned = assets.filter((a) => a.status === 'ASSIGNED').length;
+      const maintenance = assets.filter(
+        (a) => a.status === 'MAINTENANCE',
+      ).length;
+      this.logger.log(
+        `Department ${dept.name}: ${total} assets (${active} active, ${assigned} assigned, ${maintenance} maintenance)`,
+      );
     }
     this.logger.log('Daily department asset summary task completed');
   }

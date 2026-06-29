@@ -10,7 +10,12 @@ export class ReportingService {
     private readonly assetRepository: Repository<Asset>,
   ) {}
 
-  async getAssetSummary(): Promise<{ total: number; byStatus: Record<string, number>; byCondition: Record<string, number>; totalValue: number }> {
+  async getAssetSummary(): Promise<{
+    total: number;
+    byStatus: Record<string, number>;
+    byCondition: Record<string, number>;
+    totalValue: number;
+  }> {
     const assets = await this.assetRepository.find();
     const total = assets.length;
     const byStatus: Record<string, number> = {};
@@ -23,10 +28,17 @@ export class ReportingService {
       totalValue += Number(asset.purchasePrice) || 0;
     }
 
-    return { total, byStatus, byCondition, totalValue: Math.round(totalValue * 100) / 100 };
+    return {
+      total,
+      byStatus,
+      byCondition,
+      totalValue: Math.round(totalValue * 100) / 100,
+    };
   }
 
-  async getDepartmentReport(): Promise<{ departmentId: string; assetCount: number; totalValue: number }[]> {
+  async getDepartmentReport(): Promise<
+    { departmentId: string; assetCount: number; totalValue: number }[]
+  > {
     return this.assetRepository
       .createQueryBuilder('asset')
       .select('asset.departmentId', 'departmentId')
@@ -36,7 +48,9 @@ export class ReportingService {
       .getRawMany();
   }
 
-  async getCategoryReport(): Promise<{ categoryId: string; assetCount: number; totalValue: number }[]> {
+  async getCategoryReport(): Promise<
+    { categoryId: string; assetCount: number; totalValue: number }[]
+  > {
     return this.assetRepository
       .createQueryBuilder('asset')
       .select('asset.categoryId', 'categoryId')
@@ -46,7 +60,9 @@ export class ReportingService {
       .getRawMany();
   }
 
-  async getValueOverTime(): Promise<{ date: string; totalValue: number; assetCount: number }[]> {
+  async getValueOverTime(): Promise<
+    { date: string; totalValue: number; assetCount: number }[]
+  > {
     return this.assetRepository
       .createQueryBuilder('asset')
       .select("DATE_TRUNC('month', asset.createdAt)", 'date')

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsEnum, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class AssetListQueryDto {
