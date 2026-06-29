@@ -10,8 +10,20 @@ export class EmailProcessor {
   constructor(private readonly mailService: MailService) {}
 
   @Process('send')
-  async handleSend(job: Job<{ to: string; subject: string; template: string; context: Record<string, any> }>) {
+  async handleSend(
+    job: Job<{
+      to: string;
+      subject: string;
+      template: string;
+      context: Record<string, any>;
+    }>,
+  ) {
     this.logger.log(`Processing email job #${job.id} to ${job.data.to}`);
-    await this.mailService.sendTemplateEmail(job.data.to, job.data.subject, job.data.template, job.data.context);
+    await this.mailService.sendTemplateEmail(
+      job.data.to,
+      job.data.subject,
+      job.data.template,
+      job.data.context,
+    );
   }
 }

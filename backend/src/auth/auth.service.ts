@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -57,7 +61,8 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
-    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    const _tokenHash = await bcrypt.hash(refreshToken, 10);
+    void _tokenHash;
     const tokens = await this.refreshTokenRepository.find({
       where: { revokedAt: null },
       relations: ['user'],
@@ -113,7 +118,10 @@ export class AuthService {
     });
     await this.tokenRepository.save(resetToken);
 
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
+    const frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
     const resetLink = `${frontendUrl}/auth/reset-password?token=${resetToken.id}.${rawToken}`;
 
     await this.mailService.sendPasswordResetEmail(email, resetLink);
@@ -126,19 +134,27 @@ export class AuthService {
     }
     const [tokenId, rawToken] = parts;
 
-    const resetToken = await this.tokenRepository.findOne({ where: { id: tokenId } });
+    const resetToken = await this.tokenRepository.findOne({
+      where: { id: tokenId },
+    });
 
     if (!resetToken) {
-      throw new BadRequestException('Token not found, expired, or already used');
+      throw new BadRequestException(
+        'Token not found, expired, or already used',
+      );
     }
 
     if (resetToken.usedAt || resetToken.expiresAt < new Date()) {
-      throw new BadRequestException('Token not found, expired, or already used');
+      throw new BadRequestException(
+        'Token not found, expired, or already used',
+      );
     }
 
     const isValid = await bcrypt.compare(rawToken, resetToken.tokenHash);
     if (!isValid) {
-      throw new BadRequestException('Token not found, expired, or already used');
+      throw new BadRequestException(
+        'Token not found, expired, or already used',
+      );
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
@@ -154,7 +170,9 @@ export class AuthService {
 
     if (user) {
       if (!user.googleId) {
-        user = await this.usersService.update(user.id, { googleId: profile.id });
+        user = await this.usersService.update(user.id, {
+          googleId: profile.id,
+        });
       }
     } else {
       user = await this.usersService.create({

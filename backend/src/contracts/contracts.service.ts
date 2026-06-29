@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -16,23 +16,29 @@ export class ContractsService {
     private readonly contractRepository: Repository<Contract>,
     private readonly configService: ConfigService,
   ) {
-    this.nextNumber = parseInt(configService.get<string>('CONTRACT_ID_START', '500'), 10);
+    this.nextNumber = parseInt(
+      configService.get<string>('CONTRACT_ID_START', '500'),
+      10,
+    );
   }
 
-  async create(dto: CreateContractDto, userId?: string): Promise<Contract> {
+  async create(dto: CreateContractDto, _userId?: string): Promise<Contract> {
     const prefix = this.configService.get<string>('CONTRACT_ID_PREFIX', 'CTR');
     const contractId = `${prefix}-${this.nextNumber++}`;
     const contract = this.contractRepository.create({
       ...dto,
       contractId,
-      createdById: userId,
+      createdById: _userId,
     });
     return this.contractRepository.save(contract);
   }
 
-  async findAll(query: ContractQueryDto): Promise<{ data: Contract[]; total: number }> {
+  async findAll(
+    query: ContractQueryDto,
+  ): Promise<{ data: Contract[]; total: number }> {
     const { search, status, vendor, assignedToId, page, limit } = query;
-    const qb = this.contractRepository.createQueryBuilder('contract')
+    const qb = this.contractRepository
+      .createQueryBuilder('contract')
       .leftJoinAndSelect('contract.createdBy', 'createdBy')
       .leftJoinAndSelect('contract.assignedTo', 'assignedTo');
 
@@ -43,8 +49,10 @@ export class ContractsService {
       );
     }
     if (status) qb.andWhere('contract.status = :status', { status });
-    if (vendor) qb.andWhere('contract.vendor ILIKE :vendor', { vendor: `%${vendor}%` });
-    if (assignedToId) qb.andWhere('contract.assignedToId = :assignedToId', { assignedToId });
+    if (vendor)
+      qb.andWhere('contract.vendor ILIKE :vendor', { vendor: `%${vendor}%` });
+    if (assignedToId)
+      qb.andWhere('contract.assignedToId = :assignedToId', { assignedToId });
 
     qb.orderBy('contract.createdAt', 'DESC');
     qb.skip((page - 1) * limit).take(limit);
@@ -60,7 +68,11 @@ export class ContractsService {
     return contract;
   }
 
-  async update(id: string, dto: UpdateContractDto, userId?: string): Promise<Contract> {
+  async update(
+    id: string,
+    dto: UpdateContractDto,
+    _userId?: string,
+  ): Promise<Contract> {
     const contract = await this.findById(id);
     Object.assign(contract, dto);
     return this.contractRepository.save(contract);

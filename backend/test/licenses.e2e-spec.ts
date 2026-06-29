@@ -20,9 +20,7 @@ describe('Licenses (e2e)', () => {
   });
 
   it('GET /api/licenses returns 401 without auth', () => {
-    return request(app.getHttpServer())
-      .get('/api/licenses')
-      .expect(401);
+    return request(app.getHttpServer()).get('/api/licenses').expect(401);
   });
 
   it('POST /api/licenses returns 401 without auth', () => {

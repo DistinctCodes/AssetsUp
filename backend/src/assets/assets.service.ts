@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Asset } from './asset.entity';
 import { CreateAssetDto } from './dtos/create-asset.dto';
@@ -18,7 +18,10 @@ export class AssetsService {
     private readonly assetRepository: Repository<Asset>,
     private readonly configService: ConfigService,
   ) {
-    this.nextAssetNumber = parseInt(configService.get<string>('ASSET_ID_START', '1000'), 10);
+    this.nextAssetNumber = parseInt(
+      configService.get<string>('ASSET_ID_START', '1000'),
+      10,
+    );
   }
 
   async create(dto: CreateAssetDto, userId?: string): Promise<Asset> {
@@ -35,8 +38,21 @@ export class AssetsService {
   }
 
   async findAll(query: AssetListQueryDto): Promise<PaginatedResponse<Asset>> {
-    const { search, status, condition, categoryId, departmentId, assignedToId, location, sortBy, sortOrder, page, limit } = query;
-    const qb = this.assetRepository.createQueryBuilder('asset')
+    const {
+      search,
+      status,
+      condition,
+      categoryId,
+      departmentId,
+      assignedToId,
+      location,
+      sortBy,
+      sortOrder,
+      page,
+      limit,
+    } = query;
+    const qb = this.assetRepository
+      .createQueryBuilder('asset')
       .leftJoinAndSelect('asset.assignedTo', 'assignedTo')
       .leftJoinAndSelect('asset.createdBy', 'createdBy')
       .leftJoinAndSelect('asset.updatedBy', 'updatedBy');
@@ -49,13 +65,29 @@ export class AssetsService {
     }
     if (status) qb.andWhere('asset.status = :status', { status });
     if (condition) qb.andWhere('asset.condition = :condition', { condition });
-    if (categoryId) qb.andWhere('asset.categoryId = :categoryId', { categoryId });
-    if (departmentId) qb.andWhere('asset.departmentId = :departmentId', { departmentId });
-    if (assignedToId) qb.andWhere('asset.assignedToId = :assignedToId', { assignedToId });
-    if (location) qb.andWhere('asset.location ILIKE :location', { location: `%${location}%` });
+    if (categoryId)
+      qb.andWhere('asset.categoryId = :categoryId', { categoryId });
+    if (departmentId)
+      qb.andWhere('asset.departmentId = :departmentId', { departmentId });
+    if (assignedToId)
+      qb.andWhere('asset.assignedToId = :assignedToId', { assignedToId });
+    if (location)
+      qb.andWhere('asset.location ILIKE :location', {
+        location: `%${location}%`,
+      });
 
-    const allowedSortFields = ['name', 'assetId', 'status', 'condition', 'createdAt', 'updatedAt', 'purchaseDate', 'purchasePrice'];
-    const sortField = sortBy && allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const allowedSortFields = [
+      'name',
+      'assetId',
+      'status',
+      'condition',
+      'createdAt',
+      'updatedAt',
+      'purchaseDate',
+      'purchasePrice',
+    ];
+    const sortField =
+      sortBy && allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
     qb.orderBy(`asset.${sortField}`, sortOrder || 'DESC');
 
     qb.skip((page - 1) * limit).take(limit);
@@ -81,7 +113,11 @@ export class AssetsService {
     return asset;
   }
 
-  async update(id: string, dto: UpdateAssetDto, userId?: string): Promise<Asset> {
+  async update(
+    id: string,
+    dto: UpdateAssetDto,
+    userId?: string,
+  ): Promise<Asset> {
     const asset = await this.findById(id);
     Object.assign(asset, dto);
     if (userId) asset.updatedById = userId;
@@ -93,14 +129,26 @@ export class AssetsService {
     await this.assetRepository.softDelete(asset.id);
   }
 
-  async updateStatus(id: string, dto: UpdateStatusDto, userId?: string): Promise<Asset> {
+  async updateStatus(
+    id: string,
+    dto: UpdateStatusDto,
+    userId?: string,
+  ): Promise<Asset> {
     const asset = await this.findById(id);
     asset.status = dto.status;
     asset.updatedById = userId;
     return this.assetRepository.save(asset);
   }
 
-  async dispose(id: string, dto: { disposalMethod?: string; disposalReason?: string; disposalApprovedById?: string }, userId?: string): Promise<Asset> {
+  async dispose(
+    id: string,
+    dto: {
+      disposalMethod?: string;
+      disposalReason?: string;
+      disposalApprovedById?: string;
+    },
+    userId?: string,
+  ): Promise<Asset> {
     const asset = await this.findById(id);
     asset.status = 'DISPOSED';
     asset.disposalDate = new Date().toISOString().split('T')[0];

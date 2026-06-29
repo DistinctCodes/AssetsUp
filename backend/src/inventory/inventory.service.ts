@@ -14,26 +14,40 @@ export class InventoryService {
   ) {}
 
   async create(dto: CreateInventoryDto): Promise<Inventory> {
-    const totalValue = dto.quantity && dto.unitPrice ? dto.quantity * dto.unitPrice : 0;
+    const totalValue =
+      dto.quantity && dto.unitPrice ? dto.quantity * dto.unitPrice : 0;
     const item = this.inventoryRepository.create({ ...dto, totalValue });
     return this.inventoryRepository.save(item);
   }
 
-  async findAll(query: InventoryQueryDto): Promise<{ data: Inventory[]; total: number }> {
-    const { page = 1, limit = 20, categoryId, location, search, lowStock } = query;
-    const qb = this.inventoryRepository.createQueryBuilder('item')
+  async findAll(
+    query: InventoryQueryDto,
+  ): Promise<{ data: Inventory[]; total: number }> {
+    const {
+      page = 1,
+      limit = 20,
+      categoryId,
+      location,
+      search,
+      lowStock,
+    } = query;
+    const qb = this.inventoryRepository
+      .createQueryBuilder('item')
       .leftJoinAndSelect('item.asset', 'asset')
       .skip((page - 1) * limit)
       .take(limit)
       .orderBy('item.createdAt', 'DESC');
 
-    if (categoryId) qb.andWhere('item.categoryId = :categoryId', { categoryId });
-    if (location) qb.andWhere('item.location ILIKE :location', { location: `%${location}%` });
+    if (categoryId)
+      qb.andWhere('item.categoryId = :categoryId', { categoryId });
+    if (location)
+      qb.andWhere('item.location ILIKE :location', {
+        location: `%${location}%`,
+      });
     if (search) {
-      qb.andWhere(
-        '(item.notes ILIKE :search OR item.location ILIKE :search)',
-        { search: `%${search}%` },
-      );
+      qb.andWhere('(item.notes ILIKE :search OR item.location ILIKE :search)', {
+        search: `%${search}%`,
+      });
     }
     if (lowStock) {
       qb.andWhere('item.quantity <= item.reorderLevel');
@@ -56,7 +70,8 @@ export class InventoryService {
     const item = await this.findById(id);
     Object.assign(item, dto);
     if (dto.quantity !== undefined || dto.unitPrice !== undefined) {
-      item.totalValue = (dto.quantity ?? item.quantity) * (dto.unitPrice ?? item.unitPrice);
+      item.totalValue =
+        (dto.quantity ?? item.quantity) * (dto.unitPrice ?? item.unitPrice);
     }
     return this.inventoryRepository.save(item);
   }

@@ -34,7 +34,7 @@ describe('Locations (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ name: 'Main Office', city: 'New York' })
         .expect(201)
-        .then(res => {
+        .then((res) => {
           locationId = res.body.data?.id || res.body.id;
         });
     });

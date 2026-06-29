@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { VendorsService } from './vendors.service';
 import { CreateVendorDto } from './dtos/create-vendor.dto';
@@ -15,7 +25,15 @@ export class VendorsController {
   }
 
   @Get()
-  async findAll(@Query() query: { page?: number; limit?: number; isActive?: boolean; search?: string }) {
+  async findAll(
+    @Query()
+    query: {
+      page?: number;
+      limit?: number;
+      isActive?: boolean;
+      search?: string;
+    },
+  ) {
     return this.vendorsService.findAll(query);
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { License } from './entities/license.entity';
@@ -13,19 +13,22 @@ export class LicensesService {
     private readonly licenseRepository: Repository<License>,
   ) {}
 
-  async create(dto: CreateLicenseDto, userId?: string): Promise<License> {
+  async create(dto: CreateLicenseDto, _userId?: string): Promise<License> {
     const licenseKey = `LIC-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const license = this.licenseRepository.create({
       ...dto,
       licenseKey,
-      createdById: userId,
+      createdById: _userId,
     });
     return this.licenseRepository.save(license);
   }
 
-  async findAll(query: LicenseQueryDto): Promise<{ data: License[]; total: number }> {
+  async findAll(
+    query: LicenseQueryDto,
+  ): Promise<{ data: License[]; total: number }> {
     const { search, status, vendor, page, limit } = query;
-    const qb = this.licenseRepository.createQueryBuilder('license')
+    const qb = this.licenseRepository
+      .createQueryBuilder('license')
       .leftJoinAndSelect('license.assignedTo', 'assignedTo')
       .leftJoinAndSelect('license.createdBy', 'createdBy');
 
@@ -36,7 +39,8 @@ export class LicensesService {
       );
     }
     if (status) qb.andWhere('license.status = :status', { status });
-    if (vendor) qb.andWhere('license.vendor ILIKE :vendor', { vendor: `%${vendor}%` });
+    if (vendor)
+      qb.andWhere('license.vendor ILIKE :vendor', { vendor: `%${vendor}%` });
 
     qb.orderBy('license.createdAt', 'DESC');
     qb.skip((page - 1) * limit).take(limit);
@@ -52,7 +56,11 @@ export class LicensesService {
     return license;
   }
 
-  async update(id: string, dto: UpdateLicenseDto, userId?: string): Promise<License> {
+  async update(
+    id: string,
+    dto: UpdateLicenseDto,
+    _userId?: string,
+  ): Promise<License> {
     const license = await this.findById(id);
     Object.assign(license, dto);
     return this.licenseRepository.save(license);

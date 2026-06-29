@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, Req, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  Req,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ContractsService } from './contracts.service';
@@ -16,13 +29,13 @@ export class ContractsController {
   ) {}
 
   @Post()
-  async create(@Body() dto: CreateContractDto, @Req() req: any) {
-    return this.contractsService.create(dto, req.user?.id);
+  async create(@Body() dto: CreateContractDto, @Req() _req: any) {
+    return this.contractsService.create(dto, _req.user?.id);
   }
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  async upload(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+  async upload(@UploadedFile() file: Express.Multer.File, @Req() _req: any) {
     const key = `contracts/${Date.now()}-${file.originalname}`;
     await this.storageService.upload(file, key);
     const url = await this.storageService.getSignedUrl(key);
@@ -40,8 +53,12 @@ export class ContractsController {
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateContractDto, @Req() req: any) {
-    return this.contractsService.update(id, dto, req.user?.id);
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateContractDto,
+    @Req() _req: any,
+  ) {
+    return this.contractsService.update(id, dto, _req.user?.id);
   }
 
   @Delete(':id')

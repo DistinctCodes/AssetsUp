@@ -17,14 +17,23 @@ export class VendorsService {
     return this.vendorRepository.save(vendor);
   }
 
-  async findAll(query: { page?: number; limit?: number; isActive?: boolean; search?: string } = {}): Promise<{ data: Vendor[]; total: number }> {
+  async findAll(
+    query: {
+      page?: number;
+      limit?: number;
+      isActive?: boolean;
+      search?: string;
+    } = {},
+  ): Promise<{ data: Vendor[]; total: number }> {
     const { page = 1, limit = 20, isActive, search } = query;
-    const qb = this.vendorRepository.createQueryBuilder('vendor')
+    const qb = this.vendorRepository
+      .createQueryBuilder('vendor')
       .skip((page - 1) * limit)
       .take(limit)
       .orderBy('vendor.createdAt', 'DESC');
 
-    if (isActive !== undefined) qb.andWhere('vendor.isActive = :isActive', { isActive });
+    if (isActive !== undefined)
+      qb.andWhere('vendor.isActive = :isActive', { isActive });
     if (search) {
       qb.andWhere(
         '(vendor.name ILIKE :search OR vendor.email ILIKE :search OR vendor.contactPerson ILIKE :search)',
