@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
-import { Menu, User, ChevronDown } from "lucide-react";
+import { Menu, User, ChevronDown, Search } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
 const pageTitles: Record<string, string> = {
@@ -23,9 +23,10 @@ function getPageTitle(pathname: string): string {
 
 interface TopbarProps {
   onMenuClick?: () => void;
+  onSearchClick?: () => void;
 }
 
-export function Topbar({ onMenuClick }: TopbarProps) {
+export function Topbar({ onMenuClick, onSearchClick }: TopbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
@@ -69,56 +70,69 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         </h1>
       </div>
 
-      {/* Right: user dropdown */}
-      <div className="relative" ref={dropdownRef}>
+      {/* Right: search + user dropdown */}
+      <div className="flex items-center gap-4">
         <button
-          onClick={() => setDropdownOpen((v) => !v)}
-          className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+          onClick={onSearchClick}
+          className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
         >
-          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-            {user ? (
-              <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-                {initials}
-              </span>
-            ) : (
-              <User size={15} className="text-gray-500 dark:text-gray-400" />
-            )}
-          </div>
-          {user && (
-            <div className="hidden sm:block text-left">
-              <p className="text-sm font-medium text-gray-900 dark:text-white leading-none">
-                {user.firstName} {user.lastName}
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 capitalize">
-                {user.role}
-              </p>
-            </div>
-          )}
-          <ChevronDown
-            size={14}
-            className="text-gray-400 dark:text-gray-500 hidden sm:block"
-          />
+          <Search size={18} />
+          <span className="hidden md:inline">Search...</span>
+          <kbd className="hidden md:inline h-5 px-1.5 text-xs font-medium text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded">
+            ⌘K
+          </kbd>
         </button>
 
-        {dropdownOpen && (
-          <div className="absolute right-0 mt-2 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md py-1 z-50">
-            <button
-              onClick={() => {
-                setDropdownOpen(false);
-                router.push("/settings");
-              }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              View Profile
-            </button>
-            <button
-              onClick={handleLogout}
-              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              Logout
-            </button>
-          </div>
-        )}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setDropdownOpen((v) => !v)}
+            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+          >
+            <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+              {user ? (
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                  {initials}
+                </span>
+              ) : (
+                <User size={15} className="text-gray-500 dark:text-gray-400" />
+              )}
+            </div>
+            {user && (
+              <div className="hidden sm:block text-left">
+                <p className="text-sm font-medium text-gray-900 dark:text-white leading-none">
+                  {user.firstName} {user.lastName}
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 capitalize">
+                  {user.role}
+                </p>
+              </div>
+            )}
+            <ChevronDown
+              size={14}
+              className="text-gray-400 dark:text-gray-500 hidden sm:block"
+            />
+          </button>
+
+          {dropdownOpen && (
+            <div className="absolute right-0 mt-2 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md py-1 z-50">
+              <button
+                onClick={() => {
+                  setDropdownOpen(false);
+                  router.push("/settings");
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                View Profile
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
