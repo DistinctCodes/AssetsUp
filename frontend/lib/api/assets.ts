@@ -266,4 +266,14 @@ export const assetApiClient = {
 
   getPendingDisposals: (): Promise<DisposalRequest[]> =>
     api.get<DisposalRequest[]>("/assets/disposals/pending").then((r) => r.data),
+
+  importAssets: (file: File): Promise<any> => {
+    const form = new FormData();
+    form.append("file", file);
+    return api
+      .post("/assets/import", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
 };
