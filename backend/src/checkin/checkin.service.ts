@@ -9,6 +9,11 @@ import { CheckinRecord } from './checkin.entity';
 import { Asset } from '../assets/entities/asset.entity';
 import { CheckoutDto } from './dtos/checkout.dto';
 import { CheckinDto } from './dtos/checkin.dto';
+import {
+  NotificationDispatchService,
+  DispatchNotificationDto,
+} from '../notifications/notification-dispatch.service';
+import { NotificationEvent } from '../notifications/enums/notification-event.enum';
 
 @Injectable()
 export class CheckinService {
@@ -17,6 +22,7 @@ export class CheckinService {
     private readonly checkinRepository: Repository<CheckinRecord>,
     @InjectRepository(Asset)
     private readonly assetRepository: Repository<Asset>,
+    private readonly notificationDispatchService: NotificationDispatchService,
   ) {}
 
   async checkout(dto: CheckoutDto, userId?: string): Promise<CheckinRecord> {
@@ -86,5 +92,52 @@ export class CheckinService {
       relations: ['assignedTo', 'checkedOutBy', 'checkedInBy'],
       order: { checkedOutAt: 'DESC' },
     });
+  }
+
+  async markOverdue(checkinId: string): Promise<CheckinRecord> {
+    const record = await this.checkinRepository.findOne({
+      where: { id: checkinId, status: 'CHECKED_OUT' },
+      relations: ['assignedTo'],
+    });
+    if (!record) throw new NotFoundException('Checkin record not found');
+
+    const asset = await this.assetRepository.findOne({
+      where: { id: record.assetId },
+    });
+    if (!asset) throw new NotFoundException('Asset not found');
+
+    record.status = 'OVERDUE';
+    await this.checkinRepository.save(record);
+
+    // Send notification for overdue checkout
+    const notificationDto: DispatchNotificationDto = {
+      userId: record.assignedToId,
+      event: NotificationEvent.CHECKOUT_OVERDUE,
+      title: 'Checkout Overdue',
+      message: `Asset ${asset.name} checkout is overdue.`,
+      entityType: 'Checkin',
+      entityId: checkinId,
+      metadata: {
+        assetName: asset.name,
+        assetId: asset.assetId,
+        dueDate: record.dueDate,
+        checkedOutAt: record.checkedOutAt,
+      },
+      emailTemplate: 'checkout-overdue',
+      emailSubject: `Checkout Overdue: ${asset.name}`,
+      emailContext: {
+        assetName: asset.name,
+        assetId: asset.assetId,
+        assignedTo: record.assignedTo?.email || 'Unknown',
+        dueDate: record.dueDate?.toISOString().split('T')[0],
+        daysOverdue: Math.floor(
+          (Date.now() - record.dueDate.getTime()) / (1000 * 60 * 60 * 24),
+        ),
+        checkoutLink: `${process.env.FRONTEND_URL}/checkouts/${checkinId}`,
+      },
+    };
+    await this.notificationDispatchService.dispatch(notificationDto);
+
+    return record;
   }
 }

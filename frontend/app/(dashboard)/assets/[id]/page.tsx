@@ -24,6 +24,7 @@ import {
   Lock,
   Unlock,
   ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -49,26 +50,44 @@ import {
   useTransferTokens,
   useLockTokens,
   useUnlockTokens,
+  useUpdateAssetStatus,
 } from "@/lib/query/hooks/useAsset";
-import type { MaintenanceType } from "@/lib/query/types/asset";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-  useUpdateAssetStatus,  
-} from "@/lib/query/hooks/useAsset";
-import type { AssetStatus, MaintenanceType } from "@/lib/query/types/asset";
+import type {
+  AssetStatus,
+  MaintenanceType,
+  DisposalMethod,
+} from "@/lib/query/types/asset";
+import { useCreateDisposalRequest } from "@/lib/query/hooks/useAsset";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+} from "recharts";
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
-  ACTIVE:      ["INACTIVE", "MAINTENANCE", "RETIRED"],
-  INACTIVE:    ["ACTIVE", "RETIRED"],
+  ACTIVE: ["INACTIVE", "MAINTENANCE", "RETIRED"],
+  INACTIVE: ["ACTIVE", "RETIRED"],
   MAINTENANCE: ["ACTIVE", "INACTIVE", "RETIRED"],
-  RETIRED:     [], // terminal — no transitions
+  RETIRED: [], // terminal — no transitions
 };
 
-type Tab = "overview" | "history" | "maintenance" | "documents" | "notes" | "tokens";
+type Tab =
+  | "overview"
+  | "history"
+  | "maintenance"
+  | "documents"
+  | "notes"
+  | "tokens";
 
 // ── Skeleton ────────────────────────────────────────────────────────────────
 function Skeleton({ className }: { className?: string }) {
   return (
-    <div className={`animate-pulse bg-gray-100 rounded-md ${className ?? ""}`} />
+    <div
+      className={`animate-pulse bg-gray-100 rounded-md ${className ?? ""}`}
+    />
   );
 }
 
@@ -85,7 +104,9 @@ function DetailRow({
   return (
     <div className="flex justify-between text-sm">
       <dt className="text-gray-500">{label}</dt>
-      <dd className="text-gray-900 font-medium text-right">{value || fallback}</dd>
+      <dd className="text-gray-900 font-medium text-right">
+        {value || fallback}
+      </dd>
     </div>
   );
 }
@@ -104,7 +125,9 @@ const actionColors: Record<string, string> = {
 function ActionBadge({ action }: { action: string }) {
   const cls = actionColors[action] ?? "bg-gray-100 text-gray-600";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${cls}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${cls}`}
+    >
       {action.replace(/_/g, " ")}
     </span>
   );
@@ -121,7 +144,9 @@ const maintenanceStatusColors: Record<string, string> = {
 function MaintenanceStatusBadge({ status }: { status: string }) {
   const cls = maintenanceStatusColors[status] ?? "bg-gray-100 text-gray-500";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${cls}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${cls}`}
+    >
       {status.replace(/_/g, " ")}
     </span>
   );
@@ -154,11 +179,15 @@ function ScheduleMaintenanceModal({
         </h3>
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Type
+            </label>
             <select
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as MaintenanceType })}
+              onChange={(e) =>
+                setForm({ ...form, type: e.target.value as MaintenanceType })
+              }
             >
               <option value="PREVENTIVE">Preventive</option>
               <option value="CORRECTIVE">Corrective</option>
@@ -166,24 +195,34 @@ function ScheduleMaintenanceModal({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Description
+            </label>
             <input
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Scheduled Date</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Scheduled Date
+            </label>
             <input
               type="date"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={form.scheduledDate}
-              onChange={(e) => setForm({ ...form, scheduledDate: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, scheduledDate: e.target.value })
+              }
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Notes
+            </label>
             <textarea
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               rows={2}
@@ -234,10 +273,14 @@ function UploadDocumentModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <h3 className="text-base font-semibold text-gray-900 mb-4">Upload Document</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-4">
+          Upload Document
+        </h3>
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Name (optional)</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Name (optional)
+            </label>
             <input
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={name}
@@ -245,7 +288,9 @@ function UploadDocumentModal({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">File</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              File
+            </label>
             <input
               type="file"
               className="w-full text-sm"
@@ -283,8 +328,70 @@ function TransferTokensModal({
     recipientAddress: "",
     amount: "",
   });
-  const { mutate: transfer, isPending: transferring } = useTransferTokens(assetId, {
-    onSuccess: onClose,
+  const { mutate: transfer, isPending: transferring } = useTransferTokens(
+    assetId,
+    {
+      onSuccess: onClose,
+    },
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <h3 className="text-base font-semibold text-gray-900 mb-4">
+          Transfer Tokens
+        </h3>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Recipient Stellar Address
+            </label>
+            <input
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="G..."
+              value={form.recipientAddress}
+              onChange={(e) =>
+                setForm({ ...form, recipientAddress: e.target.value })
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Amount
+            </label>
+            <input
+              type="number"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="0.00"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-5">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            className="flex-1"
+            loading={transferring}
+            disabled={!form.recipientAddress || !form.amount}
+            onClick={() =>
+              transfer({
+                recipientAddress: form.recipientAddress,
+                amount: form.amount,
+              })
+            }
+          >
+            Transfer
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ChangeStatusModal ────────────────────────────────────────────────────────
 function ChangeStatusModal({
   assetId,
@@ -296,7 +403,9 @@ function ChangeStatusModal({
   onClose: () => void;
 }) {
   const allowedTransitions = STATUS_TRANSITIONS[currentStatus] ?? [];
-  const [selectedStatus, setSelectedStatus] = useState(allowedTransitions[0] ?? "");
+  const [selectedStatus, setSelectedStatus] = useState(
+    allowedTransitions[0] ?? "",
+  );
   const [apiError, setApiError] = useState<string | null>(null);
 
   const { mutate: updateStatus, isPending } = useUpdateAssetStatus(assetId, {
@@ -312,40 +421,19 @@ function ChangeStatusModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <h3 className="text-base font-semibold text-gray-900 mb-4">Transfer Tokens</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Recipient Stellar Address</label>
-            <input
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="G..."
-              value={form.recipientAddress}
-              onChange={(e) => setForm({ ...form, recipientAddress: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Amount</label>
-            <input
-              type="number"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="0.00"
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            />
-          </div>
-        </div>
-        <div className="flex gap-3 mt-5">
-          <Button variant="outline" className="flex-1" onClick={onClose}>
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-        <h3 className="text-base font-semibold text-gray-900 mb-1">Change Asset Status</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-1">
+          Change Asset Status
+        </h3>
         <p className="text-sm text-gray-500 mb-4">
           Current status:{" "}
           <span className="font-medium text-gray-700">{currentStatus}</span>
         </p>
 
         <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-600 mb-1">New Status</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            New Status
+          </label>
           <select
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
             value={selectedStatus}
@@ -369,21 +457,131 @@ function ChangeStatusModal({
         )}
 
         <div className="flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={isPending}>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={onClose}
+            disabled={isPending}
+          >
             Cancel
           </Button>
           <Button
             className="flex-1"
-            loading={transferring}
-            disabled={!form.recipientAddress || !form.amount}
-            onClick={() => transfer({ recipientAddress: form.recipientAddress, amount: form.amount })}
-          >
-            Transfer
             loading={isPending}
             disabled={!selectedStatus}
-            onClick={() => updateStatus({ status: selectedStatus as AssetStatus })}
+            onClick={() =>
+              updateStatus({ status: selectedStatus as AssetStatus })
+            }
           >
             Confirm
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── RequestDisposalModal ─────────────────────────────────────────────────────
+function RequestDisposalModal({
+  assetId,
+  onClose,
+}: {
+  assetId: string;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState({
+    method: "" as DisposalMethod | "",
+    reason: "",
+    salePrice: "",
+  });
+  const { mutate, isPending } = useCreateDisposalRequest(assetId, {
+    onSuccess: onClose,
+  });
+
+  const handleSubmit = () => {
+    if (!form.method || !form.reason) return;
+
+    mutate({
+      method: form.method as DisposalMethod,
+      reason: form.reason,
+      salePrice:
+        form.method === "SOLD" && form.salePrice
+          ? parseFloat(form.salePrice)
+          : undefined,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <h3 className="text-base font-semibold text-gray-900 mb-4">
+          Request Asset Disposal
+        </h3>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Disposal Method
+            </label>
+            <select
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              value={form.method}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  method: e.target.value as DisposalMethod | "",
+                })
+              }
+            >
+              <option value="">Select method...</option>
+              <option value="SOLD">Sold</option>
+              <option value="DONATED">Donated</option>
+              <option value="SCRAPPED">Scrapped</option>
+              <option value="RECYCLED">Recycled</option>
+              <option value="LOST">Lost</option>
+              <option value="STOLEN">Stolen</option>
+            </select>
+          </div>
+          {form.method === "SOLD" && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Sale Price
+              </label>
+              <input
+                type="number"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                placeholder="0.00"
+                value={form.salePrice}
+                onChange={(e) =>
+                  setForm({ ...form, salePrice: e.target.value })
+                }
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Reason
+            </label>
+            <textarea
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              rows={3}
+              placeholder="Provide a reason for disposal..."
+              value={form.reason}
+              onChange={(e) => setForm({ ...form, reason: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-5">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            className="flex-1"
+            loading={isPending}
+            disabled={!form.method || !form.reason}
+            onClick={handleSubmit}
+          >
+            Submit Request
           </Button>
         </div>
       </div>
@@ -398,16 +596,19 @@ export default function AssetDetailPage() {
   const [tab, setTab] = useState<Tab>("overview");
   const [qrCodeDataUri, setQrCodeDataUri] = useState<string | null>(null);
   const [showChangeStatus, setShowChangeStatus] = useState(false);
-const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
+  const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
 
   // Confirm dialogs
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<string | null>(null);
-  const [confirmDeleteNote, setConfirmDeleteNote] = useState<string | null>(null);
+  const [confirmDeleteNote, setConfirmDeleteNote] = useState<string | null>(
+    null,
+  );
 
   // Modals
   const [showScheduleMaintenance, setShowScheduleMaintenance] = useState(false);
   const [showUploadDoc, setShowUploadDoc] = useState(false);
+  const [showRequestDisposal, setShowRequestDisposal] = useState(false);
 
   // Note form
   const [noteContent, setNoteContent] = useState("");
@@ -422,12 +623,20 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
   // Queries
   const { data: asset, isLoading } = useAsset(id);
   const { data: history = [], isLoading: historyLoading } = useAssetHistory(id);
-  const { data: maintenance = [], isLoading: maintenanceLoading } = useMaintenanceRecords(id);
-  const { data: documents = [], isLoading: documentsLoading } = useAssetDocuments(id);
+  const { data: maintenance = [], isLoading: maintenanceLoading } =
+    useMaintenanceRecords(id);
+  const { data: documents = [], isLoading: documentsLoading } =
+    useAssetDocuments(id);
   const { data: notes = [], isLoading: notesLoading } = useAssetNotes(id);
-  const { data: tokenHolders = [], isLoading: tokenHoldersLoading, refetch: refetchTokenHolders } = useTokenHolders(id);
-  const { data: tokenSummary, isLoading: tokenSummaryLoading } = useTokenSummary(id);
-  const { data: tokenLockStatus, isLoading: tokenLockStatusLoading } = useTokenLockStatus(id);
+  const {
+    data: tokenHolders = [],
+    isLoading: tokenHoldersLoading,
+    refetch: refetchTokenHolders,
+  } = useTokenHolders(id);
+  const { data: tokenSummary, isLoading: tokenSummaryLoading } =
+    useTokenSummary(id);
+  const { data: tokenLockStatus, isLoading: tokenLockStatusLoading } =
+    useTokenLockStatus(id);
 
   // Mutations
   const { mutate: deleteAsset, isPending: deletingAsset } = useDeleteAsset(id, {
@@ -435,27 +644,32 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
   });
   const { mutate: deleteDoc, isPending: deletingDoc } = useDeleteDocument(id);
   const { mutate: deleteNote, isPending: deletingNote } = useDeleteNote(id);
-  const { mutate: markComplete, isPending: markingComplete } = useUpdateMaintenanceStatus(id);
+  const { mutate: markComplete, isPending: markingComplete } =
+    useUpdateMaintenanceStatus(id);
   const { mutate: addNote, isPending: addingNote } = useCreateNote(id, {
     onSuccess: () => setNoteContent(""),
   });
-  const { mutate: transferTokens, isPending: transferringTokens } = useTransferTokens(id, {
-    onSuccess: () => {
-      setShowTransferTokens(false);
-      setTransferForm({ recipientAddress: "", amount: "" });
-      refetchTokenHolders();
-    },
-  });
+  const { mutate: transferTokens, isPending: transferringTokens } =
+    useTransferTokens(id, {
+      onSuccess: () => {
+        setShowTransferTokens(false);
+        setTransferForm({ recipientAddress: "", amount: "" });
+        refetchTokenHolders();
+      },
+    });
   const { mutate: lockTokens, isPending: lockingTokens } = useLockTokens(id, {
     onSuccess: () => {
       refetchTokenHolders();
     },
   });
-  const { mutate: unlockTokens, isPending: unlockingTokens } = useUnlockTokens(id, {
-    onSuccess: () => {
-      refetchTokenHolders();
+  const { mutate: unlockTokens, isPending: unlockingTokens } = useUnlockTokens(
+    id,
+    {
+      onSuccess: () => {
+        refetchTokenHolders();
+      },
     },
-  });
+  );
 
   // Fetch QR code when asset loads
   useEffect(() => {
@@ -473,7 +687,7 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
           reader.readAsDataURL(blob);
         }
       } catch (error) {
-        console.error('Failed to fetch QR code:', error);
+        console.error("Failed to fetch QR code:", error);
       }
     };
 
@@ -483,14 +697,14 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
   // Print handler
   const handlePrint = () => {
     if (!asset) return;
-    
+
     // Set page title to asset name
     const originalTitle = document.title;
     document.title = asset.name;
-    
+
     // Trigger print
     window.print();
-    
+
     // Restore original title
     document.title = originalTitle;
   };
@@ -559,13 +773,22 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
               <ArrowRightLeft size={14} className="mr-1.5" /> Transfer
             </Button>
             <Button
-  size="sm"
-  variant="outline"
-  disabled={STATUS_TRANSITIONS[asset.status]?.length === 0}
-  onClick={() => setShowChangeStatus(true)}
->
-  <RefreshCw size={14} className="mr-1.5" /> Update Status
-</Button>
+              size="sm"
+              variant="outline"
+              disabled={STATUS_TRANSITIONS[asset.status]?.length === 0}
+              onClick={() => setShowChangeStatus(true)}
+            >
+              <RefreshCw size={14} className="mr-1.5" /> Update Status
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-orange-600 border-orange-200 hover:bg-orange-50"
+              onClick={() => setShowRequestDisposal(true)}
+              disabled={asset.status === "RETIRED"}
+            >
+              <AlertTriangle size={14} className="mr-1.5" /> Request Disposal
+            </Button>
             <Button size="sm" variant="outline">
               <Pencil size={14} className="mr-1.5" /> Edit
             </Button>
@@ -577,11 +800,7 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
             >
               <Trash2 size={14} className="mr-1.5" /> Delete
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handlePrint}
-            >
+            <Button size="sm" variant="outline" onClick={handlePrint}>
               <Printer size={14} className="mr-1.5" /> Print
             </Button>
           </div>
@@ -608,117 +827,154 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
 
       {/* ── Overview ── */}
       {tab === "overview" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Asset Details</h2>
-            <dl className="space-y-3">
-              <DetailRow label="Asset ID" value={asset.assetId} />
-              <DetailRow label="Category" value={asset.category?.name} />
-              <DetailRow label="Department" value={asset.department?.name} />
-              <DetailRow
-                label="Assigned To"
-                value={asset.assignedTo ? asset.assignedTo.name : undefined}
-                fallback="Unassigned"
+        <div className="space-y-4">
+          {/* Pending Disposal Banner */}
+          {asset.status === "RETIRED" && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3">
+              <AlertTriangle
+                className="text-orange-600 shrink-0 mt-0.5"
+                size={20}
               />
-              <DetailRow label="Location" value={asset.location} />
-              <DetailRow label="Serial Number" value={asset.serialNumber} />
-              <DetailRow label="Manufacturer" value={asset.manufacturer} />
-              <DetailRow label="Model" value={asset.model} />
-            </dl>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Financial & Dates</h2>
-            <dl className="space-y-3">
-              <DetailRow
-                label="Purchase Price"
-                value={
-                  asset.purchasePrice != null
-                    ? `$${Number(asset.purchasePrice).toLocaleString()}`
-                    : undefined
-                }
-              />
-              <DetailRow
-                label="Current Value"
-                value={
-                  asset.currentValue != null
-                    ? `$${Number(asset.currentValue).toLocaleString()}`
-                    : undefined
-                }
-              />
-              <DetailRow
-                label="Purchase Date"
-                value={
-                  asset.purchaseDate
-                    ? format(new Date(asset.purchaseDate), "MMM d, yyyy")
-                    : undefined
-                }
-              />
-              <DetailRow
-                label="Warranty Expires"
-                value={
-                  asset.warrantyExpiration
-                    ? format(new Date(asset.warrantyExpiration), "MMM d, yyyy")
-                    : undefined
-                }
-              />
-              <DetailRow
-                label="Registered"
-                value={format(new Date(asset.createdAt), "MMM d, yyyy")}
-              />
-              <DetailRow
-                label="Last Updated"
-                value={format(new Date(asset.updatedAt), "MMM d, yyyy")}
-              />
-            </dl>
-          </div>
-
-          {/* QR Code - visible in print */}
-          {qrCodeDataUri && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5 print:border-0 print:p-0">
-              <h2 className="text-sm font-semibold text-gray-900 mb-4 print:hidden">QR Code</h2>
-              <div className="flex justify-center print:justify-start">
-                <img
-                  src={qrCodeDataUri}
-                  alt={`QR Code for ${asset.name}`}
-                  className="w-32 h-32 print:w-40 print:h-40"
-                />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-orange-900 mb-1">
+                  Asset Retired
+                </h3>
+                <p className="text-xs text-orange-700">
+                  This asset has been retired and is no longer in active use.
+                </p>
               </div>
             </div>
           )}
 
-          {(asset.tags?.length || asset.notes) && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5 lg:col-span-2">
-              {asset.tags && asset.tags.length > 0 && (
-                <div className="mb-4">
-                  <h2 className="text-sm font-semibold text-gray-900 mb-2 print:hidden">Tags</h2>
-                  <div className="flex flex-wrap gap-1.5">
-                    {asset.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-md text-xs"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {asset.notes && (
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900 mb-2 print:hidden">Notes</h2>
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{asset.notes}</p>
-                </div>
-              )}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className="text-sm font-semibold text-gray-900 mb-4">
+                Asset Details
+              </h2>
+              <dl className="space-y-3">
+                <DetailRow label="Asset ID" value={asset.assetId} />
+                <DetailRow label="Category" value={asset.category?.name} />
+                <DetailRow label="Department" value={asset.department?.name} />
+                <DetailRow
+                  label="Assigned To"
+                  value={asset.assignedTo ? asset.assignedTo.name : undefined}
+                  fallback="Unassigned"
+                />
+                <DetailRow label="Location" value={asset.location} />
+                <DetailRow label="Serial Number" value={asset.serialNumber} />
+                <DetailRow label="Manufacturer" value={asset.manufacturer} />
+                <DetailRow label="Model" value={asset.model} />
+              </dl>
             </div>
-          )}
+
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className="text-sm font-semibold text-gray-900 mb-4">
+                Financial & Dates
+              </h2>
+              <dl className="space-y-3">
+                <DetailRow
+                  label="Purchase Price"
+                  value={
+                    asset.purchasePrice != null
+                      ? `$${Number(asset.purchasePrice).toLocaleString()}`
+                      : undefined
+                  }
+                />
+                <DetailRow
+                  label="Current Value"
+                  value={
+                    asset.currentValue != null
+                      ? `$${Number(asset.currentValue).toLocaleString()}`
+                      : undefined
+                  }
+                />
+                <DetailRow
+                  label="Purchase Date"
+                  value={
+                    asset.purchaseDate
+                      ? format(new Date(asset.purchaseDate), "MMM d, yyyy")
+                      : undefined
+                  }
+                />
+                <DetailRow
+                  label="Warranty Expires"
+                  value={
+                    asset.warrantyExpiration
+                      ? format(
+                          new Date(asset.warrantyExpiration),
+                          "MMM d, yyyy",
+                        )
+                      : undefined
+                  }
+                />
+                <DetailRow
+                  label="Registered"
+                  value={format(new Date(asset.createdAt), "MMM d, yyyy")}
+                />
+                <DetailRow
+                  label="Last Updated"
+                  value={format(new Date(asset.updatedAt), "MMM d, yyyy")}
+                />
+              </dl>
+            </div>
+
+            {/* QR Code - visible in print */}
+            {qrCodeDataUri && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 print:border-0 print:p-0">
+                <h2 className="text-sm font-semibold text-gray-900 mb-4 print:hidden">
+                  QR Code
+                </h2>
+                <div className="flex justify-center print:justify-start">
+                  <img
+                    src={qrCodeDataUri}
+                    alt={`QR Code for ${asset.name}`}
+                    className="w-32 h-32 print:w-40 print:h-40"
+                  />
+                </div>
+              </div>
+            )}
+
+            {(asset.tags?.length || asset.notes) && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 lg:col-span-2">
+                {asset.tags && asset.tags.length > 0 && (
+                  <div className="mb-4">
+                    <h2 className="text-sm font-semibold text-gray-900 mb-2 print:hidden">
+                      Tags
+                    </h2>
+                    <div className="flex flex-wrap gap-1.5">
+                      {asset.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-md text-xs"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {asset.notes && (
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900 mb-2 print:hidden">
+                      Notes
+                    </h2>
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                      {asset.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* ── History ── */}
       {tab === "history" && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Change History</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">
+            Change History
+          </h2>
           {historyLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
@@ -726,7 +982,9 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
               ))}
             </div>
           ) : history.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No history recorded yet.</p>
+            <p className="text-sm text-gray-400 text-center py-8">
+              No history recorded yet.
+            </p>
           ) : (
             <ol className="relative border-l border-gray-200 ml-3 space-y-6">
               {history.map((event) => (
@@ -751,17 +1009,23 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
       {tab === "maintenance" && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900">Maintenance Records</h2>
+            <h2 className="text-sm font-semibold text-gray-900">
+              Maintenance Records
+            </h2>
             <Button size="sm" onClick={() => setShowScheduleMaintenance(true)}>
               <Plus size={14} className="mr-1.5" /> Schedule Maintenance
             </Button>
           </div>
           {maintenanceLoading ? (
             <div className="space-y-3">
-              {[1, 2].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
             </div>
           ) : maintenance.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No maintenance records.</p>
+            <p className="text-sm text-gray-400 text-center py-8">
+              No maintenance records.
+            </p>
           ) : (
             <div className="space-y-3">
               {maintenance.map((record) => (
@@ -771,27 +1035,38 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">{record.type}</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {record.type}
+                      </span>
                       <MaintenanceStatusBadge status={record.status} />
                     </div>
-                    <p className="text-sm text-gray-600">{record.description}</p>
+                    <p className="text-sm text-gray-600">
+                      {record.description}
+                    </p>
                     <p className="text-xs text-gray-400">
-                      Scheduled: {format(new Date(record.scheduledDate), "MMM d, yyyy")}
-                      {record.cost != null && ` · $${Number(record.cost).toLocaleString()}`}
+                      Scheduled:{" "}
+                      {format(new Date(record.scheduledDate), "MMM d, yyyy")}
+                      {record.cost != null &&
+                        ` · $${Number(record.cost).toLocaleString()}`}
                     </p>
                   </div>
-                  {record.status !== "COMPLETED" && record.status !== "CANCELLED" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      loading={markingComplete}
-                      onClick={() =>
-                        markComplete({ maintenanceId: record.id, status: "COMPLETED" })
-                      }
-                    >
-                      <CheckCircle size={14} className="mr-1.5" /> Mark Complete
-                    </Button>
-                  )}
+                  {record.status !== "COMPLETED" &&
+                    record.status !== "CANCELLED" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={markingComplete}
+                        onClick={() =>
+                          markComplete({
+                            maintenanceId: record.id,
+                            status: "COMPLETED",
+                          })
+                        }
+                      >
+                        <CheckCircle size={14} className="mr-1.5" /> Mark
+                        Complete
+                      </Button>
+                    )}
                 </div>
               ))}
             </div>
@@ -810,10 +1085,14 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
           </div>
           {documentsLoading ? (
             <div className="space-y-3">
-              {[1, 2].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
             </div>
           ) : documents.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No documents uploaded.</p>
+            <p className="text-sm text-gray-400 text-center py-8">
+              No documents uploaded.
+            </p>
           ) : (
             <div className="space-y-2">
               {documents.map((doc) => (
@@ -822,7 +1101,9 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
                   className="flex items-center justify-between border border-gray-100 rounded-lg px-4 py-3"
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{doc.name}</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {doc.name}
+                    </p>
                     <p className="text-xs text-gray-400">
                       {doc.type} · {(doc.size / 1024).toFixed(1)} KB ·{" "}
                       {format(new Date(doc.createdAt), "MMM d, yyyy")}
@@ -847,7 +1128,9 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
       {tab === "notes" && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">Add Note</h2>
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">
+              Add Note
+            </h2>
             <textarea
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
               rows={3}
@@ -871,10 +1154,14 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
             <h2 className="text-sm font-semibold text-gray-900 mb-4">Notes</h2>
             {notesLoading ? (
               <div className="space-y-3">
-                {[1, 2].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+                {[1, 2].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
               </div>
             ) : notes.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">No notes yet.</p>
+              <p className="text-sm text-gray-400 text-center py-8">
+                No notes yet.
+              </p>
             ) : (
               <div className="space-y-3">
                 {notes.map((note) => (
@@ -921,7 +1208,9 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <p className="text-xs text-gray-500 mb-1">Circulating Tokens</p>
               <p className="text-2xl font-bold text-gray-900">
-                {tokenSummaryLoading ? "—" : tokenSummary?.circulatingTokens || "0"}
+                {tokenSummaryLoading
+                  ? "—"
+                  : tokenSummary?.circulatingTokens || "0"}
               </p>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -933,7 +1222,11 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <p className="text-xs text-gray-500 mb-1">Token Price</p>
               <p className="text-2xl font-bold text-gray-900">
-                {tokenSummaryLoading ? "—" : tokenSummary?.tokenPrice ? `$${tokenSummary.tokenPrice.toFixed(2)}` : "N/A"}
+                {tokenSummaryLoading
+                  ? "—"
+                  : tokenSummary?.tokenPrice
+                    ? `$${tokenSummary.tokenPrice.toFixed(2)}`
+                    : "N/A"}
               </p>
             </div>
           </div>
@@ -942,11 +1235,15 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Pie Chart */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-semibold text-gray-900 mb-4">Ownership Distribution</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-4">
+                Ownership Distribution
+              </h2>
               {tokenHoldersLoading ? (
                 <Skeleton className="h-64 w-full" />
               ) : tokenHolders.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">No token holders yet.</p>
+                <p className="text-sm text-gray-400 text-center py-8">
+                  No token holders yet.
+                </p>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -958,13 +1255,18 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                      label={({ name, percent }) =>
+                        `${name}: ${((percent ?? 0) * 100).toFixed(1)}%`
+                      }
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
                     >
                       {tokenHolders.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={`hsl(${(index * 360) / tokenHolders.length}, 70%, 50%)`} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={`hsl(${(index * 360) / tokenHolders.length}, 70%, 50%)`}
+                        />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -976,19 +1278,26 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
             {/* Holders Table */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-gray-900">Token Holders</h2>
+                <h2 className="text-sm font-semibold text-gray-900">
+                  Token Holders
+                </h2>
                 <Button size="sm" onClick={() => setShowTransferTokens(true)}>
-                  <ArrowRightLeft size={14} className="mr-1.5" /> Transfer Tokens
+                  <ArrowRightLeft size={14} className="mr-1.5" /> Transfer
+                  Tokens
                 </Button>
               </div>
               {tokenHoldersLoading ? (
                 <div className="space-y-3">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
                 </div>
               ) : tokenHolders.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">No token holders yet.</p>
+                <p className="text-sm text-gray-400 text-center py-8">
+                  No token holders yet.
+                </p>
               ) : (
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                <div className="space-y-2 max-h-75 overflow-y-auto">
                   {tokenHolders.map((holder) => (
                     <div
                       key={holder.address}
@@ -996,18 +1305,23 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
                     >
                       <div className="flex items-center gap-2">
                         <a
-                          href={`https://stellar.expert/explorer/${process.env.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet'}/account/${holder.address}`}
+                          href={`https://stellar.expert/explorer/${process.env.NEXT_PUBLIC_STELLAR_NETWORK || "testnet"}/account/${holder.address}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
                         >
-                          {holder.address.slice(0, 6)}...{holder.address.slice(-4)}
+                          {holder.address.slice(0, 6)}...
+                          {holder.address.slice(-4)}
                           <ExternalLink size={12} />
                         </a>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">{holder.balance}</p>
-                        <p className="text-xs text-gray-500">{holder.percentage.toFixed(2)}%</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {holder.balance}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {holder.percentage.toFixed(2)}%
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -1020,10 +1334,17 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-gray-900">Token Lock Status</h2>
+                <h2 className="text-sm font-semibold text-gray-900">
+                  Token Lock Status
+                </h2>
                 <p className="text-xs text-gray-500 mt-1">
-                  {tokenLockStatusLoading ? "Loading..." : tokenLockStatus?.isLocked ? "Tokens are locked" : "Tokens are unlocked"}
-                  {tokenLockStatus?.lockedAt && ` since ${format(new Date(tokenLockStatus.lockedAt), "MMM d, yyyy")}`}
+                  {tokenLockStatusLoading
+                    ? "Loading..."
+                    : tokenLockStatus?.isLocked
+                      ? "Tokens are locked"
+                      : "Tokens are unlocked"}
+                  {tokenLockStatus?.lockedAt &&
+                    ` since ${format(new Date(tokenLockStatus.lockedAt), "MMM d, yyyy")}`}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -1099,15 +1420,24 @@ const [statusToastMsg, setStatusToastMsg] = useState<string | null>(null);
           onClose={() => setShowScheduleMaintenance(false)}
         />
       )}
-{showChangeStatus && (
-  <ChangeStatusModal
-    assetId={id}
-    currentStatus={asset.status}
-    onClose={() => setShowChangeStatus(false)}
-  />
-)}
+      {showChangeStatus && (
+        <ChangeStatusModal
+          assetId={id}
+          currentStatus={asset.status}
+          onClose={() => setShowChangeStatus(false)}
+        />
+      )}
       {showUploadDoc && (
-        <UploadDocumentModal assetId={id} onClose={() => setShowUploadDoc(false)} />
+        <UploadDocumentModal
+          assetId={id}
+          onClose={() => setShowUploadDoc(false)}
+        />
+      )}
+      {showRequestDisposal && (
+        <RequestDisposalModal
+          assetId={id}
+          onClose={() => setShowRequestDisposal(false)}
+        />
       )}
     </div>
   );

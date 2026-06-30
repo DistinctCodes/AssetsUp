@@ -3,18 +3,18 @@
  */
 
 export enum AssetStatus {
-  ACTIVE = 'ACTIVE',
-  ASSIGNED = 'ASSIGNED',
-  MAINTENANCE = 'MAINTENANCE',
-  RETIRED = 'RETIRED',
+  ACTIVE = "ACTIVE",
+  ASSIGNED = "ASSIGNED",
+  MAINTENANCE = "MAINTENANCE",
+  RETIRED = "RETIRED",
 }
 
 export enum AssetCondition {
-  NEW = 'NEW',
-  GOOD = 'GOOD',
-  FAIR = 'FAIR',
-  POOR = 'POOR',
-  DAMAGED = 'DAMAGED',
+  NEW = "NEW",
+  GOOD = "GOOD",
+  FAIR = "FAIR",
+  POOR = "POOR",
+  DAMAGED = "DAMAGED",
 }
 
 export interface AssetCategory {
@@ -65,13 +65,13 @@ export interface Asset {
 }
 
 export type AssetHistoryAction =
-  | 'CREATED'
-  | 'UPDATED'
-  | 'STATUS_CHANGED'
-  | 'TRANSFERRED'
-  | 'MAINTENANCE'
-  | 'NOTE_ADDED'
-  | 'DOCUMENT_UPLOADED';
+  | "CREATED"
+  | "UPDATED"
+  | "STATUS_CHANGED"
+  | "TRANSFERRED"
+  | "MAINTENANCE"
+  | "NOTE_ADDED"
+  | "DOCUMENT_UPLOADED";
 
 export interface AssetHistoryEvent {
   id: string;
@@ -95,8 +95,12 @@ export interface AssetDocument {
   createdAt: string;
 }
 
-export type MaintenanceType = 'PREVENTIVE' | 'CORRECTIVE' | 'SCHEDULED';
-export type MaintenanceStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type MaintenanceType = "PREVENTIVE" | "CORRECTIVE" | "SCHEDULED";
+export type MaintenanceStatus =
+  | "SCHEDULED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
 
 export interface MaintenanceRecord {
   id: string;
@@ -176,6 +180,8 @@ export interface TokenLockStatus {
   isLocked: boolean;
   lockedBy: string | null;
   lockedAt: string | null;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -198,4 +204,45 @@ export interface UpdateAssetInput {
   manufacturer?: string;
   model?: string;
   notes?: string;
+}
+
+// ── Asset Disposal Types ─────────────────────────────────────────────────────
+
+export enum DisposalMethod {
+  SOLD = "SOLD",
+  DONATED = "DONATED",
+  SCRAPPED = "SCRAPPED",
+  RECYCLED = "RECYCLED",
+  LOST = "LOST",
+  STOLEN = "STOLEN",
+}
+
+export enum DisposalStatus {
+  PENDING = "PENDING",
+  APPROVED = "APPROVED",
+  REJECTED = "REJECTED",
+}
+
+export interface DisposalRequest {
+  id: string;
+  assetId: string;
+  method: DisposalMethod;
+  reason: string;
+  salePrice?: number;
+  status: DisposalStatus;
+  requestedBy: AssetUser;
+  approvedBy?: AssetUser;
+  rejectionReason?: string;
+  requestedAt: string;
+  approvedAt?: string;
+  asset?: {
+    name: string;
+    assetId: string;
+  };
+}
+
+export interface CreateDisposalInput {
+  method: DisposalMethod;
+  reason: string;
+  salePrice?: number;
 }
