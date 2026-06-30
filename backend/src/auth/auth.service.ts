@@ -61,8 +61,6 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
-    const _tokenHash = await bcrypt.hash(refreshToken, 10);
-    void _tokenHash;
     const tokens = await this.refreshTokenRepository.find({
       where: { revokedAt: null },
       relations: ['user'],

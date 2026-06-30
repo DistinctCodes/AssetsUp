@@ -29,13 +29,13 @@ export class ContractsController {
   ) {}
 
   @Post()
-  async create(@Body() dto: CreateContractDto, @Req() _req: any) {
-    return this.contractsService.create(dto, _req.user?.id);
+  async create(@Body() dto: CreateContractDto, @Req() req: any) {
+    return this.contractsService.create(dto, req.user?.id);
   }
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  async upload(@UploadedFile() file: Express.Multer.File, @Req() _req: any) {
+  async upload(@UploadedFile() file: Express.Multer.File) {
     const key = `contracts/${Date.now()}-${file.originalname}`;
     await this.storageService.upload(file, key);
     const url = await this.storageService.getSignedUrl(key);
@@ -56,9 +56,9 @@ export class ContractsController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateContractDto,
-    @Req() _req: any,
+    @Req() req: any,
   ) {
-    return this.contractsService.update(id, dto, _req.user?.id);
+    return this.contractsService.update(id, dto, req.user?.id);
   }
 
   @Delete(':id')

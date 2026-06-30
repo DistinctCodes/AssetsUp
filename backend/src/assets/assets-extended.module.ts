@@ -7,6 +7,7 @@ import { MaintenanceRecord } from './entities/maintenance-record.entity';
 import { AssetsExtendedService } from './assets-extended.service';
 import { AssetsExtendedController } from './assets-extended.controller';
 import { AssetAuditController } from './asset-audit.controller';
+import { NotificationModule } from '../notifications/notification.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AssetAuditController } from './asset-audit.controller';
       AssetDocument,
       MaintenanceRecord,
     ]),
+    NotificationModule,
   ],
   controllers: [AssetsExtendedController, AssetAuditController],
   providers: [AssetsExtendedService],

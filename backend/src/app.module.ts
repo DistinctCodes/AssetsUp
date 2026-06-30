@@ -3,10 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-store';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { AcceptLanguageResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
-import * as path from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -31,6 +29,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { StellarModule } from './stellar/stellar.module';
+import { NotificationModule } from './notifications/notification.module';
 
 @Module({
   imports: [
@@ -115,6 +114,7 @@ import { StellarModule } from './stellar/stellar.module';
     NotificationsModule,
     WebhooksModule,
     StellarModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [
