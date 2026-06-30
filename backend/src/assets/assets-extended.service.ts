@@ -9,6 +9,11 @@ import { TransferAssetDto } from './dtos/transfer-asset.dto';
 import { CreateMaintenanceDto } from './dtos/create-maintenance.dto';
 import { UpdateMaintenanceDto } from './dtos/update-maintenance.dto';
 import { HistoryQueryDto } from './dtos/history-query.dto';
+import {
+  NotificationDispatchService,
+  DispatchNotificationDto,
+} from '../notifications/notification-dispatch.service';
+import { NotificationEvent } from '../notifications/enums/notification-event.enum';
 
 @Injectable()
 export class AssetsExtendedService {
@@ -21,6 +26,7 @@ export class AssetsExtendedService {
     private readonly documentRepository: Repository<AssetDocument>,
     @InjectRepository(MaintenanceRecord)
     private readonly maintenanceRepository: Repository<MaintenanceRecord>,
+    private readonly notificationDispatchService: NotificationDispatchService,
   ) {}
 
   async transfer(
@@ -55,6 +61,34 @@ export class AssetsExtendedService {
         performedById: userId,
       }),
     );
+
+    // Send notification for asset transfer
+    if (dto.assignedToId) {
+      const notificationDto: DispatchNotificationDto = {
+        userId: dto.assignedToId,
+        event: NotificationEvent.ASSET_TRANSFERRED,
+        title: 'Asset Transferred',
+        message: `Asset ${asset.name} (${asset.assetId}) has been transferred to you.`,
+        entityType: 'Asset',
+        entityId: id,
+        metadata: {
+          assetName: asset.name,
+          assetId: asset.assetId,
+          previousAssignee: previousValue.assignedToId,
+          newAssignee: dto.assignedToId,
+        },
+        emailTemplate: 'asset-transferred',
+        emailSubject: `Asset Transferred: ${asset.name}`,
+        emailContext: {
+          assetName: asset.name,
+          assetId: asset.assetId,
+          assignedTo: dto.assignedToId,
+          location: dto.location || asset.location,
+          assetLink: `${process.env.FRONTEND_URL}/assets/${id}`,
+        },
+      };
+      await this.notificationDispatchService.dispatch(notificationDto);
+    }
 
     return asset;
   }

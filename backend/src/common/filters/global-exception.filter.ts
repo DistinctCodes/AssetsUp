@@ -28,8 +28,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         : 'Internal server error';
 
     this.logger.error(
-      `${request.method} - ${request.url}`,
-      exception instanceof Error ? exception.stack : String(exception),
+      `${request.method} ${request.url} - ${exception instanceof Error ? exception.stack : String(exception)}`,
     );
 
     response.status(status).json({

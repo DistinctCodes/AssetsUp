@@ -12,11 +12,15 @@ export class CategoriesController {
   @UseInterceptors(CacheInterceptor)
   @CacheKey('categories_list_all')
   async getAllCategories() {
+    // Database retrieval execution logic goes here
     return [{ id: 1, name: 'DeFi Vaults' }];
   }
 
   @Post()
   async createCategory(@Body() _body: any) {
+    // 1. Process standard write operations to database repository context
+
+    // 2. Clear out the cached asset layout lists instantly to invalidate stale states
     await this.cacheService.del(this.CATEGORIES_CACHE_KEY);
     return { success: true };
   }

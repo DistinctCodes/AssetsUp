@@ -35,4 +35,20 @@ export class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  passwordHash?: string;
+
+  @IsOptional()
+  @IsString()
+  googleId?: string;
+
+  @IsOptional()
+  @IsString()
+  microsoftId?: string;
+
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
 }

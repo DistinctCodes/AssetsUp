@@ -1,4 +1,4 @@
-﻿import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -24,7 +24,7 @@ export class PurchaseOrdersService {
 
   async create(
     dto: CreatePurchaseOrderDto,
-    _userId?: string,
+    userId?: string,
   ): Promise<PurchaseOrder> {
     const prefix = this.configService.get<string>('PO_ID_PREFIX', 'PO');
     const poNumber = `${prefix}-${this.nextNumber++}`;
@@ -43,7 +43,7 @@ export class PurchaseOrdersService {
       poNumber,
       subtotal,
       total,
-      createdById: _userId,
+      createdById: userId,
     });
     return this.poRepository.save(po);
   }

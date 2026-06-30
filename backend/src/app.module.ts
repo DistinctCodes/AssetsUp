@@ -3,10 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-store';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { AcceptLanguageResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
-import * as path from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -30,6 +28,7 @@ import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { TasksModule } from './tasks/tasks.module';
 import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { NotificationModule } from './notifications/notification.module';
 
 @Module({
   imports: [
@@ -113,6 +112,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     DashboardModule,
     ReportsModule,
     NotificationsModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [

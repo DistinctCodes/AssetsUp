@@ -1,4 +1,4 @@
-﻿import {
+import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
@@ -105,6 +105,18 @@ export class Asset {
   @Column({ default: false })
   endOfLifeNotificationSent: boolean;
 
+  @Column({ type: 'date', nullable: true })
+  disposalDate: string;
+
+  @Column({ nullable: true })
+  disposalMethod: string;
+
+  @Column({ nullable: true, type: 'text' })
+  disposalReason: string;
+
+  @Column({ nullable: true })
+  disposalApprovedById: string;
+
   @Column({ nullable: true, type: 'text' })
   notes: string;
 
@@ -127,16 +139,4 @@ export class Asset {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @Column({ nullable: true, type: 'date' })
-  disposalDate: string;
-
-  @Column({ nullable: true })
-  disposalMethod: string;
-
-  @Column({ nullable: true, type: 'text' })
-  disposalReason: string;
-
-  @Column({ nullable: true })
-  disposalApprovedById: string;
 }
