@@ -113,15 +113,15 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {/* Bottom: Settings + Logout */}
-        <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
+        <div className="px-3 py-4 border-t border-gray-100 dark:border-gray-800 space-y-0.5">
           <Link
             href="/settings"
             onClick={onClose}
             className={clsx(
               "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
               pathname.startsWith("/settings")
-                ? "bg-gray-100 text-gray-900"
-                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50",
+                ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
+                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800",
             )}
           >
             <Settings size={17} />
@@ -129,7 +129,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </Link>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800 transition-colors"
           >
             <LogOut size={17} />
             Logout
