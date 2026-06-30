@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { CreateAssetModal } from "@/components/assets/create-asset-modal";
+import { ImportAssetModal } from "@/components/assets/import-asset-modal";
 import { ScannerModal } from "@/components/assets/ScannerModal";
 import { useAssets } from "@/lib/query/hooks/useAssets";
 import { AssetStatus, AssetCondition } from "@/lib/query/types/asset";
@@ -17,6 +18,11 @@ const STATUS_OPTIONS = ["All", ...Object.values(AssetStatus)];
 
 export default function AssetsPage() {
   const router = useRouter();
+  const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(1);
   const [showScanner, setShowScanner] = useState(false);
   const { toast } = useToast();
 
@@ -66,6 +72,14 @@ export default function AssetsPage() {
               : "No assets yet"}
           </p>
         </div>
+        <Button onClick={() => setShowImportModal(true)} variant="outline">
+          <Plus size={16} className="mr-1.5" />
+          Import Assets
+        </Button>
+        <Button onClick={() => setShowModal(true)}>
+          <Plus size={16} className="mr-1.5" />
+          Register Asset
+        </Button>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -248,6 +262,10 @@ export default function AssetsPage() {
           onSuccess={() => refetch()}
         />
       )}
+      {showImportModal && (
+        <ImportAssetModal
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => refetch()}
 
       {showScanner && (
         <ScannerModal

@@ -52,17 +52,17 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
       <aside
         className={clsx(
-          "fixed left-0 top-0 h-full w-60 bg-white border-r border-gray-200 flex flex-col z-30 transition-transform duration-200",
+          "fixed left-0 top-0 h-full w-60 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col z-30 transition-transform duration-200",
           "lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-5 py-5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-5 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-900">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-900 dark:bg-white">
               <svg
-                className="w-4 h-4 text-white"
+                className="w-4 h-4 text-white dark:text-gray-900"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -75,14 +75,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 />
               </svg>
             </div>
-            <span className="font-semibold text-gray-900 text-sm">
+            <span className="font-semibold text-gray-900 dark:text-white text-sm">
               AssetsUp
             </span>
           </div>
           {onClose && (
             <button
               onClick={onClose}
-              className="lg:hidden text-gray-400 hover:text-gray-600"
+              className="lg:hidden text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
               <X size={18} />
             </button>
@@ -101,8 +101,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 className={clsx(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   active
-                    ? "bg-gray-100 text-gray-900"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50",
+                    ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800",
                 )}
               >
                 <Icon size={17} />
@@ -113,15 +113,15 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {/* Bottom: Settings + Logout */}
-        <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
+        <div className="px-3 py-4 border-t border-gray-100 dark:border-gray-800 space-y-0.5">
           <Link
             href="/settings"
             onClick={onClose}
             className={clsx(
               "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
               pathname.startsWith("/settings")
-                ? "bg-gray-100 text-gray-900"
-                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50",
+                ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
+                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800",
             )}
           >
             <Settings size={17} />
@@ -129,7 +129,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </Link>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800 transition-colors"
           >
             <LogOut size={17} />
             Logout
