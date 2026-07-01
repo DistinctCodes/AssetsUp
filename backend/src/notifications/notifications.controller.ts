@@ -1,24 +1,38 @@
-import { Controller, Get, Patch, Param, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Post,
+  Body,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { NotificationsService } from './notifications.service';
+import { NotificationPreferenceService } from './notification-preference.service';
 
-@Controller('notifications')
+@Controller('users/me/notification-preferences')
 @UseGuards(AuthGuard('jwt'))
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(private readonly prefService: NotificationPreferenceService) {}
 
   @Get()
   findAll(@Req() req: any) {
-    return this.notificationsService.findByUser(req.user?.id);
+    return this.prefService.findByUser(req.user?.id);
   }
 
-  @Patch(':id/read')
-  markRead(@Param('id') id: string, @Req() req: any) {
-    return this.notificationsService.markRead(id, req.user?.id);
+  @Put()
+  upsertAll(
+    @Req() req: any,
+    @Body()
+    body: {
+      preferences: { channel: string; enabled: boolean; events?: string[] }[];
+    },
+  ) {
+    return this.prefService.upsertAll(req.user?.id, body.preferences);
   }
 
-  @Patch('read-all')
-  markAllRead(@Req() req: any) {
-    return this.notificationsService.markAllRead(req.user?.id);
+  @Post('reset')
+  reset(@Req() req: any) {
+    return this.prefService.reset(req.user?.id);
   }
 }

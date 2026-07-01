@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { StellarService } from './stellar.service';
-import { StellarController } from './stellar.controller';
+import { StellarDividendsController } from './stellar-dividends.controller';
+import { StellarKycController } from './stellar-kyc.controller';
 
 @Module({
   imports: [ConfigModule],
-  controllers: [StellarController],
+  controllers: [StellarDividendsController, StellarKycController],
   providers: [StellarService],
   exports: [StellarService],
 })
