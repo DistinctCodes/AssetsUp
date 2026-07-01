@@ -56,4 +56,36 @@ export class NotificationsService {
       where: { userId, isRead: false },
     });
   }
+
+  async sendToUser(
+    userId: string,
+    type: string,
+    message: string,
+  ): Promise<Notification> {
+    return this.create({
+      userId,
+      event: type as any,
+      title: type,
+      message,
+      emailTemplate: '',
+      emailSubject: '',
+      emailContext: {},
+    } as any);
+  }
+
+  async findByUser(userId: string): Promise<Notification[]> {
+    return this.findByUserId(userId);
+  }
+
+  async markRead(id: string, userId: string): Promise<Notification | null> {
+    const notification = await this.notificationRepository.findOne({
+      where: { id, userId },
+    });
+    if (!notification) return null;
+    return this.markAsRead(id);
+  }
+
+  async markAllRead(userId: string): Promise<void> {
+    return this.markAllAsRead(userId);
+  }
 }

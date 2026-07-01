@@ -26,6 +26,8 @@ import { ContractsModule } from './contracts/contracts.module';
 import { LicensesModule } from './licenses/licenses.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { TasksModule } from './tasks/tasks.module';
+import { ReportsModule } from './reports/reports.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { StellarModule } from './stellar/stellar.module';
 import { NotificationModule } from './notifications/notification.module';
@@ -110,6 +112,8 @@ import { NotificationModule } from './notifications/notification.module';
     InventoryModule,
     VendorsModule,
     DashboardModule,
+    ReportsModule,
+    NotificationsModule,
     ApiKeysModule,
     StellarModule,
     NotificationModule,
