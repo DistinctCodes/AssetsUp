@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
@@ -175,7 +175,7 @@ export class MailService {
     const render = templates[template];
     if (!render) {
       this.logger.warn(`Unknown email template: ${template}`);
-      return `<p>Email notification</p>`;
+      return `<p>Unknown template: ${template}</p>`;
     }
     return render(context);
   }

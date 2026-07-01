@@ -1,6 +1,17 @@
-import { IsEmail, IsOptional, IsString, IsBoolean } from 'class-validator';
+﻿import { IsEmail, IsOptional, IsString, IsBoolean } from 'class-validator';
 
 export class CreateUserDto {
+  @IsOptional()
+  @IsString()
+  passwordHash?: string;
+
+  @IsOptional()
+  @IsString()
+  googleId?: string;
+
+  @IsOptional()
+  @IsString()
+  microsoftId?: string;
   @IsEmail()
   email: string;
 

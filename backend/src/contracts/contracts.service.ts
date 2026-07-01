@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -22,13 +22,13 @@ export class ContractsService {
     );
   }
 
-  async create(dto: CreateContractDto, userId?: string): Promise<Contract> {
+  async create(dto: CreateContractDto, _userId?: string): Promise<Contract> {
     const prefix = this.configService.get<string>('CONTRACT_ID_PREFIX', 'CTR');
     const contractId = `${prefix}-${this.nextNumber++}`;
     const contract = this.contractRepository.create({
       ...dto,
       contractId,
-      createdById: userId,
+      createdById: _userId,
     });
     return this.contractRepository.save(contract);
   }

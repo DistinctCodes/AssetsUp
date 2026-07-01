@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { License } from './entities/license.entity';
@@ -13,12 +13,12 @@ export class LicensesService {
     private readonly licenseRepository: Repository<License>,
   ) {}
 
-  async create(dto: CreateLicenseDto, userId?: string): Promise<License> {
+  async create(dto: CreateLicenseDto, _userId?: string): Promise<License> {
     const licenseKey = `LIC-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const license = this.licenseRepository.create({
       ...dto,
       licenseKey,
-      createdById: userId,
+      createdById: _userId,
     });
     return this.licenseRepository.save(license);
   }
