@@ -5,10 +5,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { User, Lock, CheckCircle, Palette } from "lucide-react";
+import { User, Lock, CheckCircle } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { useUpdateProfile } from "@/lib/query/hooks/useUsers";
-import { ThemeSettings } from "@/components/settings/theme-settings";
 
 // ── Profile schema ──────────────────────────────────────────────
 const profileSchema = z.object({
@@ -74,21 +73,21 @@ export default function SettingsPage() {
     <div className="max-w-2xl">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+        <p className="text-sm text-gray-500 mt-1">
           Manage your profile and account preferences
         </p>
       </div>
 
       {/* Profile section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-5">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-8 h-8 rounded-full bg-gray-900 dark:bg-gray-700 text-white flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center flex-shrink-0">
             <User size={15} />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Profile</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Update your display name</p>
+            <h2 className="text-sm font-semibold text-gray-900">Profile</h2>
+            <p className="text-xs text-gray-500">Update your display name</p>
           </div>
         </div>
 
@@ -98,12 +97,12 @@ export default function SettingsPage() {
         >
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 First name
               </label>
               <input
                 {...profileForm.register("firstName")}
-                className="w-full px-3 py-2 text-sm bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
               />
               {profileForm.formState.errors.firstName && (
                 <p className="text-xs text-red-500 mt-1">
@@ -112,12 +111,12 @@ export default function SettingsPage() {
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 Last name
               </label>
               <input
                 {...profileForm.register("lastName")}
-                className="w-full px-3 py-2 text-sm bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
               />
               {profileForm.formState.errors.lastName && (
                 <p className="text-xs text-red-500 mt-1">
@@ -129,23 +128,23 @@ export default function SettingsPage() {
 
           {/* Email (read-only) */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               Email address
             </label>
             <input
               type="email"
               value={user?.email ?? ""}
               disabled
-              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed"
             />
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            <p className="text-xs text-gray-400 mt-1">
               Email cannot be changed.
             </p>
           </div>
 
           {/* Role (read-only) */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               Role
             </label>
             <input
@@ -155,7 +154,7 @@ export default function SettingsPage() {
                   : ""
               }
               disabled
-              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed"
             />
           </div>
 
@@ -163,18 +162,18 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={updateProfile.isPending}
-              className="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+              className="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {updateProfile.isPending ? "Saving…" : "Save changes"}
             </button>
             {profileSaved && (
-              <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+              <span className="flex items-center gap-1.5 text-xs text-green-600">
                 <CheckCircle size={13} />
                 Saved successfully
               </span>
             )}
             {updateProfile.isError && (
-              <span className="text-xs text-red-500 dark:text-red-400">
+              <span className="text-xs text-red-500">
                 Failed to save. Try again.
               </span>
             )}
@@ -182,31 +181,17 @@ export default function SettingsPage() {
         </form>
       </div>
 
-      {/* Appearance section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-5">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center flex-shrink-0">
-            <Palette size={15} />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Appearance</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Choose your preferred theme</p>
-          </div>
-        </div>
-        <ThemeSettings />
-      </div>
-
       {/* Password section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center flex-shrink-0">
             <Lock size={15} />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-sm font-semibold text-gray-900">
               Change Password
             </h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-gray-500">
               Choose a strong password (min. 8 characters)
             </p>
           </div>
@@ -216,56 +201,52 @@ export default function SettingsPage() {
           onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
           className="space-y-4"
         >
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                New password
-              </label>
-              <input
-                type="password"
-                {...passwordForm.register("password")}
-                className="w-full px-3 py-2 text-sm bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
-              />
-              {passwordForm.formState.errors.password && (
-                <p className="text-xs text-red-500 mt-1">
-                  {passwordForm.formState.errors.password.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Confirm password
-              </label>
-              <input
-                type="password"
-                {...passwordForm.register("confirmPassword")}
-                className="w-full px-3 py-2 text-sm bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
-              />
-              {passwordForm.formState.errors.confirmPassword && (
-                <p className="text-xs text-red-500 mt-1">
-                  {passwordForm.formState.errors.confirmPassword.message}
-                </p>
-              )}
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              New password
+            </label>
+            <input
+              {...passwordForm.register("password")}
+              type="password"
+              placeholder="••••••••"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+            {passwordForm.formState.errors.password && (
+              <p className="text-xs text-red-500 mt-1">
+                {passwordForm.formState.errors.password.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Confirm new password
+            </label>
+            <input
+              {...passwordForm.register("confirmPassword")}
+              type="password"
+              placeholder="••••••••"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+            {passwordForm.formState.errors.confirmPassword && (
+              <p className="text-xs text-red-500 mt-1">
+                {passwordForm.formState.errors.confirmPassword.message}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-3 pt-1">
             <button
               type="submit"
               disabled={updateProfile.isPending}
-              className="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+              className="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {updateProfile.isPending ? "Saving…" : "Save password"}
+              {updateProfile.isPending ? "Updating…" : "Update password"}
             </button>
             {passwordSaved && (
-              <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+              <span className="flex items-center gap-1.5 text-xs text-green-600">
                 <CheckCircle size={13} />
-                Saved successfully
-              </span>
-            )}
-            {updateProfile.isError && (
-              <span className="text-xs text-red-500 dark:text-red-400">
-                Failed to save. Try again.
+                Password updated
               </span>
             )}
           </div>

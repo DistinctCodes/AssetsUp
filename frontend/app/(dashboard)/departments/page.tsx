@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Plus, Trash2, Building2, Tag, Package } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useState } from 'react';
+import { Plus, Trash2, Building2, Tag, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   useDepartmentsList,
   useCreateDepartment,
@@ -12,47 +12,35 @@ import {
   useCategories,
   useCreateCategory,
   useDeleteCategory,
-} from "@/lib/query/hooks/useAssets";
-import { DepartmentWithCount, CategoryWithCount } from "@/lib/api/assets";
+} from '@/lib/query/hooks/useAssets';
+import { DepartmentWithCount, CategoryWithCount } from '@/lib/api/assets';
 
-type Tab = "departments" | "categories";
+type Tab = 'departments' | 'categories';
 
 export default function DepartmentsPage() {
-  const [tab, setTab] = useState<Tab>("departments");
+  const [tab, setTab] = useState<Tab>('departments');
 
   return (
     <div>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Organisation</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Manage departments and asset categories
-        </p>
+        <p className="text-sm text-gray-500 mt-1">Manage departments and asset categories</p>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-200">
-        {(
-          [
-            {
-              key: "departments" as Tab,
-              label: "Departments",
-              icon: <Building2 size={15} />,
-            },
-            {
-              key: "categories" as Tab,
-              label: "Categories",
-              icon: <Tag size={15} />,
-            },
-          ] as const
-        ).map(({ key, label, icon }) => (
+        {([
+          { key: 'departments' as Tab, label: 'Departments', icon: <Building2 size={15} /> },
+          { key: 'categories' as Tab, label: 'Categories', icon: <Tag size={15} /> },
+        ] as const).map(({ key, label, icon }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
               tab === key
-                ? "border-gray-900 text-gray-900"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             {icon}
@@ -61,8 +49,8 @@ export default function DepartmentsPage() {
         ))}
       </div>
 
-      {tab === "departments" && <DepartmentsTab />}
-      {tab === "categories" && <CategoriesTab />}
+      {tab === 'departments' && <DepartmentsTab />}
+      {tab === 'categories' && <CategoriesTab />}
     </div>
   );
 }
@@ -75,31 +63,22 @@ function DepartmentsTab() {
   const deleteDept = useDeleteDepartment();
 
   const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [formError, setFormError] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<DepartmentWithCount | null>(
-    null,
-  );
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [formError, setFormError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<DepartmentWithCount | null>(null);
 
   const handleCreate = async () => {
-    if (!name.trim()) {
-      setFormError("Name is required");
-      return;
-    }
-    setFormError("");
+    if (!name.trim()) { setFormError('Name is required'); return; }
+    setFormError('');
     try {
-      await createDept.mutateAsync({
-        name: name.trim(),
-        description: description.trim() || undefined,
-      });
-      setName("");
-      setDescription("");
+      await createDept.mutateAsync({ name: name.trim(), description: description.trim() || undefined });
+      setName('');
+      setDescription('');
       setShowForm(false);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })
-        ?.response?.data?.message;
-      setFormError(msg || "Failed to create department.");
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setFormError(msg || 'Failed to create department.');
     }
   };
 
@@ -113,15 +92,9 @@ function DepartmentsTab() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-500">
-          {departments.length} department{departments.length !== 1 ? "s" : ""}
+          {departments.length} department{departments.length !== 1 ? 's' : ''}
         </p>
-        <Button
-          size="sm"
-          onClick={() => {
-            setShowForm(true);
-            setFormError("");
-          }}
-        >
+        <Button size="sm" onClick={() => { setShowForm(true); setFormError(''); }}>
           <Plus size={15} className="mr-1" />
           Add Department
         </Button>
@@ -130,9 +103,7 @@ function DepartmentsTab() {
       {/* Inline create form */}
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">
-            New Department
-          </h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">New Department</h3>
           <div className="space-y-3">
             <Input
               id="dept-name"
@@ -140,7 +111,7 @@ function DepartmentsTab() {
               placeholder="e.g. Engineering"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
             <Input
               id="dept-desc"
@@ -151,22 +122,10 @@ function DepartmentsTab() {
             />
             {formError && <p className="text-xs text-red-500">{formError}</p>}
             <div className="flex gap-2 pt-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowForm(false);
-                  setName("");
-                  setDescription("");
-                }}
-              >
+              <Button variant="outline" size="sm" onClick={() => { setShowForm(false); setName(''); setDescription(''); }}>
                 Cancel
               </Button>
-              <Button
-                size="sm"
-                loading={createDept.isPending}
-                onClick={handleCreate}
-              >
+              <Button size="sm" loading={createDept.isPending} onClick={handleCreate}>
                 Create Department
               </Button>
             </div>
@@ -176,9 +135,7 @@ function DepartmentsTab() {
 
       {/* List */}
       {isLoading ? (
-        <div className="text-sm text-gray-400 text-center py-12">
-          Loading departments...
-        </div>
+        <div className="text-sm text-gray-400 text-center py-12">Loading departments...</div>
       ) : departments.length === 0 ? (
         <EmptyState
           icon={<Building2 size={32} className="text-gray-300" />}
@@ -221,31 +178,22 @@ function CategoriesTab() {
   const deleteCat = useDeleteCategory();
 
   const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [formError, setFormError] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<CategoryWithCount | null>(
-    null,
-  );
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [formError, setFormError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<CategoryWithCount | null>(null);
 
   const handleCreate = async () => {
-    if (!name.trim()) {
-      setFormError("Name is required");
-      return;
-    }
-    setFormError("");
+    if (!name.trim()) { setFormError('Name is required'); return; }
+    setFormError('');
     try {
-      await createCat.mutateAsync({
-        name: name.trim(),
-        description: description.trim() || undefined,
-      });
-      setName("");
-      setDescription("");
+      await createCat.mutateAsync({ name: name.trim(), description: description.trim() || undefined });
+      setName('');
+      setDescription('');
       setShowForm(false);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })
-        ?.response?.data?.message;
-      setFormError(msg || "Failed to create category.");
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setFormError(msg || 'Failed to create category.');
     }
   };
 
@@ -259,15 +207,9 @@ function CategoriesTab() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-500">
-          {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
+          {categories.length} categor{categories.length !== 1 ? 'ies' : 'y'}
         </p>
-        <Button
-          size="sm"
-          onClick={() => {
-            setShowForm(true);
-            setFormError("");
-          }}
-        >
+        <Button size="sm" onClick={() => { setShowForm(true); setFormError(''); }}>
           <Plus size={15} className="mr-1" />
           Add Category
         </Button>
@@ -276,9 +218,7 @@ function CategoriesTab() {
       {/* Inline create form */}
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">
-            New Category
-          </h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">New Category</h3>
           <div className="space-y-3">
             <Input
               id="cat-name"
@@ -286,7 +226,7 @@ function CategoriesTab() {
               placeholder="e.g. Laptops"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
             <Input
               id="cat-desc"
@@ -297,22 +237,10 @@ function CategoriesTab() {
             />
             {formError && <p className="text-xs text-red-500">{formError}</p>}
             <div className="flex gap-2 pt-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowForm(false);
-                  setName("");
-                  setDescription("");
-                }}
-              >
+              <Button variant="outline" size="sm" onClick={() => { setShowForm(false); setName(''); setDescription(''); }}>
                 Cancel
               </Button>
-              <Button
-                size="sm"
-                loading={createCat.isPending}
-                onClick={handleCreate}
-              >
+              <Button size="sm" loading={createCat.isPending} onClick={handleCreate}>
                 Create Category
               </Button>
             </div>
@@ -322,9 +250,7 @@ function CategoriesTab() {
 
       {/* List */}
       {isLoading ? (
-        <div className="text-sm text-gray-400 text-center py-12">
-          Loading categories...
-        </div>
+        <div className="text-sm text-gray-400 text-center py-12">Loading categories...</div>
       ) : categories.length === 0 ? (
         <EmptyState
           icon={<Tag size={32} className="text-gray-300" />}
@@ -383,8 +309,7 @@ function EntityCard({
         )}
         <div className="flex items-center gap-1 mt-2 text-xs text-gray-400">
           <Package size={12} />
-          {count} {countLabel}
-          {count !== 1 ? "s" : ""}
+          {count} {countLabel}{count !== 1 ? 's' : ''}
         </div>
       </div>
       <button
@@ -398,15 +323,7 @@ function EntityCard({
   );
 }
 
-function EmptyState({
-  icon,
-  title,
-  message,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  message: string;
-}) {
+function EmptyState({ icon, title, message }: { icon: React.ReactNode; title: string; message: string }) {
   return (
     <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
       <div className="flex justify-center mb-3">{icon}</div>

@@ -1,4 +1,4 @@
-import { api } from "../api";
+import { api } from '../api';
 import type {
   Asset,
   AssetHistoryEvent,
@@ -13,13 +13,7 @@ import type {
   Department,
   AssetCategory,
   AssetUser,
-  TokenHolder,
-  TokenSummary,
-  TransferTokensInput,
-  TokenLockStatus,
-  DisposalRequest,
-  CreateDisposalInput,
-} from "../query/types/asset";
+} from '../query/types/asset';
 
 export interface DepartmentWithCount extends Department {
   assetCount: number;
@@ -69,85 +63,57 @@ export interface CreateAssetInput {
 
 export const assetApiClient = {
   getAssets: (filters?: AssetListFilters): Promise<AssetListResponse> =>
-    api
-      .get<AssetListResponse>("/assets", { params: filters })
-      .then((r) => r.data),
+    api.get<AssetListResponse>('/assets', { params: filters }).then((r) => r.data),
 
   getAsset: (id: string): Promise<Asset> =>
     api.get<Asset>(`/assets/${id}`).then((r) => r.data),
 
   createAsset: (data: CreateAssetInput): Promise<Asset> =>
-    api.post<Asset>("/assets", data).then((r) => r.data),
+    api.post<Asset>('/assets', data).then((r) => r.data),
 
   updateAsset: (id: string, data: Partial<CreateAssetInput>): Promise<Asset> =>
     api.patch<Asset>(`/assets/${id}`, data).then((r) => r.data),
 
-  getAssetHistory: (
-    id: string,
-    filters?: AssetHistoryFilters,
-  ): Promise<AssetHistoryEvent[]> =>
-    api
-      .get<AssetHistoryEvent[]>(`/assets/${id}/history`, { params: filters })
-      .then((r) => r.data),
+  getAssetHistory: (id: string, filters?: AssetHistoryFilters): Promise<AssetHistoryEvent[]> =>
+    api.get<AssetHistoryEvent[]>(`/assets/${id}/history`, { params: filters }).then((r) => r.data),
 
   getAssetDocuments: (id: string): Promise<AssetDocument[]> =>
     api.get<AssetDocument[]>(`/assets/${id}/documents`).then((r) => r.data),
 
   getMaintenanceRecords: (id: string): Promise<MaintenanceRecord[]> =>
-    api
-      .get<MaintenanceRecord[]>(`/assets/${id}/maintenance`)
-      .then((r) => r.data),
+    api.get<MaintenanceRecord[]>(`/assets/${id}/maintenance`).then((r) => r.data),
 
   getAssetNotes: (id: string): Promise<AssetNote[]> =>
     api.get<AssetNote[]>(`/assets/${id}/notes`).then((r) => r.data),
 
   getDepartments: (): Promise<DepartmentWithCount[]> =>
-    api.get<DepartmentWithCount[]>("/departments").then((r) => r.data),
+    api.get<DepartmentWithCount[]>('/departments').then((r) => r.data),
 
-  createDepartment: (data: {
-    name: string;
-    description?: string;
-  }): Promise<Department> =>
-    api.post<Department>("/departments", data).then((r) => r.data),
+  createDepartment: (data: { name: string; description?: string }): Promise<Department> =>
+    api.post<Department>('/departments', data).then((r) => r.data),
 
   deleteDepartment: (id: string): Promise<void> =>
     api.delete(`/departments/${id}`).then(() => undefined),
 
-  updateDepartment: (
-    id: string,
-    data: { name?: string; description?: string },
-  ): Promise<Department> =>
+  updateDepartment: (id: string, data: { name?: string; description?: string }): Promise<Department> =>
     api.patch<Department>(`/departments/${id}`, data).then((r) => r.data),
 
   getCategories: (): Promise<CategoryWithCount[]> =>
-    api.get<CategoryWithCount[]>("/categories").then((r) => r.data),
+    api.get<CategoryWithCount[]>('/categories').then((r) => r.data),
 
-  createCategory: (data: {
-    name: string;
-    description?: string;
-  }): Promise<{ id: string; name: string }> =>
-    api
-      .post<{ id: string; name: string }>("/categories", data)
-      .then((r) => r.data),
+  createCategory: (data: { name: string; description?: string }): Promise<{ id: string; name: string }> =>
+    api.post<{ id: string; name: string }>('/categories', data).then((r) => r.data),
 
   deleteCategory: (id: string): Promise<void> =>
     api.delete(`/categories/${id}`).then(() => undefined),
 
-  updateCategory: (
-    id: string,
-    data: { name?: string; description?: string },
-  ): Promise<{ id: string; name: string }> =>
-    api
-      .patch<{ id: string; name: string }>(`/categories/${id}`, data)
-      .then((r) => r.data),
+  updateCategory: (id: string, data: { name?: string; description?: string }): Promise<{ id: string; name: string }> =>
+    api.patch<{ id: string; name: string }>(`/categories/${id}`, data).then((r) => r.data),
 
   getUsers: (): Promise<AssetUser[]> =>
-    api.get<AssetUser[]>("/users").then((r) => r.data),
+    api.get<AssetUser[]>('/users').then((r) => r.data),
 
-  updateAssetStatus: (
-    id: string,
-    data: UpdateAssetStatusInput,
-  ): Promise<Asset> =>
+  updateAssetStatus: (id: string, data: UpdateAssetStatusInput): Promise<Asset> =>
     api.patch<Asset>(`/assets/${id}/status`, data).then((r) => r.data),
 
   transferAsset: (id: string, data: TransferAssetInput): Promise<Asset> =>
@@ -156,33 +122,22 @@ export const assetApiClient = {
   deleteAsset: (id: string): Promise<void> =>
     api.delete(`/assets/${id}`).then(() => undefined),
 
-  uploadDocument: (
-    assetId: string,
-    file: File,
-    name?: string,
-  ): Promise<AssetDocument> => {
+  uploadDocument: (assetId: string, file: File, name?: string): Promise<AssetDocument> => {
     const form = new FormData();
-    form.append("file", file);
-    if (name) form.append("name", name);
+    form.append('file', file);
+    if (name) form.append('name', name);
     return api
       .post<AssetDocument>(`/assets/${assetId}/documents`, form, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       .then((r) => r.data);
   },
 
   deleteDocument: (assetId: string, documentId: string): Promise<void> =>
-    api
-      .delete(`/assets/${assetId}/documents/${documentId}`)
-      .then(() => undefined),
+    api.delete(`/assets/${assetId}/documents/${documentId}`).then(() => undefined),
 
-  createMaintenanceRecord: (
-    assetId: string,
-    data: CreateMaintenanceInput,
-  ): Promise<MaintenanceRecord> =>
-    api
-      .post<MaintenanceRecord>(`/assets/${assetId}/maintenance`, data)
-      .then((r) => r.data),
+  createMaintenanceRecord: (assetId: string, data: CreateMaintenanceInput): Promise<MaintenanceRecord> =>
+    api.post<MaintenanceRecord>(`/assets/${assetId}/maintenance`, data).then((r) => r.data),
 
   createNote: (assetId: string, data: CreateNoteInput): Promise<AssetNote> =>
     api.post<AssetNote>(`/assets/${assetId}/notes`, data).then((r) => r.data),
@@ -196,84 +151,6 @@ export const assetApiClient = {
     status: string,
   ): Promise<MaintenanceRecord> =>
     api
-      .patch<MaintenanceRecord>(
-        `/assets/${assetId}/maintenance/${maintenanceId}`,
-        { status },
-      )
+      .patch<MaintenanceRecord>(`/assets/${assetId}/maintenance/${maintenanceId}`, { status })
       .then((r) => r.data),
-
-  // Stellar token operations
-  getTokenHolders: (assetId: string): Promise<TokenHolder[]> =>
-    api
-      .get<TokenHolder[]>(`/stellar/assets/${assetId}/tokens`)
-      .then((r) => r.data),
-
-  getTokenSummary: (assetId: string): Promise<TokenSummary> =>
-    api
-      .get<TokenSummary>(`/stellar/assets/${assetId}/tokens/summary`)
-      .then((r) => r.data),
-
-  transferTokens: (assetId: string, data: TransferTokensInput): Promise<void> =>
-    api
-      .post(`/stellar/assets/${assetId}/tokens/transfer`, data)
-      .then(() => undefined),
-
-  lockTokens: (assetId: string): Promise<TokenLockStatus> =>
-    api
-      .post<TokenLockStatus>(`/stellar/assets/${assetId}/tokens/lock`)
-      .then((r) => r.data),
-
-  unlockTokens: (assetId: string): Promise<TokenLockStatus> =>
-    api
-      .post<TokenLockStatus>(`/stellar/assets/${assetId}/tokens/unlock`)
-      .then((r) => r.data),
-
-  getTokenLockStatus: (assetId: string): Promise<TokenLockStatus> =>
-    api
-      .get<TokenLockStatus>(`/stellar/assets/${assetId}/tokens/lock-status`)
-      .then((r) => r.data),
-
-  // Asset disposal operations
-  createDisposalRequest: (
-    assetId: string,
-    data: CreateDisposalInput,
-  ): Promise<DisposalRequest> =>
-    api
-      .post<DisposalRequest>(`/assets/${assetId}/disposal`, data)
-      .then((r) => r.data),
-
-  approveDisposal: (
-    assetId: string,
-    disposalId: string,
-  ): Promise<DisposalRequest> =>
-    api
-      .patch<DisposalRequest>(
-        `/assets/${assetId}/disposal/${disposalId}/approve`,
-      )
-      .then((r) => r.data),
-
-  rejectDisposal: (
-    assetId: string,
-    disposalId: string,
-    reason: string,
-  ): Promise<DisposalRequest> =>
-    api
-      .patch<DisposalRequest>(
-        `/assets/${assetId}/disposal/${disposalId}/reject`,
-        { reason },
-      )
-      .then((r) => r.data),
-
-  getPendingDisposals: (): Promise<DisposalRequest[]> =>
-    api.get<DisposalRequest[]>("/assets/disposals/pending").then((r) => r.data),
-
-  importAssets: (file: File): Promise<any> => {
-    const form = new FormData();
-    form.append("file", file);
-    return api
-      .post("/assets/import", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
-      .then((r) => r.data);
-  },
 };

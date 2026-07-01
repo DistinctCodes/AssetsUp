@@ -2,52 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, SlidersHorizontal, ScanLine } from "lucide-react";
+import { Plus, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { CreateAssetModal } from "@/components/assets/create-asset-modal";
-import { ImportAssetModal } from "@/components/assets/import-asset-modal";
-import { ScannerModal } from "@/components/assets/ScannerModal";
 import { useAssets } from "@/lib/query/hooks/useAssets";
 import { AssetStatus, AssetCondition } from "@/lib/query/types/asset";
-import { useToast } from "@/components/ui/use-toast";
-import { apiClient } from "@/lib/api/client";
 
 const STATUS_OPTIONS = ["All", ...Object.values(AssetStatus)];
 
 export default function AssetsPage() {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
-  const [showScanner, setShowScanner] = useState(false);
-  const { toast } = useToast();
-
-  const handleScanSuccess = async (decodedText: string) => {
-    setShowScanner(false);
-    try {
-      const res = await apiClient.get(`/assets/scan?code=${decodedText}`);
-      if (res.data) {
-        router.push(`/assets/${res.data.id}`);
-      } else {
-        toast({
-          title: "Not Found",
-          description: "No asset found for this code.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch asset information.",
-        variant: "destructive",
-      });
-    }
-  };
-
 
   const { data, isLoading, refetch } = useAssets({
     search: search || undefined,
@@ -72,39 +42,11 @@ export default function AssetsPage() {
               : "No assets yet"}
           </p>
         </div>
-        <Button onClick={() => setShowImportModal(true)} variant="outline">
-          <Plus size={16} className="mr-1.5" />
-          Import Assets
-        </Button>
         <Button onClick={() => setShowModal(true)}>
           <Plus size={16} className="mr-1.5" />
           Register Asset
         </Button>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="hidden sm:flex"
-            onClick={() => setShowScanner(true)}
-          >
-            <ScanLine size={16} className="mr-1.5" />
-            Scan Asset
-          </Button>
-          <Button onClick={() => setShowModal(true)}>
-            <Plus size={16} className="mr-1.5" />
-            Register Asset
-          </Button>
-        </div>
       </div>
-
-      {/* FAB for mobile */}
-      <Button
-        variant="default"
-        size="icon"
-        className="fixed bottom-4 right-4 sm:hidden rounded-full h-14 w-14 shadow-lg"
-        onClick={() => setShowScanner(true)}
-      >
-        <ScanLine size={24} />
-      </Button>
 
       {/* Filters */}
       <div className="flex gap-3 mb-4">
@@ -260,17 +202,6 @@ export default function AssetsPage() {
         <CreateAssetModal
           onClose={() => setShowModal(false)}
           onSuccess={() => refetch()}
-        />
-      )}
-      {showImportModal && (
-        <ImportAssetModal
-          onClose={() => setShowImportModal(false)}
-          onSuccess={() => refetch()}
-
-      {showScanner && (
-        <ScannerModal
-          onClose={() => setShowScanner(false)}
-          onScanSuccess={handleScanSuccess}
         />
       )}
     </div>
