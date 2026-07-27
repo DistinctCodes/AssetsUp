@@ -1,0 +1,122 @@
+# cargo-deny configuration for the contracts workspace.
+#
+# Run locally with:
+#   cargo install --locked cargo-deny
+#   cd contracts && cargo deny check
+#
+# CI runs the same command on every pull request and on a weekly schedule, so
+# an advisory published after a merge is still caught.
+
+[graph]
+# Contracts only ever ship to wasm32; native is needed for `cargo test`.
+targets = [
+    { triple = "wasm32-unknown-unknown" },
+    { triple = "x86_64-unknown-linux-gnu" },
+]
+all-features = true
+
+[output]
+feature-depth = 1
+
+# ---------------------------------------------------------------------------
+# Security advisories
+# ---------------------------------------------------------------------------
+[advisories]
+version = 2
+# Any crate with a RUSTSEC *vulnerability* advisory fails the build. These
+# contracts govern asset ownership and multisig approvals, so an exploitable
+# advisory in a transitive dependency is a release blocker.
+#
+# Yanked crates are warned about rather than denied. soroban-sdk 22 pins yanked
+# versions of `spin` and `keccak` deep in its own tree; neither can be resolved
+# from this workspace by any `cargo update`, and a yank is a publishing signal,
+# not evidence of a vulnerability. Denying here would mean a permanently red
+# build that teaches everyone to ignore this job. Revisit once the SDK upgrade
+# in [SC-35] lands, which is expected to move both off the yanked versions.
+yanked = "warn"
+
+# Advisories consciously accepted. Every entry MUST carry:
+#   - the advisory id
+#   - why it does not apply here, or what compensating control exists
+#   - a review date, so an ignore cannot quietly become permanent
+#
+# Triage process:
+#   1. Read the advisory. Determine whether the vulnerable code path is
+#      reachable from a contract entrypoint.
+#   2. If it is reachable, fix it — upgrade, patch, or drop the dependency.
+#      Do not ignore it.
+#   3. If it is genuinely unreachable, or it is unfixable from this workspace
+#      because it comes from inside soroban-sdk's own tree, add it below with
+#      the reasoning and a review date no more than 90 days out.
+#   4. On the review date, re-check rather than extending by reflex. If the
+#      dependency is still stuck, say so explicitly and move the date.
+#
+# Every entry below is transitive through soroban-sdk and cannot be resolved
+# from this workspace: nothing here is a direct dependency, and no combination
+# of `cargo update` fixes them while the SDK pins what it pins. They are
+# unmaintained-or-yanked notices, not exploitable vulnerabilities.
+ignore = [
+    # `derivative` is unmaintained. Pulled in by soroban-env-host. It is a
+    # proc-macro used at compile time only; no code from it reaches a
+    # deployed contract. Review 2026-10-27.
+    { id = "RUSTSEC-2024-0388", reason = "unmaintained proc-macro, compile-time only, transitive via soroban-env-host; review 2026-10-27" },
+
+    # `paste` is no longer maintained. Also a compile-time proc-macro reached
+    # through soroban-sdk. No runtime surface. Review 2026-10-27.
+    { id = "RUSTSEC-2024-0436", reason = "unmaintained proc-macro, compile-time only, transitive via soroban-sdk; review 2026-10-27" },
+]
+
+# ---------------------------------------------------------------------------
+# Licenses
+# ---------------------------------------------------------------------------
+[licenses]
+version = 2
+# The five workspace crates are never published and carry no `license` field,
+# so exempt them. This only affects our own crates; every third-party
+# dependency is still checked against the allowlist below.
+private = { ignore = true }
+
+# Permissive licences only. Anything copyleft or unlisted fails and must be
+# reviewed deliberately rather than absorbed by accident.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "Unicode-3.0",
+    "Unlicense",
+]
+confidence-threshold = 0.8
+
+# ---------------------------------------------------------------------------
+# Dependency bans
+# ---------------------------------------------------------------------------
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# contrib dev-depends on assetsup by path, which cargo-deny reads as a
+# wildcard version requirement. Path dependencies inside this workspace are
+# not a supply-chain risk; wildcards on registry crates still fail.
+allow-wildcard-paths = true
+# Prefer the highest version when the same crate appears twice, so the warning
+# above points at something actionable.
+highlight = "all"
+
+# Duplicate versions that come from the soroban-sdk dependency tree and cannot
+# be resolved from this workspace are listed here so the signal stays useful.
+skip = []
+
+deny = []
+
+# ---------------------------------------------------------------------------
+# Sources
+# ---------------------------------------------------------------------------
+[sources]
+# Only crates.io. A git or unknown-registry dependency in a contract workspace
+# is a supply-chain risk that should be an explicit, reviewed decision.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
