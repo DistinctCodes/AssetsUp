@@ -132,25 +132,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
             ${{ runner.os }}-cargo-
-      # Every crate in the workspace is a deployable contract: each declares a
-      # `cdylib` crate-type and a `#[contract]` entrypoint. Building the whole
-      # workspace for wasm32 therefore fails the job if any contract cannot be
-      # deployed, which native compilation alone does not guarantee.
+      # Every crate declares a cdylib crate-type and a #[contract] entrypoint,
+      # so all five are deployable and all five must be size-checked.
       - name: Build all contracts to WASM
         run: cargo build --workspace --target wasm32-unknown-unknown --release --verbose
 
-      - name: Report WASM artifact sizes
-        run: |
-          echo "### WASM artifact sizes" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Contract | Size (bytes) |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---:|" >> "$GITHUB_STEP_SUMMARY"
-          for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
-            name=$(basename "$wasm" .wasm)
-            size=$(wc -c < "$wasm" | tr -d ' ')
-            printf '| %s | %s |\n' "$name" "$size" >> "$GITHUB_STEP_SUMMARY"
-          done
-          cat "$GITHUB_STEP_SUMMARY"
+      - name: Check WASM size budgets
+        run: ./scripts/check-wasm-size.sh | tee "$GITHUB_STEP_SUMMARY"
 
       - name: Upload WASM artifacts
         uses: actions/upload-artifact@v4
@@ -159,6 +147,128 @@ jobs:
           path: contracts/target/wasm32-unknown-unknown/release/*.wasm
           if-no-files-found: error
           retention-days: 14
+
+  wasm-size-delta:
+    name: WASM Size Delta
+    runs-on: ubuntu-latest
+    # Only meaningful on a pull request, where there is a base to compare to.
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read pinned toolchain
+        id: toolchain
+        run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          targets: wasm32-unknown-unknown
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('contracts/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+            ${{ runner.os }}-cargo-
+
+      - name: Measure this branch
+        run: |
+          cargo build --workspace --target wasm32-unknown-unknown --release
+          ./scripts/check-wasm-size.sh --json > /tmp/head-sizes.json
+          cat /tmp/head-sizes.json
+
+      - name: Measure the base branch
+        run: |
+          git stash --include-untracked || true
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git checkout "origin/${{ github.base_ref }}" -- .
+          cargo build --workspace --target wasm32-unknown-unknown --release
+          ./scripts/check-wasm-size.sh --json > /tmp/base-sizes.json || echo '{}' > /tmp/base-sizes.json
+          cat /tmp/base-sizes.json
+
+      - name: Build the delta table
+        id: delta
+        run: |
+          python3 - <<'PY' > /tmp/delta.md
+          import json
+
+          with open('/tmp/head-sizes.json') as f:
+              head = json.load(f)
+          try:
+              with open('/tmp/base-sizes.json') as f:
+                  base = json.load(f)
+          except Exception:
+              base = {}
+
+          rows = []
+          for name in sorted(head):
+              now = head[name]
+              before = base.get(name)
+              if before is None:
+                  rows.append(f"| `{name}` | — | {now} | new |")
+                  continue
+              diff = now - before
+              pct = 0 if before == 0 else (diff / before) * 100
+              sign = "+" if diff > 0 else ""
+              marker = " :warning:" if diff > 0 else (" :white_check_mark:" if diff < 0 else "")
+              rows.append(f"| `{name}` | {before} | {now} | {sign}{diff} ({sign}{pct:.2f}%){marker} |")
+
+          print("### WASM size delta")
+          print()
+          print("| Contract | Base | This PR | Change |")
+          print("|---|---:|---:|---:|")
+          print("\n".join(rows))
+          print()
+          print("_Sizes in bytes, before `stellar contract optimize`. "
+                "Budgets are in `contracts/scripts/check-wasm-size.sh`._")
+          PY
+          cat /tmp/delta.md >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/delta.md
+
+      # A pull_request event from a fork gets a read-only GITHUB_TOKEN whatever
+      # the permissions block says, so commenting is best-effort. The delta is
+      # always in the job summary above; this only adds the convenience of
+      # having it inline on the PR when the token allows it.
+      - name: Comment the per-contract delta
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('/tmp/delta.md', 'utf8');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(
+              (c) => c.user.type === 'Bot' && c.body.startsWith('### WASM size delta')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
 
   # ─────────────────────────────────────────────
   # BACKEND — NestJS
