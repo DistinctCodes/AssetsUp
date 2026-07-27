@@ -29,7 +29,7 @@ fn test_tokenize_asset_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #10)")]
+#[should_panic(expected = "Error(Contract, #120)")]
 fn test_tokenize_asset_already_tokenized() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -64,7 +64,7 @@ fn test_tokenize_asset_already_tokenized() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #12)")]
+#[should_panic(expected = "Error(Contract, #122)")]
 fn test_tokenize_asset_invalid_supply() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -113,7 +113,7 @@ fn test_mint_tokens_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_mint_tokens_unauthorized() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
@@ -138,7 +138,7 @@ fn test_mint_tokens_unauthorized() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #11)")]
+#[should_panic(expected = "Error(Contract, #121)")]
 fn test_mint_tokens_not_tokenized() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -177,7 +177,7 @@ fn test_burn_tokens_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #14)")]
+#[should_panic(expected = "Error(Contract, #124)")]
 fn test_burn_tokens_insufficient_balance() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -232,7 +232,7 @@ fn test_transfer_tokens_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #14)")]
+#[should_panic(expected = "Error(Contract, #124)")]
 fn test_transfer_tokens_insufficient_balance() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
@@ -257,7 +257,7 @@ fn test_transfer_tokens_insufficient_balance() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #16)")]
+#[should_panic(expected = "Error(Contract, #126)")]
 fn test_transfer_tokens_locked() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
@@ -321,7 +321,7 @@ fn test_lock_unlock_tokens() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_lock_tokens_unauthorized() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
@@ -438,7 +438,7 @@ fn test_update_valuation() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #30)")]
+#[should_panic(expected = "Error(Contract, #162)")]
 fn test_update_valuation_invalid() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);

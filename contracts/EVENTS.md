@@ -64,7 +64,9 @@ assert_eq!(name, Symbol::new(&env, "asset_registered"));
 | `asset_updated` | `asset_id` | `caller`, `timestamp` | `update_asset_metadata` |
 | `asset_transferred` | `asset_id` | `old_owner`, `new_owner`, `timestamp` | `transfer_asset_ownership` |
 | `asset_retired` | `asset_id` | `caller`, `timestamp` | `retire_asset` |
-| `admin_changed` | `new_admin` | `old_admin`, `timestamp` | `update_admin` |
+| `admin_proposed` | `proposed_admin` | `current_admin`, `timestamp` | `propose_admin` |
+| `admin_proposal_cancelled` | `proposed_admin` | `current_admin`, `timestamp` | `cancel_admin_proposal` |
+| `admin_changed` | `new_admin` | `old_admin`, `timestamp` | `accept_admin` |
 | `registrar_added` | `registrar` | `timestamp` | `add_authorized_registrar` |
 | `registrar_removed` | `registrar` | `timestamp` | `remove_authorized_registrar` |
 | `contract_paused` | `admin` | `timestamp` | `pause_contract` |

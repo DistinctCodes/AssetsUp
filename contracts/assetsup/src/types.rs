@@ -85,7 +85,7 @@ pub enum TokenDataKey {
     TokenizedAsset(u64),
     /// Stores OwnershipRecord for (asset_id, holder_address)
     TokenHolder(u64, Address),
-    /// Stores Vec<Address> of all token holders for an asset
+    /// Stores `Vec<Address>` of all token holders for an asset
     TokenHoldersList(u64),
     /// Stores lock timestamp for (asset_id, holder_address)
     TokenLockedUntil(u64, Address),
@@ -95,7 +95,7 @@ pub enum TokenDataKey {
     VoteTally(u64, u64),
     /// Stores TransferRestriction for asset_id
     TransferRestriction(u64),
-    /// Stores Vec<Address> whitelist for asset_id
+    /// Stores `Vec<Address>` whitelist for asset_id
     Whitelist(u64),
     /// Stores unclaimed dividend for (asset_id, holder_address)
     UnclaimedDividend(u64, Address),

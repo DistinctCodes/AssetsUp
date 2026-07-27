@@ -65,7 +65,28 @@ pub struct AssetRetired {
     pub timestamp: u64,
 }
 
-/// The contract admin was changed.
+/// An admin transfer was nominated. The role does **not** move until the
+/// proposed address accepts.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminProposed {
+    #[topic]
+    pub proposed_admin: Address,
+    pub current_admin: Address,
+    pub timestamp: u64,
+}
+
+/// A pending admin nomination was withdrawn by the current admin.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminProposalCancelled {
+    #[topic]
+    pub proposed_admin: Address,
+    pub current_admin: Address,
+    pub timestamp: u64,
+}
+
+/// The contract admin was changed, after the incoming address accepted.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AdminChanged {
@@ -357,6 +378,24 @@ pub fn asset_retired(env: &Env, asset_id: &BytesN<32>, caller: &Address) {
     AssetRetired {
         asset_id: asset_id.clone(),
         caller: caller.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn admin_proposed(env: &Env, current_admin: &Address, proposed_admin: &Address) {
+    AdminProposed {
+        proposed_admin: proposed_admin.clone(),
+        current_admin: current_admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn admin_proposal_cancelled(env: &Env, current_admin: &Address, proposed_admin: &Address) {
+    AdminProposalCancelled {
+        proposed_admin: proposed_admin.clone(),
+        current_admin: current_admin.clone(),
         timestamp: env.ledger().timestamp(),
     }
     .publish(env);

@@ -1,5 +1,6 @@
 use crate::audit;
 use crate::error::Error;
+use crate::math;
 use crate::types::{OwnershipRecord, TokenDataKey, TokenMetadata, TokenizedAsset};
 use soroban_sdk::{Address, BytesN, Env, String, Vec};
 
@@ -123,19 +124,21 @@ pub fn mint_tokens(
     }
 
     // Update total supply
-    tokenized_asset.total_supply += amount;
-    tokenized_asset.tokens_in_circulation += amount;
+    tokenized_asset.total_supply = math::add(tokenized_asset.total_supply, amount)?;
+    tokenized_asset.tokens_in_circulation =
+        math::add(tokenized_asset.tokens_in_circulation, amount)?;
 
     // Update tokenizer's ownership
     let holder_key = TokenDataKey::TokenHolder(asset_id, minter.clone());
     let mut ownership: OwnershipRecord = store.get(&holder_key).ok_or(Error::HolderNotFound)?;
 
-    ownership.balance += amount;
+    ownership.balance = math::add(ownership.balance, amount)?;
     ownership.voting_power = ownership.balance;
     ownership.dividend_entitlement = ownership.balance;
 
     // Recalculate ownership percentage
-    ownership.ownership_percentage = (ownership.balance * 10000) / tokenized_asset.total_supply;
+    ownership.ownership_percentage =
+        math::mul_div(ownership.balance, 10000, tokenized_asset.total_supply)?;
 
     store.set(&holder_key, &ownership);
     store.set(&key, &tokenized_asset.clone());
@@ -188,15 +191,17 @@ pub fn burn_tokens(
     }
 
     // Update balances
-    ownership.balance -= amount;
+    ownership.balance = math::sub(ownership.balance, amount)?;
     ownership.voting_power = ownership.balance;
     ownership.dividend_entitlement = ownership.balance;
 
     // Recalculate ownership percentage
-    ownership.ownership_percentage = (ownership.balance * 10000) / tokenized_asset.total_supply;
+    ownership.ownership_percentage =
+        math::mul_div(ownership.balance, 10000, tokenized_asset.total_supply)?;
 
-    tokenized_asset.total_supply -= amount;
-    tokenized_asset.tokens_in_circulation -= amount;
+    tokenized_asset.total_supply = math::sub(tokenized_asset.total_supply, amount)?;
+    tokenized_asset.tokens_in_circulation =
+        math::sub(tokenized_asset.tokens_in_circulation, amount)?;
 
     store.set(&holder_key, &ownership);
     store.set(&key, &tokenized_asset.clone());
@@ -273,17 +278,17 @@ pub fn transfer_tokens(
     };
 
     // Update balances
-    from_ownership.balance -= amount;
+    from_ownership.balance = math::sub(from_ownership.balance, amount)?;
     from_ownership.voting_power = from_ownership.balance;
     from_ownership.dividend_entitlement = from_ownership.balance;
     from_ownership.ownership_percentage =
-        (from_ownership.balance * 10000) / tokenized_asset.total_supply;
+        math::mul_div(from_ownership.balance, 10000, tokenized_asset.total_supply)?;
 
-    to_ownership.balance += amount;
+    to_ownership.balance = math::add(to_ownership.balance, amount)?;
     to_ownership.voting_power = to_ownership.balance;
     to_ownership.dividend_entitlement = to_ownership.balance;
     to_ownership.ownership_percentage =
-        (to_ownership.balance * 10000) / tokenized_asset.total_supply;
+        math::mul_div(to_ownership.balance, 10000, tokenized_asset.total_supply)?;
 
     store.set(&from_holder_key, &from_ownership);
     store.set(&to_holder_key, &to_ownership);
@@ -417,7 +422,7 @@ pub fn calculate_ownership_percentage(
         return Ok(0);
     }
 
-    Ok((ownership.balance * 10000) / tokenized_asset.total_supply)
+    math::mul_div(ownership.balance, 10000, tokenized_asset.total_supply)
 }
 
 /// Get tokenized asset details

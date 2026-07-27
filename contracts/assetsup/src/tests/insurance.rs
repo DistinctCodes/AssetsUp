@@ -26,7 +26,7 @@ fn test_create_insurance_policy_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3)")]
+#[should_panic(expected = "Error(Contract, #101)")]
 fn test_create_insurance_policy_already_exists() {
     let env = create_env();
     let (admin, user1, insurer, _) = create_mock_addresses(&env);
@@ -44,7 +44,7 @@ fn test_create_insurance_policy_already_exists() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #9)")]
+#[should_panic(expected = "Error(Contract, #106)")]
 fn test_create_insurance_policy_invalid_coverage() {
     let env = create_env();
     let (admin, user1, insurer, _) = create_mock_addresses(&env);
@@ -65,7 +65,7 @@ fn test_create_insurance_policy_invalid_coverage() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #9)")]
+#[should_panic(expected = "Error(Contract, #106)")]
 fn test_create_insurance_policy_invalid_dates() {
     let env = create_env();
     let (admin, user1, insurer, _) = create_mock_addresses(&env);
@@ -128,7 +128,7 @@ fn test_cancel_insurance_policy_by_insurer() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_cancel_insurance_policy_unauthorized() {
     let env = create_env();
     let (admin, user1, insurer, user3) = create_mock_addresses(&env);
@@ -167,7 +167,7 @@ fn test_suspend_insurance_policy() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_suspend_insurance_policy_unauthorized() {
     let env = create_env();
     let (admin, user1, insurer, _) = create_mock_addresses(&env);
@@ -216,7 +216,7 @@ fn test_expire_insurance_policy() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_expire_insurance_policy_not_yet_expired() {
     let env = create_env();
     let (admin, user1, insurer, _) = create_mock_addresses(&env);
@@ -260,7 +260,7 @@ fn test_renew_insurance_policy() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_renew_insurance_policy_unauthorized() {
     let env = create_env();
     let (admin, user1, insurer, _) = create_mock_addresses(&env);

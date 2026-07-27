@@ -110,18 +110,45 @@ fn retire_asset_emits_asset_retired() {
 }
 
 #[test]
-fn update_admin_emits_admin_changed_keyed_by_new_admin() {
+fn the_two_step_admin_transfer_emits_a_distinct_event_at_each_step() {
+    // Admin transfer is two-step ([SC-48]). Each step is separately
+    // observable, so a consumer can tell a nomination from a completed
+    // handover — which the old single-step admin_changed could not express.
     let env = create_env();
     let admin = Address::generate(&env);
     let client = initialize_contract(&env, &admin);
     let new_admin = Address::generate(&env);
 
-    client.update_admin(&new_admin);
+    client.propose_admin(&new_admin);
+    let (topics, _) = only_event(&env);
+    assert_event_name(&env, &topics, "admin_proposed");
+    let emitted: Address = topics.get(1).unwrap().try_into_val(&env).unwrap();
+    assert_eq!(
+        emitted, new_admin,
+        "the nominee is the indexable topic while the transfer is pending"
+    );
 
+    client.accept_admin();
     let (topics, _) = only_event(&env);
     assert_event_name(&env, &topics, "admin_changed");
     let emitted: Address = topics.get(1).unwrap().try_into_val(&env).unwrap();
     assert_eq!(emitted, new_admin);
+}
+
+#[test]
+fn cancelling_an_admin_proposal_is_observable() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    let candidate = Address::generate(&env);
+
+    client.propose_admin(&candidate);
+    client.cancel_admin_proposal();
+
+    let (topics, _) = only_event(&env);
+    assert_event_name(&env, &topics, "admin_proposal_cancelled");
+    let emitted: Address = topics.get(1).unwrap().try_into_val(&env).unwrap();
+    assert_eq!(emitted, candidate);
 }
 
 #[test]

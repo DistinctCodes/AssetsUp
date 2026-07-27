@@ -35,7 +35,7 @@ fn test_cast_vote_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #22)")]
+#[should_panic(expected = "Error(Contract, #141)")]
 fn test_cast_vote_already_voted() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -62,7 +62,7 @@ fn test_cast_vote_already_voted() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #21)")]
+#[should_panic(expected = "Error(Contract, #140)")]
 fn test_cast_vote_insufficient_voting_power() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);

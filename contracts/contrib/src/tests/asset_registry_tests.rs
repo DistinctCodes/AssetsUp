@@ -7,6 +7,8 @@ fn setup_test(env: &Env) -> (ContribContractClient<'_>, Address) {
     let admin = Address::generate(env);
     let contract_id = env.register(ContribContract, ());
     let client = ContribContractClient::new(env, &contract_id);
+    // initialize now requires the admin's authorization.
+    env.mock_all_auths();
     client.initialize(&admin);
     (client, admin)
 }
