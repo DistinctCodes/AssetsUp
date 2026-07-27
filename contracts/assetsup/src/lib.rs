@@ -63,6 +63,9 @@ pub enum DataKey {
     TotalAssetCount,
     ContractMetadata,
     AuthorizedRegistrar(Address),
+    /// Address that has been proposed as the next admin but has not yet
+    /// accepted. Absent when no transfer is in flight.
+    PendingAdmin,
     ScheduledTransfer(BytesN<32>),
     PendingApproval(BytesN<32>),
 }
@@ -232,6 +235,18 @@ impl AssetUpContract {
             (asset.owner, asset.id, env.ledger().timestamp()),
         );
 
+        Ok(())
+    }
+
+    /// Rejects the call if the contract is paused.
+    ///
+    /// Every mutating entrypoint calls this except the deliberate exemptions
+    /// documented in `contracts/PAUSE.md`: the pause controls themselves, the
+    /// admin transfer flow, and `claim_dividends`.
+    fn require_not_paused(env: &Env) -> Result<(), Error> {
+        if Self::is_paused(env.clone())? {
+            return Err(Error::ContractPaused);
+        }
         Ok(())
     }
 
@@ -531,7 +546,16 @@ impl AssetUpContract {
     }
 
     // Admin functions
-    pub fn update_admin(env: Env, new_admin: Address) -> Result<(), Error> {
+    /// Step one of a two-step admin transfer: nominate `new_admin`.
+    ///
+    /// This does **not** change the admin. The proposal only takes effect when
+    /// the proposed address calls [`Self::accept_admin`], which proves it is
+    /// reachable and controlled. A single-step transfer means one typo
+    /// permanently bricks administration of a contract governing real asset
+    /// ownership, with no on-chain undo.
+    ///
+    /// Calling this again replaces any proposal already in flight.
+    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), Error> {
         let current_admin = Self::get_admin(env.clone())?;
         current_admin.require_auth();
 
@@ -544,27 +568,87 @@ impl AssetUpContract {
             return Err(Error::InvalidOwnerAddress);
         }
 
-        let old_admin = current_admin.clone();
-        env.storage().persistent().set(&DataKey::Admin, &new_admin);
+        // Transferring to yourself is a no-op that would leave a confusing
+        // pending proposal behind.
+        if new_admin == current_admin {
+            return Err(Error::InvalidOwnerAddress);
+        }
 
-        // Remove old admin from authorized registrars and add new admin
         env.storage()
             .persistent()
-            .set(&DataKey::AuthorizedRegistrar(old_admin.clone()), &false);
-        env.storage()
-            .persistent()
-            .set(&DataKey::AuthorizedRegistrar(new_admin.clone()), &true);
+            .set(&DataKey::PendingAdmin, &new_admin);
 
-        // Emit event
         env.events().publish(
-            (symbol_short!("admin_chg"),),
-            (old_admin, new_admin, env.ledger().timestamp()),
+            (symbol_short!("adm_prop"),),
+            (current_admin, new_admin, env.ledger().timestamp()),
         );
 
         Ok(())
     }
 
+    /// Step two: the proposed admin accepts, and only then does the role move.
+    ///
+    /// Authorized by the *incoming* address, which is the whole point — an
+    /// address that never accepts leaves the original admin in place forever.
+    pub fn accept_admin(env: Env) -> Result<(), Error> {
+        let pending: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PendingAdmin)
+            .ok_or(Error::AdminNotFound)?;
+
+        pending.require_auth();
+
+        let old_admin = Self::get_admin(env.clone())?;
+
+        env.storage().persistent().set(&DataKey::Admin, &pending);
+        env.storage().persistent().remove(&DataKey::PendingAdmin);
+
+        // Move registrar rights along with the role.
+        env.storage()
+            .persistent()
+            .set(&DataKey::AuthorizedRegistrar(old_admin.clone()), &false);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AuthorizedRegistrar(pending.clone()), &true);
+
+        env.events().publish(
+            (symbol_short!("admin_chg"),),
+            (old_admin, pending, env.ledger().timestamp()),
+        );
+
+        Ok(())
+    }
+
+    /// Withdraws a pending proposal. Only the current admin may cancel.
+    pub fn cancel_admin_proposal(env: Env) -> Result<(), Error> {
+        let current_admin = Self::get_admin(env.clone())?;
+        current_admin.require_auth();
+
+        let pending: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PendingAdmin)
+            .ok_or(Error::AdminNotFound)?;
+
+        env.storage().persistent().remove(&DataKey::PendingAdmin);
+
+        env.events().publish(
+            (symbol_short!("adm_cncl"),),
+            (current_admin, pending, env.ledger().timestamp()),
+        );
+
+        Ok(())
+    }
+
+    /// The address currently nominated to become admin, if any.
+    pub fn get_pending_admin(env: Env) -> Option<Address> {
+        env.storage().persistent().get(&DataKey::PendingAdmin)
+    }
+
     pub fn add_authorized_registrar(env: Env, registrar: Address) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
 
@@ -575,6 +659,8 @@ impl AssetUpContract {
     }
 
     pub fn remove_authorized_registrar(env: Env, registrar: Address) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
 
@@ -643,6 +729,8 @@ impl AssetUpContract {
         description: String,
         asset_type: AssetType,
     ) -> Result<TokenizedAsset, Error> {
+        Self::require_not_paused(&env)?;
+
         tokenizer.require_auth();
 
         let metadata = TokenMetadata {
@@ -675,6 +763,8 @@ impl AssetUpContract {
         amount: i128,
         minter: Address,
     ) -> Result<TokenizedAsset, Error> {
+        Self::require_not_paused(&env)?;
+
         minter.require_auth();
         tokenization::mint_tokens(&env, asset_id, amount, minter)
     }
@@ -686,6 +776,8 @@ impl AssetUpContract {
         amount: i128,
         burner: Address,
     ) -> Result<TokenizedAsset, Error> {
+        Self::require_not_paused(&env)?;
+
         burner.require_auth();
         tokenization::burn_tokens(&env, asset_id, amount, burner)
     }
@@ -698,6 +790,8 @@ impl AssetUpContract {
         to: Address,
         amount: i128,
     ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         from.require_auth();
 
         // Validate transfer restrictions
@@ -724,12 +818,16 @@ impl AssetUpContract {
         until_timestamp: u64,
         caller: Address,
     ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         caller.require_auth();
         tokenization::lock_tokens(&env, asset_id, holder, until_timestamp, caller)
     }
 
     /// Unlock tokens
     pub fn unlock_tokens(env: Env, asset_id: u64, holder: Address) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         tokenization::unlock_tokens(&env, asset_id, holder)
     }
 
@@ -754,6 +852,8 @@ impl AssetUpContract {
 
     /// Update asset valuation
     pub fn update_valuation(env: Env, asset_id: u64, new_valuation: i128) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         tokenization::update_valuation(&env, asset_id, new_valuation)
     }
 
@@ -763,6 +863,8 @@ impl AssetUpContract {
 
     /// Distribute dividends proportionally to all holders
     pub fn distribute_dividends(env: Env, asset_id: u64, total_amount: i128) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         dividends::distribute_dividends(&env, asset_id, total_amount)
     }
 
@@ -783,11 +885,15 @@ impl AssetUpContract {
 
     /// Enable revenue sharing for an asset
     pub fn enable_revenue_sharing(env: Env, asset_id: u64) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         dividends::enable_revenue_sharing(&env, asset_id)
     }
 
     /// Disable revenue sharing for an asset
     pub fn disable_revenue_sharing(env: Env, asset_id: u64) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         dividends::disable_revenue_sharing(&env, asset_id)
     }
 
@@ -802,6 +908,8 @@ impl AssetUpContract {
         proposal_id: u64,
         voter: Address,
     ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         voter.require_auth();
         voting::cast_vote(&env, asset_id, proposal_id, voter)
     }
@@ -836,6 +944,8 @@ impl AssetUpContract {
         asset_id: u64,
         require_accredited: bool,
     ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         transfer_restrictions::set_transfer_restriction(
             &env,
             asset_id,
@@ -848,11 +958,15 @@ impl AssetUpContract {
 
     /// Add address to whitelist
     pub fn add_to_whitelist(env: Env, asset_id: u64, address: Address) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         transfer_restrictions::add_to_whitelist(&env, asset_id, address)
     }
 
     /// Remove address from whitelist
     pub fn remove_from_whitelist(env: Env, asset_id: u64, address: Address) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         transfer_restrictions::remove_from_whitelist(&env, asset_id, address)
     }
 
@@ -876,12 +990,16 @@ impl AssetUpContract {
         asset_id: u64,
         proposer: Address,
     ) -> Result<u64, Error> {
+        Self::require_not_paused(&env)?;
+
         proposer.require_auth();
         detokenization::propose_detokenization(&env, asset_id, proposer)
     }
 
     /// Execute detokenization (if vote passed)
     pub fn execute_detokenization(env: Env, asset_id: u64, proposal_id: u64) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         detokenization::execute_detokenization(&env, asset_id, proposal_id)
     }
 
@@ -907,6 +1025,8 @@ impl AssetUpContract {
         env: Env,
         policy: insurance::InsurancePolicy,
     ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         policy.insurer.require_auth();
         insurance::create_policy(env, policy)
     }
@@ -917,6 +1037,8 @@ impl AssetUpContract {
         policy_id: BytesN<32>,
         caller: Address,
     ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         caller.require_auth();
         insurance::cancel_policy(env, policy_id, caller)
     }
@@ -927,12 +1049,16 @@ impl AssetUpContract {
         policy_id: BytesN<32>,
         insurer: Address,
     ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         insurer.require_auth();
         insurance::suspend_policy(env, policy_id, insurer)
     }
 
     /// Expire a policy (permissionless)
     pub fn expire_insurance_policy(env: Env, policy_id: BytesN<32>) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         insurance::expire_policy(env, policy_id)
     }
 
@@ -944,6 +1070,8 @@ impl AssetUpContract {
         new_premium: i128,
         insurer: Address,
     ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         insurer.require_auth();
         insurance::renew_policy(env, policy_id, new_end_date, new_premium, insurer)
     }
@@ -973,6 +1101,8 @@ impl AssetUpContract {
         rent: i128,
         deposit: i128,
     ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         lessor.require_auth();
         lease::create_lease(
             &env, asset_id, lease_id, lessor, lessee, start, end, rent, deposit,
@@ -985,18 +1115,24 @@ impl AssetUpContract {
         lease_id: BytesN<32>,
         caller: Address,
     ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         caller.require_auth();
         lease::return_leased_asset(&env, lease_id, caller)
     }
 
     /// Cancel a lease before it starts. Lessor only.
     pub fn cancel_lease(env: Env, lease_id: BytesN<32>, caller: Address) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         caller.require_auth();
         lease::cancel_lease(&env, lease_id, caller)
     }
 
     /// Expire a lease permissionlessly once end_timestamp has passed.
     pub fn expire_lease(env: Env, lease_id: BytesN<32>) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
         lease::expire_lease(&env, lease_id)
     }
 

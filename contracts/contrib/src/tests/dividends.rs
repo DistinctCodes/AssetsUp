@@ -71,7 +71,7 @@ fn test_distribute_dividends_proportional_multiple_holders() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #26)")]
+#[should_panic(expected = "Error(Contract, #150)")]
 fn test_claim_dividends_nothing_to_claim() {
     let env = Env::default();
     let client = setup(&env);
