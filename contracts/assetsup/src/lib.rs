@@ -43,8 +43,10 @@ pub(crate) mod dividends;
 pub(crate) mod error;
 pub(crate) mod insurance;
 pub(crate) mod lease;
+pub(crate) mod math;
 pub(crate) mod tokenization;
 pub(crate) mod transfer_restrictions;
+pub(crate) mod ttl;
 pub(crate) mod types;
 pub(crate) mod voting;
 
@@ -72,6 +74,7 @@ pub struct AssetUpContract;
 impl AssetUpContract {
     pub fn initialize(env: Env, admin: Address) -> Result<(), Error> {
         admin.require_auth();
+        ttl::extend_instance(&env);
 
         if env.storage().persistent().has(&DataKey::Admin) {
             handle_error(&env, Error::AlreadyInitialized)
@@ -102,20 +105,38 @@ impl AssetUpContract {
             .persistent()
             .set(&DataKey::AuthorizedRegistrar(admin.clone()), &true);
 
+        // Extend on write, not only on read. A freshly written entry gets the
+        // network's minimum lifetime, which is short; without this the whole
+        // contract configuration can be archived before anyone reads it, and a
+        // read cannot rescue an entry that is already gone.
+        ttl::extend_persistent(&env, &DataKey::Admin);
+        ttl::extend_persistent(&env, &DataKey::Paused);
+        ttl::extend_persistent(&env, &DataKey::TotalAssetCount);
+        ttl::extend_persistent(&env, &DataKey::ContractMetadata);
+        ttl::extend_persistent(&env, &DataKey::AuthorizedRegistrar(admin));
+
         Ok(())
     }
 
     pub fn get_admin(env: Env) -> Result<Address, Error> {
+        ttl::extend_instance(&env);
+
         let key = DataKey::Admin;
         if !env.storage().persistent().has(&key) {
             handle_error(&env, Error::AdminNotFound)
         }
+
+        // Contract-level configuration lives in persistent storage, so it
+        // needs extending like any other persistent entry — the instance bump
+        // alone does not cover it.
+        ttl::extend_persistent(&env, &key);
 
         let admin = env.storage().persistent().get(&key).unwrap();
         Ok(admin)
     }
 
     pub fn is_paused(env: Env) -> Result<bool, Error> {
+        ttl::extend_persistent(&env, &DataKey::Paused);
         Ok(env
             .storage()
             .persistent()
@@ -124,6 +145,7 @@ impl AssetUpContract {
     }
 
     pub fn get_total_asset_count(env: Env) -> Result<u64, Error> {
+        ttl::extend_persistent(&env, &DataKey::TotalAssetCount);
         Ok(env
             .storage()
             .persistent()
@@ -132,6 +154,7 @@ impl AssetUpContract {
     }
 
     pub fn get_contract_metadata(env: Env) -> Result<ContractMetadata, Error> {
+        ttl::extend_persistent(&env, &DataKey::ContractMetadata);
         let metadata = env.storage().persistent().get(&DataKey::ContractMetadata);
         match metadata {
             Some(m) => Ok(m),
@@ -140,15 +163,21 @@ impl AssetUpContract {
     }
 
     pub fn is_authorized_registrar(env: Env, address: Address) -> Result<bool, Error> {
-        Ok(env
-            .storage()
-            .persistent()
-            .get(&DataKey::AuthorizedRegistrar(address))
-            .unwrap_or(false))
+        let key = DataKey::AuthorizedRegistrar(address);
+        ttl::extend_persistent(&env, &key);
+        Ok(env.storage().persistent().get(&key).unwrap_or(false))
     }
 
     // Asset functions
     pub fn register_asset(env: Env, asset: asset::Asset, caller: Address) -> Result<(), Error> {
+        ttl::extend_instance(&env);
+
+        // Authenticate the caller before trusting `caller` for anything else.
+        // The registrar check below compares against a caller-supplied address,
+        // so without this any account could name an authorized registrar and
+        // pass it.
+        caller.require_auth();
+
         // Check if contract is paused
         if Self::is_paused(env.clone())? {
             return Err(Error::ContractPaused);
@@ -172,6 +201,7 @@ impl AssetUpContract {
 
         // Store asset
         store.set(&key, &asset);
+        ttl::extend_persistent(&env, &key);
 
         // Update owner registry
         let owner_key = asset::DataKey::OwnerRegistry(asset.owner.clone());
@@ -249,6 +279,12 @@ impl AssetUpContract {
         new_custom_attributes: Option<Vec<types::CustomAttribute>>,
         caller: Address,
     ) -> Result<(), Error> {
+        ttl::extend_instance(&env);
+
+        // Authenticate before the owner/admin comparison below, which would
+        // otherwise be satisfied by simply naming the owner's address.
+        caller.require_auth();
+
         // Check if contract is paused
         if Self::is_paused(env.clone())? {
             return Err(Error::ContractPaused);
@@ -285,6 +321,7 @@ impl AssetUpContract {
         }
 
         store.set(&key, &asset);
+        ttl::extend_persistent(&env, &key);
 
         // Append audit log
         audit::append_audit_log(
@@ -310,6 +347,13 @@ impl AssetUpContract {
         new_owner: Address,
         caller: Address,
     ) -> Result<(), Error> {
+        ttl::extend_instance(&env);
+
+        // Authenticate before the ownership comparison below. Without this,
+        // anyone could pass the current owner's address and take the asset —
+        // a direct asset-theft path.
+        caller.require_auth();
+
         // Check if contract is paused
         if Self::is_paused(env.clone())? {
             return Err(Error::ContractPaused);
@@ -360,6 +404,7 @@ impl AssetUpContract {
         asset.last_transfer_timestamp = env.ledger().timestamp();
         asset.status = AssetStatus::Transferred;
         store.set(&key, &asset);
+        ttl::extend_persistent(&env, &key);
 
         // Append audit log
         audit::append_audit_log(
@@ -380,6 +425,11 @@ impl AssetUpContract {
     }
 
     pub fn retire_asset(env: Env, asset_id: BytesN<32>, caller: Address) -> Result<(), Error> {
+        ttl::extend_instance(&env);
+
+        // Authenticate before the owner/admin comparison below.
+        caller.require_auth();
+
         // Check if contract is paused
         if Self::is_paused(env.clone())? {
             return Err(Error::ContractPaused);
@@ -401,6 +451,7 @@ impl AssetUpContract {
 
         asset.status = AssetStatus::Retired;
         store.set(&key, &asset);
+        ttl::extend_persistent(&env, &key);
 
         // Append audit log
         audit::append_audit_log(
@@ -421,10 +472,18 @@ impl AssetUpContract {
     }
 
     pub fn get_asset(env: Env, asset_id: BytesN<32>) -> Result<asset::Asset, Error> {
+        ttl::extend_instance(&env);
+
         let key = asset::DataKey::Asset(asset_id);
         let store = env.storage().persistent();
         match store.get::<_, asset::Asset>(&key) {
-            Some(a) => Ok(a),
+            Some(a) => {
+                // Extend on read too. An asset that is only ever queried and
+                // never modified would otherwise be archived despite being in
+                // active use.
+                ttl::extend_persistent(&env, &key);
+                Ok(a)
+            }
             None => Err(Error::AssetNotFound),
         }
     }
@@ -439,6 +498,8 @@ impl AssetUpContract {
     }
 
     pub fn check_asset_exists(env: Env, asset_id: BytesN<32>) -> Result<bool, Error> {
+        ttl::extend_instance(&env);
+
         let key = asset::DataKey::Asset(asset_id);
         let store = env.storage().persistent();
         Ok(store.has(&key))

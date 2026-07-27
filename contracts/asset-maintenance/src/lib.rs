@@ -27,6 +27,7 @@
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec};
 
 mod test;
+mod tests_coverage;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -187,7 +188,27 @@ pub struct AssetMaintenanceContract;
 
 #[contractimpl]
 impl AssetMaintenanceContract {
+    /// Loads the stored admin and requires its authorization.
+    ///
+    /// Several entrypoints mutate registry-level data without taking a caller
+    /// argument, so the stored admin is the only principal this contract can
+    /// authenticate against without an ABI change. A finer-grained model —
+    /// letting the asset owner manage their own warranty, for instance — needs
+    /// the asset-registry integration this contract does not have yet.
+    fn require_admin(env: &Env) {
+        let admin: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Admin)
+            .expect("not initialized");
+        admin.require_auth();
+    }
+
     pub fn init(env: Env, admin: Address, registry: Address) {
+        // Without this, whoever calls init first becomes admin of a freshly
+        // deployed contract, regardless of who deployed it.
+        admin.require_auth();
+
         if env.storage().persistent().has(&DataKey::Admin) {
             panic!("already initialized");
         }
@@ -372,6 +393,8 @@ impl AssetMaintenanceContract {
     }
 
     pub fn add_warranty_information(env: Env, warranty: WarrantyInfo) {
+        Self::require_admin(&env);
+
         if warranty.end_date <= warranty.start_date {
             panic!("warranty dates invalid");
         }
@@ -386,6 +409,8 @@ impl AssetMaintenanceContract {
     }
 
     pub fn update_warranty_information(env: Env, warranty: WarrantyInfo) {
+        Self::require_admin(&env);
+
         if !env
             .storage()
             .persistent()
@@ -407,6 +432,8 @@ impl AssetMaintenanceContract {
     }
 
     pub fn file_warranty_claim(env: Env, asset_id: u64, claim_amount: i128) {
+        Self::require_admin(&env);
+
         let mut warranty: WarrantyInfo = env
             .storage()
             .persistent()
@@ -435,6 +462,8 @@ impl AssetMaintenanceContract {
     }
 
     pub fn create_maintenance_alert(env: Env, alert: MaintenanceAlert) {
+        Self::require_admin(&env);
+
         let mut alerts = env
             .storage()
             .persistent()

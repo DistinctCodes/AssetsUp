@@ -14,6 +14,9 @@ fn test_init_and_provider_registration() {
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
 
+    // init now requires the admin's authorization, so auths must be mocked
+    // before it rather than after.
+    env.mock_all_auths();
     client.init(&admin, &registry);
 
     let provider_addr = Address::generate(&env);
@@ -30,7 +33,6 @@ fn test_init_and_provider_registration() {
         service_area: String::from_str(&env, "Global"),
     };
 
-    env.mock_all_auths();
     client.register_provider(&provider);
 
     let fetched = client.get_provider_details(&provider_addr).unwrap();
