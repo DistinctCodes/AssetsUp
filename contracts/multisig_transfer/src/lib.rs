@@ -3,6 +3,7 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
 
 mod approvals;
+mod auth_tests;
 mod errors;
 mod events;
 mod registry;
@@ -24,6 +25,10 @@ impl MultiSigTransferContract {
     // Init
     // ----------------------------
     pub fn initialize(e: Env, admin: Address, asset_registry: Address) {
+        // Without this, whoever calls initialize first becomes admin of a
+        // freshly deployed contract, regardless of who deployed it.
+        admin.require_auth();
+
         storage::set_admin(&e, &admin);
         storage::set_registry(&e, &asset_registry);
         e.storage()
@@ -39,6 +44,10 @@ impl MultiSigTransferContract {
         caller: Address,
         rule: ApprovalRule,
     ) -> Result<(), MultiSigError> {
+        // require_admin only compares `caller` against the stored admin.
+        // Without authenticating `caller` first, anyone could pass the admin's
+        // address and pass that check.
+        caller.require_auth();
         utils::require_admin(&e, &caller)?;
 
         let mut rules_map = storage::rules_map(&e);
@@ -63,6 +72,9 @@ impl MultiSigTransferContract {
         expires_at: u64,
         execute_after: Option<u64>,
     ) -> Result<u64, MultiSigError> {
+        // The ownership check below compares the registry's owner against a
+        // caller-supplied address; authenticate it first.
+        caller.require_auth();
         let (_admin, registry_addr) = utils::require_init(&e)?;
 
         if caller == new_owner {
@@ -155,6 +167,10 @@ impl MultiSigTransferContract {
         caller: Address,
         request_id: u64,
     ) -> Result<(), MultiSigError> {
+        // The approver-membership check below compares against a
+        // caller-supplied address; authenticate it first or approvals can be
+        // forged by naming an authorized approver.
+        caller.require_auth();
         let (_admin, _registry) = utils::require_init(&e)?;
 
         let mut requests = storage::requests_map(&e);
@@ -211,6 +227,7 @@ impl MultiSigTransferContract {
         request_id: u64,
         reason_hash: BytesN<32>,
     ) -> Result<(), MultiSigError> {
+        caller.require_auth();
         let (_admin, _registry) = utils::require_init(&e)?;
 
         let mut requests = storage::requests_map(&e);
@@ -245,7 +262,12 @@ impl MultiSigTransferContract {
     // ----------------------------
     pub fn execute_transfer(e: Env, caller: Address, request_id: u64) -> Result<(), MultiSigError> {
         let (_admin, registry_addr) = utils::require_init(&e)?;
-        let _ = caller; // anyone can execute, kept for audit if desired
+        // Deliberately permissionless, like multisig-wallet's execute_*: the
+        // authorization decision was already made by the approvers, and
+        // requiring one of them to also submit the execution adds liveness
+        // risk without adding security. `caller` is retained for the audit
+        // trail only and is intentionally not authenticated.
+        let _ = caller;
 
         let mut requests = storage::requests_map(&e);
         let mut req = requests
@@ -291,6 +313,9 @@ impl MultiSigTransferContract {
         caller: Address,
         request_id: u64,
     ) -> Result<(), MultiSigError> {
+        // Cancellation is restricted to the requester or the admin, both
+        // compared against a caller-supplied address.
+        caller.require_auth();
         let (admin, _registry) = utils::require_init(&e)?;
 
         let mut requests = storage::requests_map(&e);

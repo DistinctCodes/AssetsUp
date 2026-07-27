@@ -62,6 +62,10 @@ pub struct ContribContract;
 impl ContribContract {
     /// Initialize the contract with an admin.
     pub fn initialize(env: Env, admin: Address) {
+        // Without this, whoever calls initialize first becomes admin of a
+        // freshly deployed contract, regardless of who deployed it.
+        admin.require_auth();
+
         if env.storage().persistent().has(&DataKey::Admin) {
             panic!("Already initialized");
         }

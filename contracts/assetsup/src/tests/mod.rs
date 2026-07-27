@@ -5,6 +5,7 @@ mod helpers;
 mod admin;
 mod asset;
 mod audit_trail;
+mod auth;
 mod initialization;
 
 // Tokenization and ownership tests
@@ -28,3 +29,6 @@ mod integration;
 mod tokenization_new;
 mod transfer_restrictions_new;
 mod voting_new;
+
+// Storage TTL policy tests
+mod ttl;
