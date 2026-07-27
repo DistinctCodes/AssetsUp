@@ -243,8 +243,9 @@ fn test_admin_operations_workflow() {
     client.unpause_contract();
     assert!(!client.is_paused());
 
-    // Update admin
-    client.update_admin(&new_admin);
+    // Update admin (two-step: propose then accept)
+    client.propose_admin(&new_admin);
+    client.accept_admin();
     assert_eq!(client.get_admin(), new_admin);
 
     // Verify old admin is no longer authorized registrar

@@ -29,7 +29,7 @@ fn test_register_asset_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3)")]
+#[should_panic(expected = "Error(Contract, #101)")]
 fn test_register_asset_already_exists() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -46,7 +46,7 @@ fn test_register_asset_already_exists() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #34)")]
+#[should_panic(expected = "Error(Contract, #6)")]
 fn test_register_asset_when_paused() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -65,7 +65,7 @@ fn test_register_asset_when_paused() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_register_asset_unauthorized() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
@@ -81,7 +81,7 @@ fn test_register_asset_unauthorized() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #36)")]
+#[should_panic(expected = "Error(Contract, #170)")]
 fn test_register_asset_invalid_name_too_short() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -98,7 +98,7 @@ fn test_register_asset_invalid_name_too_short() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #37)")]
+#[should_panic(expected = "Error(Contract, #171)")]
 fn test_register_asset_invalid_purchase_value() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -115,7 +115,7 @@ fn test_register_asset_invalid_purchase_value() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #39)")]
+#[should_panic(expected = "Error(Contract, #173)")]
 fn test_register_asset_zero_owner() {
     let env = create_env();
     let admin = Address::generate(&env);
@@ -160,7 +160,7 @@ fn test_update_asset_metadata_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #4)")]
+#[should_panic(expected = "Error(Contract, #102)")]
 fn test_update_asset_metadata_not_found() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -176,7 +176,7 @@ fn test_update_asset_metadata_not_found() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_update_asset_metadata_unauthorized() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
@@ -224,7 +224,7 @@ fn test_transfer_asset_ownership_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_transfer_asset_ownership_unauthorized() {
     let env = create_env();
     let (admin, user1, user2, user3) = create_mock_addresses(&env);
@@ -261,7 +261,7 @@ fn test_retire_asset_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_retire_asset_unauthorized() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
