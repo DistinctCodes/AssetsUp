@@ -129,10 +129,7 @@ pub fn create_lease(
     set_asset_active_lease(env, &asset_id, &lease_id);
     append_lessee_lease(env, &lessee, &lease_id);
 
-    env.events().publish(
-        (soroban_sdk::symbol_short!("lease_new"),),
-        (lease_id, asset_id, lessor, lessee, env.ledger().timestamp()),
-    );
+    crate::events::lease_created(env, &lease_id, &asset_id, &lessor, &lessee);
 
     Ok(())
 }
@@ -152,10 +149,7 @@ pub fn return_leased_asset(env: &Env, lease_id: BytesN<32>, caller: Address) -> 
     save_lease(env, &lease);
     clear_asset_active_lease(env, &lease.asset_id);
 
-    env.events().publish(
-        (soroban_sdk::symbol_short!("lease_ret"),),
-        (lease_id, caller, env.ledger().timestamp()),
-    );
+    crate::events::lease_returned(env, &lease_id, &caller);
 
     Ok(())
 }
@@ -179,10 +173,7 @@ pub fn cancel_lease(env: &Env, lease_id: BytesN<32>, caller: Address) -> Result<
     save_lease(env, &lease);
     clear_asset_active_lease(env, &lease.asset_id);
 
-    env.events().publish(
-        (soroban_sdk::symbol_short!("lease_can"),),
-        (lease_id, caller, env.ledger().timestamp()),
-    );
+    crate::events::lease_cancelled(env, &lease_id, &caller);
 
     Ok(())
 }
@@ -202,10 +193,7 @@ pub fn expire_lease(env: &Env, lease_id: BytesN<32>) -> Result<(), Error> {
     save_lease(env, &lease);
     clear_asset_active_lease(env, &lease.asset_id);
 
-    env.events().publish(
-        (soroban_sdk::symbol_short!("lease_exp"),),
-        (lease_id, env.ledger().timestamp()),
-    );
+    crate::events::lease_expired(env, &lease_id);
 
     Ok(())
 }

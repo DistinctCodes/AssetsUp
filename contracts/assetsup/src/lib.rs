@@ -2,9 +2,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::error::{handle_error, Error};
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, String, Vec};
 
 pub(crate) mod asset;
 pub(crate) mod audit;
@@ -12,6 +10,7 @@ pub(crate) mod branch;
 pub(crate) mod detokenization;
 pub(crate) mod dividends;
 pub(crate) mod error;
+pub mod events;
 pub(crate) mod insurance;
 pub(crate) mod lease;
 pub(crate) mod tokenization;
@@ -72,6 +71,8 @@ impl AssetUpContract {
         env.storage()
             .persistent()
             .set(&DataKey::AuthorizedRegistrar(admin.clone()), &true);
+
+        events::contract_initialized(&env, &admin);
 
         Ok(())
     }
@@ -168,10 +169,7 @@ impl AssetUpContract {
         );
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("asset_reg"),),
-            (asset.owner, asset.id, env.ledger().timestamp()),
-        );
+        events::asset_registered(&env, &asset.id, &asset.owner);
 
         Ok(())
     }
@@ -267,10 +265,7 @@ impl AssetUpContract {
         );
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("asset_upd"),),
-            (asset_id, caller, env.ledger().timestamp()),
-        );
+        events::asset_updated(&env, &asset_id, &caller);
 
         Ok(())
     }
@@ -342,10 +337,7 @@ impl AssetUpContract {
         );
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("asset_tx"),),
-            (asset_id, old_owner, new_owner, env.ledger().timestamp()),
-        );
+        events::asset_transferred(&env, &asset_id, &old_owner, &new_owner);
 
         Ok(())
     }
@@ -383,10 +375,7 @@ impl AssetUpContract {
         );
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("asset_ret"),),
-            (asset_id, caller, env.ledger().timestamp()),
-        );
+        events::asset_retired(&env, &asset_id, &caller);
 
         Ok(())
     }
@@ -466,10 +455,7 @@ impl AssetUpContract {
             .set(&DataKey::AuthorizedRegistrar(new_admin.clone()), &true);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("admin_chg"),),
-            (old_admin, new_admin, env.ledger().timestamp()),
-        );
+        events::admin_changed(&env, &old_admin, &new_admin);
 
         Ok(())
     }
@@ -480,7 +466,9 @@ impl AssetUpContract {
 
         env.storage()
             .persistent()
-            .set(&DataKey::AuthorizedRegistrar(registrar), &true);
+            .set(&DataKey::AuthorizedRegistrar(registrar.clone()), &true);
+
+        events::registrar_added(&env, &registrar);
         Ok(())
     }
 
@@ -495,7 +483,9 @@ impl AssetUpContract {
 
         env.storage()
             .persistent()
-            .set(&DataKey::AuthorizedRegistrar(registrar), &false);
+            .set(&DataKey::AuthorizedRegistrar(registrar.clone()), &false);
+
+        events::registrar_removed(&env, &registrar);
         Ok(())
     }
 
@@ -506,10 +496,7 @@ impl AssetUpContract {
         env.storage().persistent().set(&DataKey::Paused, &true);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("c_pause"),),
-            (admin, env.ledger().timestamp()),
-        );
+        events::contract_paused(&env, &admin);
 
         Ok(())
     }
@@ -521,10 +508,7 @@ impl AssetUpContract {
         env.storage().persistent().set(&DataKey::Paused, &false);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("c_unpause"),),
-            (admin, env.ledger().timestamp()),
-        );
+        events::contract_unpaused(&env, &admin);
 
         Ok(())
     }

@@ -1,6 +1,7 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec};
 
+pub mod events;
 mod test;
 
 #[contracttype]
@@ -170,6 +171,8 @@ impl AssetMaintenanceContract {
         env.storage()
             .persistent()
             .set(&DataKey::AssetRegistry, &registry);
+
+        events::contract_initialized(&env, &admin, &registry);
     }
 
     pub fn register_provider(env: Env, provider: ProviderProfile) {
@@ -179,6 +182,8 @@ impl AssetMaintenanceContract {
         env.storage()
             .persistent()
             .set(&DataKey::Provider(provider.address.clone()), &provider);
+
+        events::provider_registered(&env, &provider.address);
     }
 
     pub fn deactivate_provider(env: Env, provider_address: Address) {
@@ -193,7 +198,9 @@ impl AssetMaintenanceContract {
             provider.is_active = false;
             env.storage()
                 .persistent()
-                .set(&DataKey::Provider(provider_address), &provider);
+                .set(&DataKey::Provider(provider_address.clone()), &provider);
+
+            events::provider_deactivated(&env, &provider_address);
         }
     }
 
@@ -271,10 +278,7 @@ impl AssetMaintenanceContract {
             .set(&DataKey::AssetStats(record.asset_id), &stats);
 
         // 6. Emit Event
-        env.events().publish(
-            (symbol_short!("MaintRec"), record.asset_id),
-            (record.record_id, record.provider, env.ledger().timestamp()),
-        );
+        events::maintenance_recorded(&env, &record);
     }
 
     pub fn get_maintenance_history(env: Env, asset_id: u64) -> Vec<MaintenanceRecord> {
@@ -286,23 +290,13 @@ impl AssetMaintenanceContract {
 
     pub fn schedule_maintenance(env: Env, owner: Address, schedule: ScheduledMaintenance) {
         owner.require_auth();
-        // Asset owner check (placeholder - assuming caller is owner or admin)
-        // In a real system, we'd check if owner is truly the owner via Registry
-        if schedule.frequency_days == 0 {
-            panic!("frequency must be positive");
-        }
-
-        env.storage()
-            .persistent()
-            .set(&DataKey::MaintenanceSchedule(schedule.asset_id), &schedule);
-
-        env.events().publish(
-            (symbol_short!("MaintSch"), schedule.asset_id),
-            (schedule.next_service_due, env.ledger().timestamp()),
-        );
+        Self::store_schedule(&env, &schedule);
+        events::maintenance_scheduled(&env, &schedule);
     }
 
     pub fn update_maintenance_schedule(env: Env, owner: Address, schedule: ScheduledMaintenance) {
+        owner.require_auth();
+
         // Update existing schedule
         if !env
             .storage()
@@ -311,7 +305,23 @@ impl AssetMaintenanceContract {
         {
             panic!("no schedule exists for asset");
         }
-        Self::schedule_maintenance(env, owner, schedule);
+
+        Self::store_schedule(&env, &schedule);
+        events::maintenance_schedule_updated(&env, &schedule);
+    }
+
+    /// Validates and persists a schedule without emitting an event, so that
+    /// the create and update entrypoints each emit their own.
+    fn store_schedule(env: &Env, schedule: &ScheduledMaintenance) {
+        // Asset owner check (placeholder - assuming caller is owner or admin)
+        // In a real system, we'd check if owner is truly the owner via Registry
+        if schedule.frequency_days == 0 {
+            panic!("frequency must be positive");
+        }
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::MaintenanceSchedule(schedule.asset_id), schedule);
     }
 
     pub fn get_upcoming_maintenance(env: Env, asset_id: u64) -> Option<ScheduledMaintenance> {
@@ -340,24 +350,12 @@ impl AssetMaintenanceContract {
             }
         }
 
-        env.events().publish(
-            (symbol_short!("MaintCmp"), asset_id),
-            (record.record_id, record.provider, env.ledger().timestamp()),
-        );
+        events::maintenance_completed(&env, asset_id, &record);
     }
 
     pub fn add_warranty_information(env: Env, warranty: WarrantyInfo) {
-        if warranty.end_date <= warranty.start_date {
-            panic!("warranty dates invalid");
-        }
-        env.storage()
-            .persistent()
-            .set(&DataKey::Warranty(warranty.asset_id), &warranty);
-
-        env.events().publish(
-            (symbol_short!("WarrAdd"), warranty.asset_id),
-            (warranty.end_date, env.ledger().timestamp()),
-        );
+        Self::store_warranty(&env, &warranty);
+        events::warranty_added(&env, warranty.asset_id, warranty.end_date);
     }
 
     pub fn update_warranty_information(env: Env, warranty: WarrantyInfo) {
@@ -368,7 +366,20 @@ impl AssetMaintenanceContract {
         {
             panic!("no warranty exists for asset");
         }
-        Self::add_warranty_information(env, warranty);
+
+        Self::store_warranty(&env, &warranty);
+        events::warranty_updated(&env, warranty.asset_id, warranty.end_date);
+    }
+
+    /// Validates and persists warranty terms without emitting an event, so
+    /// that the add and update entrypoints each emit their own.
+    fn store_warranty(env: &Env, warranty: &WarrantyInfo) {
+        if warranty.end_date <= warranty.start_date {
+            panic!("warranty dates invalid");
+        }
+        env.storage()
+            .persistent()
+            .set(&DataKey::Warranty(warranty.asset_id), warranty);
     }
 
     pub fn get_provider_details(env: Env, provider_address: Address) -> Option<ProviderProfile> {
@@ -403,10 +414,7 @@ impl AssetMaintenanceContract {
             .persistent()
             .set(&DataKey::Warranty(asset_id), &warranty);
 
-        env.events().publish(
-            (symbol_short!("WarrClm"), asset_id),
-            (claim_amount, env.ledger().timestamp()),
-        );
+        events::warranty_claim_filed(&env, asset_id, claim_amount);
     }
 
     pub fn create_maintenance_alert(env: Env, alert: MaintenanceAlert) {
@@ -420,10 +428,7 @@ impl AssetMaintenanceContract {
             .persistent()
             .set(&DataKey::Alerts(alert.asset_id), &alerts);
 
-        env.events().publish(
-            (symbol_short!("AlertCr"), alert.asset_id),
-            (alert.alert_type, alert.severity, env.ledger().timestamp()),
-        );
+        events::alert_created(&env, &alert);
     }
 
     pub fn acknowledge_maintenance_alert(env: Env, asset_id: u64, alert_index: u32, by: Address) {
@@ -436,11 +441,13 @@ impl AssetMaintenanceContract {
 
         if let Some(mut alert) = alerts.get(alert_index) {
             alert.acknowledged = true;
-            alert.acknowledged_by = by;
+            alert.acknowledged_by = by.clone();
             alerts.set(alert_index, alert);
             env.storage()
                 .persistent()
                 .set(&DataKey::Alerts(asset_id), &alerts);
+
+            events::alert_acknowledged(&env, asset_id, alert_index, &by);
         }
     }
 

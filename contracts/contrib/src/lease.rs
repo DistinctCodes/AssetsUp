@@ -1,5 +1,5 @@
 use crate::{Asset, DataKey as GlobalDataKey};
-use soroban_sdk::{contracttype, symbol_short, Address, BytesN, Env, Vec};
+use soroban_sdk::{contracttype, Address, BytesN, Env, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -82,10 +82,7 @@ pub fn create_lease(
     leases.push_back(lease_id.clone());
     store.set(&list_key, &leases);
 
-    env.events().publish(
-        (symbol_short!("lease_cr"), lease_id.clone()),
-        (asset_id, lessor, lessee),
-    );
+    crate::events::lease_created(&env, &lease_id, &asset_id, &lessor, &lessee);
 
     lease_id
 }
@@ -103,10 +100,7 @@ pub fn check_in_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
     lease.status = LeaseStatus::Returned;
     store.set(&key, &lease);
 
-    env.events().publish(
-        (symbol_short!("lease_in"), lease_id),
-        (env.ledger().timestamp(),),
-    );
+    crate::events::lease_checked_in(&env, &lease_id);
 }
 
 pub fn cancel_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
@@ -124,10 +118,7 @@ pub fn cancel_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
     lease.status = LeaseStatus::Cancelled;
     store.set(&key, &lease);
 
-    env.events().publish(
-        (symbol_short!("lease_can"), lease_id),
-        (caller, env.ledger().timestamp()),
-    );
+    crate::events::lease_cancelled(&env, &lease_id, &caller);
 }
 
 pub fn get_active_leases(env: Env, asset_id: BytesN<32>) -> Vec<BytesN<32>> {

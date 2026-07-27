@@ -1,8 +1,11 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Val, Vec};
+use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
 
 mod errors;
+#[cfg(test)]
+mod event_tests;
+pub mod events;
 #[cfg(test)]
 mod tests;
 mod types;
@@ -63,6 +66,8 @@ impl MultisigWallet {
                 .set(&DataKey::OwnerProfile(owner), &profile);
         }
 
+        events::wallet_initialized(&env, &admin, &owners, threshold);
+
         Ok(())
     }
 
@@ -109,10 +114,7 @@ impl MultisigWallet {
             .persistent()
             .set(&DataKey::Transaction(tx_id), &tx);
 
-        env.events().publish(
-            (symbol_short!("tx_sub"), tx_id),
-            (initiator, tx.tx_type, env.ledger().timestamp()),
-        );
+        events::transaction_submitted(&env, tx_id, &initiator, tx.tx_type);
 
         Ok(tx_id)
     }
@@ -169,10 +171,7 @@ impl MultisigWallet {
             .persistent()
             .set(&DataKey::OwnerProfile(confirmer.clone()), &profile);
 
-        env.events().publish(
-            (symbol_short!("tx_conf"), tx_id),
-            (confirmer, tx.confirmations_count, env.ledger().timestamp()),
-        );
+        events::transaction_confirmed(&env, tx_id, &confirmer, tx.confirmations_count);
 
         // Auto-execute if threshold reached
         if tx.confirmations_count >= tx.required_confirmations {
@@ -214,10 +213,7 @@ impl MultisigWallet {
             .persistent()
             .set(&DataKey::Transaction(tx_id), &tx);
 
-        env.events().publish(
-            (symbol_short!("tx_rev"), tx_id),
-            (revoker, env.ledger().timestamp()),
-        );
+        events::confirmation_revoked(&env, tx_id, &revoker);
 
         Ok(())
     }
@@ -264,10 +260,7 @@ impl MultisigWallet {
         let _result: Val =
             env.invoke_contract(&tx.target, &tx.function_name, tx.parameters.clone());
 
-        env.events().publish(
-            (symbol_short!("tx_exec"), tx_id),
-            (tx.initiator, _result, env.ledger().timestamp()),
-        );
+        events::transaction_executed(&env, tx_id, &tx.initiator);
 
         Ok(())
     }
@@ -297,10 +290,7 @@ impl MultisigWallet {
             .persistent()
             .set(&DataKey::Transaction(tx_id), &tx);
 
-        env.events().publish(
-            (symbol_short!("tx_can"), tx_id),
-            (caller, env.ledger().timestamp()),
-        );
+        events::transaction_cancelled(&env, tx_id, &caller);
 
         Ok(())
     }
@@ -405,6 +395,13 @@ impl MultisigWallet {
             .persistent()
             .set(&DataKey::Proposal(proposal_id), &proposal);
 
+        events::proposal_confirmed(
+            &env,
+            proposal_id,
+            &confirmer,
+            proposal.confirmations_received,
+        );
+
         let threshold: u32 = env.storage().instance().get(&DataKey::Threshold).unwrap();
         if proposal.confirmations_received >= threshold {
             Self::execute_proposal(env, proposal_id)?;
@@ -451,14 +448,7 @@ impl MultisigWallet {
                     .persistent()
                     .set(&DataKey::OwnerProfile(new_owner.clone()), &profile);
 
-                env.events().publish(
-                    (symbol_short!("own_add"),),
-                    (
-                        new_owner,
-                        proposal.proposer.clone(),
-                        env.ledger().timestamp(),
-                    ),
-                );
+                events::owner_added(&env, &new_owner, &proposal.proposer);
             }
             ProposalType::RemoveOwner => {
                 let owner_to_remove = proposal.target_address.clone().unwrap();
@@ -472,14 +462,7 @@ impl MultisigWallet {
                     .persistent()
                     .remove(&DataKey::OwnerProfile(owner_to_remove.clone()));
 
-                env.events().publish(
-                    (symbol_short!("own_rem"),),
-                    (
-                        owner_to_remove,
-                        proposal.proposer.clone(),
-                        env.ledger().timestamp(),
-                    ),
-                );
+                events::owner_removed(&env, &owner_to_remove, &proposal.proposer);
             }
             ProposalType::ChangeThreshold => {
                 let new_threshold = proposal.new_threshold.unwrap();
@@ -488,10 +471,7 @@ impl MultisigWallet {
                     .instance()
                     .set(&DataKey::Threshold, &new_threshold);
 
-                env.events().publish(
-                    (symbol_short!("thr_chg"),),
-                    (old_threshold, new_threshold, env.ledger().timestamp()),
-                );
+                events::threshold_changed(&env, old_threshold, new_threshold);
             }
         }
 
@@ -525,10 +505,7 @@ impl MultisigWallet {
         // For now, let's just set it.
         env.storage().instance().set(&DataKey::Frozen, &true);
 
-        env.events().publish(
-            (symbol_short!("frozen"),),
-            (caller, env.ledger().timestamp()),
-        );
+        events::wallet_frozen(&env, &caller);
         Ok(())
     }
 
@@ -538,10 +515,7 @@ impl MultisigWallet {
 
         env.storage().instance().set(&DataKey::Frozen, &false);
 
-        env.events().publish(
-            (symbol_short!("unfrozen"),),
-            (caller, env.ledger().timestamp()),
-        );
+        events::wallet_unfrozen(&env, &caller);
         Ok(())
     }
 
@@ -551,6 +525,8 @@ impl MultisigWallet {
 
         // Should probably be a proposal too.
         env.storage().instance().set(&DataKey::DailyLimit, &limit);
+
+        events::daily_limit_changed(&env, &caller, limit);
         Ok(())
     }
 
@@ -642,10 +618,7 @@ impl MultisigWallet {
             .unwrap_or(0);
 
         if spent + amount > limit {
-            env.events().publish(
-                (symbol_short!("lim_rch"),),
-                (limit, spent + amount, env.ledger().timestamp()),
-            );
+            events::daily_limit_reached(env, limit, spent + amount);
             return Err(Error::DailyLimitExceeded);
         }
 
@@ -685,6 +658,8 @@ impl MultisigWallet {
         env.storage()
             .persistent()
             .set(&DataKey::Proposal(id), &proposal);
+
+        events::proposal_submitted(env, id, &proposer, proposal.proposal_type);
 
         // Auto-confirm for proposer
         // Self::confirm_proposal(env.clone(), proposer, id)?;

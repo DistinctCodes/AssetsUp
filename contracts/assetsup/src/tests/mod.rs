@@ -5,6 +5,7 @@ mod helpers;
 mod admin;
 mod asset;
 mod audit_trail;
+mod events;
 mod initialization;
 
 // Tokenization and ownership tests

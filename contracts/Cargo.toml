@@ -1,15 +1,20 @@
 [workspace]
 resolver = "2"
+
+# Naming convention: crate (package) names use hyphens, matching Rust ecosystem
+# norms, and every directory name matches its package name. That keeps
+# `cargo <cmd> -p <dirname>` working for all five crates. Member paths are
+# listed bare and alphabetically — no `./` prefixes, no mixed separators.
 members = [
-  "./asset-maintenance",
+  "asset-maintenance",
   "assetsup",
   "contrib",
+  "multisig-transfer",
   "multisig-wallet",
-  "multisig_transfer",
 ]
 
 [workspace.dependencies]
-soroban-sdk = "22"
+soroban-sdk = "23"
 
 [profile.release]
 opt-level = "z"

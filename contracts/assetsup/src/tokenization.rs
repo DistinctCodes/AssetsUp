@@ -94,10 +94,7 @@ pub fn tokenize_asset(
     );
 
     // Emit event: (asset_id, supply, symbol, decimals, tokenizer)
-    env.events().publish(
-        ("token", "asset_tokenized"),
-        (asset_id, total_supply, symbol, decimals, tokenizer),
-    );
+    crate::events::asset_tokenized(env, asset_id, total_supply, symbol, decimals, tokenizer);
 
     Ok(tokenized_asset)
 }
@@ -154,10 +151,7 @@ pub fn mint_tokens(
     );
 
     // Emit event: (asset_id, amount, new_supply)
-    env.events().publish(
-        ("token", "tokens_minted"),
-        (asset_id, amount, tokenized_asset.total_supply),
-    );
+    crate::events::tokens_minted(env, asset_id, amount, tokenized_asset.total_supply);
 
     Ok(tokenized_asset)
 }
@@ -218,10 +212,7 @@ pub fn burn_tokens(
     );
 
     // Emit event: (asset_id, amount, new_supply)
-    env.events().publish(
-        ("token", "tokens_burned"),
-        (asset_id, amount, tokenized_asset.total_supply),
-    );
+    crate::events::tokens_burned(env, asset_id, amount, tokenized_asset.total_supply);
 
     Ok(tokenized_asset)
 }
@@ -320,10 +311,7 @@ pub fn transfer_tokens(
     );
 
     // Emit event: (asset_id, from, to, amount)
-    env.events().publish(
-        ("token", "tokens_transferred"),
-        (asset_id, from.clone(), to.clone(), amount),
-    );
+    crate::events::tokens_transferred(env, asset_id, &from, &to, amount);
 
     Ok(())
 }
@@ -372,10 +360,7 @@ pub fn lock_tokens(
     store.set(&lock_key, &until_timestamp);
 
     // Emit event: (asset_id, holder, until_timestamp)
-    env.events().publish(
-        ("token", "tokens_locked"),
-        (asset_id, holder, until_timestamp),
-    );
+    crate::events::tokens_locked(env, asset_id, &holder, until_timestamp);
 
     Ok(())
 }
@@ -396,8 +381,7 @@ pub fn unlock_tokens(env: &Env, asset_id: u64, holder: Address) -> Result<(), Er
     }
 
     // Emit event: (asset_id, holder)
-    env.events()
-        .publish(("token", "tokens_unlocked"), (asset_id, holder));
+    crate::events::tokens_unlocked(env, asset_id, &holder);
 
     Ok(())
 }
@@ -468,8 +452,7 @@ pub fn update_valuation(env: &Env, asset_id: u64, new_valuation: i128) -> Result
     store.set(&key, &tokenized_asset);
 
     // Emit event: (asset_id, new_valuation)
-    env.events()
-        .publish(("token", "valuation_updated"), (asset_id, new_valuation));
+    crate::events::valuation_updated(env, asset_id, new_valuation);
 
     Ok(())
 }
