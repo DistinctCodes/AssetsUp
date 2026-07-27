@@ -1,3 +1,9 @@
 target
 .env
 test_snapshots/
+
+# Deployment records hold live contract ids per network and are produced by
+# scripts/deploy.sh. They are environment state, not source. The committed
+# deployments/testnet.example.json documents the shape.
+deployments/*
+!deployments/*.example.json

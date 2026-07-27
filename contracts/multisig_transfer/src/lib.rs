@@ -1,4 +1,34 @@
 #![no_std]
+//! # multisig-transfer
+//!
+//! An approval workflow for asset ownership transfers.
+//!
+//! A transfer is requested, collects approvals from authorized approvers until
+//! a per-category threshold is met, and is then executed — at which point this
+//! contract calls into a separate asset **registry contract** to actually move
+//! ownership.
+//!
+//! ## Naming
+//!
+//! The directory is `multisig_transfer/` (underscore) but the package is
+//! `multisig-transfer` (hyphen), so use `cargo test -p multisig-transfer`.
+//!
+//! ## Invariants
+//!
+//! - An asset has at most one pending transfer request at a time.
+//! - An approver cannot approve the same request twice.
+//! - A requester cannot approve their own request.
+//! - Execution requires `approvals >= rule.required_approvals` for the asset's
+//!   category.
+//! - Retired assets cannot be transferred.
+//!
+//! ## Not to be confused with `multisig-wallet`
+//!
+//! `multisig-wallet` is a generic *m-of-n* wallet over arbitrary transactions.
+//! This crate is domain-specific to asset transfers. Neither calls the other.
+//!
+//! See [`README.md`](https://github.com/DistinctCodes/AssetsUp/blob/main/contracts/multisig_transfer/README.md)
+//! for the full entrypoint, storage, event, and error tables.
 
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
 

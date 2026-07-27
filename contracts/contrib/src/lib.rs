@@ -1,5 +1,33 @@
 #![no_std]
 #![allow(clippy::too_many_arguments)]
+//! # contrib
+//!
+//! A second AssetsUp asset registry carrying the capabilities `assetsup` does
+//! not have: escrow, KYC, staking, a price oracle, and a first-class emergency
+//! pause.
+//!
+//! ## Relationship to `assetsup`
+//!
+//! `contrib` and `assetsup` are **independent contracts with separate
+//! storage**. Neither reads or calls the other. Several module names appear in
+//! both (`audit`, `detokenization`, `insurance`, `lease`, `tokenization`) but
+//! the implementations have diverged and are not interchangeable. See
+//! `contracts/README.md` for the ownership split.
+//!
+//! ## Invariants
+//!
+//! - An asset has exactly one owner at any time.
+//! - A retired asset cannot be transferred.
+//! - While paused, mutating registry entrypoints reject; reads still work.
+//! - Escrowed funds are either released to the beneficiary or returned to the
+//!   depositor — never both.
+//!
+//! Unlike `assetsup`, every acting address here is authenticated with
+//! `require_auth()`; this crate is the reference for authorization in the
+//! workspace.
+//!
+//! See [`README.md`](https://github.com/DistinctCodes/AssetsUp/blob/main/contracts/contrib/README.md)
+//! for the full entrypoint, storage, event, and error tables.
 
 mod audit;
 mod pause;
