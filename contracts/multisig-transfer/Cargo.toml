@@ -12,3 +12,5 @@ soroban-sdk = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+# Cross-contract integration tests register the real registry ([SC-51]).
+assetsup = { path = "../assetsup" }

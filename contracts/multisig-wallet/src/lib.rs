@@ -33,6 +33,7 @@ mod errors;
 #[cfg(test)]
 mod event_tests;
 pub mod events;
+mod proptests;
 #[cfg(test)]
 mod tests;
 mod types;
