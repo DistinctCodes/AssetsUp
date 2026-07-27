@@ -198,8 +198,14 @@ jobs:
           command -v cargo-audit >/dev/null || cargo install --locked cargo-audit
           command -v cargo-deny  >/dev/null || cargo install --locked cargo-deny
 
+      # Gates on actual vulnerabilities. Deliberately not --deny warnings:
+      # that promotes *yanked* crates to errors, and soroban-sdk pins yanked
+      # versions of spin and keccak inside its own tree that no cargo update
+      # can resolve. Yanked and unmaintained advisories are handled by cargo
+      # deny below, where deny.toml records each one with a reason and a review
+      # date rather than failing the build indefinitely.
       - name: cargo audit
-        run: cargo audit --file Cargo.lock --deny warnings
+        run: cargo audit --file Cargo.lock
 
       # Covers advisories, the license allowlist, duplicate versions, and
       # source registries. See contracts/deny.toml for the triage process.
