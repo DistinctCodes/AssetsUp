@@ -56,13 +56,16 @@ tracked in [SC-42].
 | `add_maintenance_record` | `record: MaintenanceRecord` | `()` | `record.provider` |
 | `get_maintenance_history` | `asset_id` | `Vec<MaintenanceRecord>` | read-only |
 | `schedule_maintenance` | `owner, schedule` | `()` | `owner` |
-| `update_maintenance_schedule` | `owner, schedule` | `()` | — (none) |
-| `complete_scheduled_maintenance` | `asset_id, record` | `()` | — (none) |
+| `update_maintenance_schedule` | `owner, schedule` | `()` | `owner` (via `schedule_maintenance`) |
+| `complete_scheduled_maintenance` | `asset_id, record` | `()` | `record.provider` (via `add_maintenance_record`) |
 | `get_upcoming_maintenance` | `asset_id` | `Option<ScheduledMaintenance>` | read-only |
 | `get_overdue_maintenance` | `asset_id` | `bool` | read-only |
 
-`update_maintenance_schedule` takes an `owner` argument but never calls
-`owner.require_auth()`, so the argument is currently decorative.
+`update_maintenance_schedule` and `complete_scheduled_maintenance` authenticate
+indirectly: they delegate to `schedule_maintenance` and
+`add_maintenance_record` respectively, which call `require_auth()`. The
+protection is real but easy to miss, and easy to break by refactoring the
+delegation away.
 
 ### Warranties
 

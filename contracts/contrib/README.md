@@ -1,64 +1,92 @@
 # `contrib`
 
-A second asset registry carrying the capabilities `assetsup` does not have:
-**escrow**, **KYC**, **staking**, a **price oracle**, and a first-class
-**emergency pause**.
+A second asset registry with an audit log, an emergency pause, insurance
+policies and claims, and leasing.
 
 Contract type: `ContribContract`. Deployable (`crate-type = ["lib", "cdylib"]`).
+
+## ⚠️ Most of this directory is not compiled
+
+`contrib/src/lib.rs` declares only five modules:
+
+```rust
+mod audit;
+mod pause;
+mod types;
+mod insurance;
+mod lease;
+```
+
+Every other `.rs` file in `contrib/src/` has **no `mod` declaration and is
+therefore not part of the crate** — roughly 1,670 lines that never compile and
+never ship:
+
+| File | Lines | File | Lines |
+|---|---:|---|---:|
+| `tokenization.rs` | 392 | `kyc.rs` | 107 |
+| `restrictions.rs` | 177 | `test.rs` | 102 |
+| `detokenization.rs` | 162 | `escrow.rs` | 101 |
+| `staking.rs` | 138 | `oracle.rs` | 95 |
+| `oracle_test.rs` | 133 | `error.rs` | 42 |
+| `kyc_test.rs` | 115 | | |
+| `staking_test.rs` | 108 | | |
+
+Consequences worth being explicit about:
+
+- **`ContribContract` does not expose escrow, KYC, staking, oracle,
+  tokenization, detokenization, or transfer restrictions.** Reading those files
+  will tell you nothing about the deployed contract.
+- **`contrib` has no typed errors.** `error.rs` defines an `Error` enum that
+  nothing references, so failures surface as `panic!` on a string.
+- `tokenization.rs` does not even parse as valid contract code; it has never
+  compiled.
+- The orphaned `*_test.rs` files never run. All 35 passing tests come from
+  `src/tests/`.
+
+Whether to wire these modules in or delete them is part of the `assetsup` /
+`contrib` consolidation tracked in [SC-46].
 
 ## Relationship to `assetsup`
 
 `contrib` and `assetsup` are **two independent contracts with separate storage**.
 Neither reads the other's state, and neither calls the other. Several module
-names appear in both (`audit`, `detokenization`, `insurance`, `lease`,
-`tokenization`, transfer restrictions) but the implementations have diverged
-and are **not** interchangeable.
+names appear in both (`audit`, `insurance`, `lease`) but the implementations
+have diverged and are **not** interchangeable.
 
-What each crate uniquely owns today:
+What each crate actually ships today:
 
 | Concern | `assetsup` | `contrib` |
 |---|---|---|
 | Asset registry | ✅ authoritative | ✅ separate copy |
-| Escrow | — | ✅ only here |
-| KYC | — | ✅ only here |
-| Staking | — | ✅ only here |
-| Price oracle | — | ✅ only here |
 | Emergency pause | partial | ✅ dedicated `pause` module |
-| Dividends, voting | ✅ only here | — |
-| Insurance | ✅ full claim state machine | smaller policy/claim store |
-| Leasing | ✅ richer lifecycle | check-in/cancel only |
+| Audit log | ✅ | ✅ |
+| Insurance | ✅ full claim state machine | ✅ smaller policy/claim store |
+| Leasing | ✅ richer lifecycle | ✅ check-in/cancel only |
+| Tokenization, dividends, voting, detokenization | ✅ only here | ❌ present as dead files only |
+| Escrow, KYC, staking, price oracle | — | ❌ present as dead files only |
 
-Deciding which crate owns each duplicated concern is tracked in [SC-46]. Until
-that lands, treat them as separate deployments and read this file for
-`contrib`'s actual behaviour.
+The often-repeated idea that `contrib` is where escrow and KYC live is not true
+of the compiled contract.
 
 ## Invariants
 
 - An asset has exactly one owner at any time.
 - A retired asset cannot be transferred.
 - While paused, every mutating registry entrypoint rejects; reads still work.
-- An escrow's funds are either released to the beneficiary or returned to the
-  depositor — never both.
-- A KYC record is approved only by the admin and carries an expiry.
 
 ## Module layout
+
+Compiled modules only — see the section above for the files that are not part
+of the crate.
 
 | Module | Responsibility |
 |---|---|
 | `lib.rs` | Registry entrypoints and re-exported module facades. |
 | `types.rs` | `AssetStatus` and shared types. |
-| `error.rs` | `Error` enum and `handle_error`. |
 | `pause.rs` | `pause`, `unpause`, `is_paused`, `require_not_paused`. |
 | `audit.rs` | Append-only audit log per asset. |
-| `escrow.rs` | Escrow creation, release, cancellation. |
-| `kyc.rs` | KYC submission, approval, revocation, tiers. |
-| `staking.rs` | Token staking, unstaking, reward accrual. |
-| `oracle.rs` | Oracle allowlist and asset valuation feed. |
 | `insurance.rs` | Policies and claims. |
 | `lease.rs` | Lease creation, check-in, cancellation. |
-| `tokenization.rs` | Fractional shares. |
-| `detokenization.rs` | Detokenization proposals. |
-| `restrictions.rs` | Whitelists and transfer validation. |
 
 ## Storage layout
 
@@ -72,8 +100,6 @@ that lands, treat them as separate deployments and read this file for
 | `AuthorizedRegistrar(Address)` | `bool` | Registrar allowlist. |
 | `AuditLogCount` | `u64` | Audit entry counter. |
 | `AuditLogs(BytesN<32>)` | `Vec<AuditLog>` | Audit trail per asset. |
-
-Escrow, KYC, staking, and oracle modules define their own keys.
 
 ## Entrypoints
 
@@ -108,40 +134,17 @@ Reads: `get_admin`, `get_asset`, `get_asset_info`, `get_assets_by_owner`,
 `pause::require_not_paused` is the guard mutating entrypoints call. Verifying
 that **every** mutating entrypoint calls it is tracked in [SC-47].
 
-### Escrow
-
-| Entrypoint | Args | Auth |
-|---|---|---|
-| `create_escrow` | `depositor, beneficiary, amount, ...` | `depositor` |
-| `confirm_release` | `escrow_id` | depositor/arbiter check |
-| `cancel_escrow` | `escrow_id` | depositor/arbiter check |
-| `get_escrow` | `escrow_id` | read-only |
-
-### KYC
-
-| Entrypoint | Args | Auth |
-|---|---|---|
-| `init` | `admin` | — (none) |
-| `submit_kyc` | `address` | `address` |
-| `approve_kyc` | `address, tier, expires_at` | admin |
-| `revoke_kyc` | `address` | admin |
-| `is_kyc_approved` / `get_kyc_record` | `address` | read-only |
-
-### Staking
-
-`init`, `stake_tokens`, `unstake_tokens`, `get_staking_power`,
-`accrue_staking_rewards`.
-
-### Oracle
-
-`init`, `add_oracle`, `remove_oracle`, `update_valuation` (restricted to
-allowlisted oracle sources), `get_latest_valuation`, `get_valuation_history`.
-
 ### Insurance and leasing
 
 `create_policy`, `get_policy`, `cancel_policy`, `is_policy_active`,
 `submit_claim`, `update_claim_status`, `get_claim`, `get_claims_for_policy`,
 `create_lease`, `check_in_lease`, `cancel_lease`, `get_active_leases`.
+
+### Not present
+
+There are no escrow, KYC, staking, oracle, tokenization, detokenization, or
+transfer-restriction entrypoints. Source files for them exist in `contrib/src/`
+but are not compiled into the crate — see the warning at the top of this file.
 
 ## Events
 
@@ -153,27 +156,23 @@ allowlisted oracle sources), `get_latest_valuation`, `get_valuation_history`.
 | `("asset_reg", asset_id)` | `register_asset` |
 | `("asset_tra", asset_id)` | `transfer_asset` |
 | `("asset_ret", asset_id)` | `retire_asset` |
-| `("escrow_created", escrow_id)` | `create_escrow` |
-| `("escrow_completed", escrow_id)` | `confirm_release` |
-| `("escrow_cancelled", escrow_id)` | `cancel_escrow` |
-| `("kyc_submitted", address)` | `submit_kyc` |
-| `("kyc_approved", address)` | `approve_kyc` |
-| `("kyc_revoked", address)` | `revoke_kyc` |
-| `("oracle_added", oracle)` / `("oracle_removed", oracle)` | oracle allowlist |
-| `("valuation_updated", asset_id)` | `update_valuation` |
-| `("staked", asset_id, staker)` / `("unstaked", asset_id, staker)` | staking |
-| `("rewards_accrued", asset_id)` | `accrue_staking_rewards` |
 | `("pol_cre", policy_id)`, `("pol_can", policy_id)` | insurance policies |
 | `("clm_sub", claim_id)`, `("clm_upd", claim_id)` | insurance claims |
 | `("lease_cr", lease_id)`, `("lease_in", lease_id)`, `("lease_can", lease_id)` | leasing |
+| `("pause",)`, `("unpause",)` | `pause_contract`, `unpause_contract` |
 
-Unifying this is tracked in [SC-36].
+`initialize` and the registrar allowlist changes emit **no** event. Unifying
+the convention and closing those gaps is tracked in [SC-36].
 
 ## Errors
 
-`Error`, defined in [`src/error.rs`](src/error.rs). Codes 1–21 and 28–32; note
-the gap at 22–27 and that the numbering **overlaps `assetsup` with different
-meanings** — code 5 is `Unauthorized` here but `BranchAlreadyExists` in
+**`contrib` has no typed errors in compiled code.** `src/error.rs` defines an
+`Error` enum with codes 1–21 and 28–32, but the file is not declared as a
+module and nothing references it, so every failure surfaces as a `panic!` on a
+string rather than a `contracterror` a caller can match on.
+
+Were it wired in, its numbering would **overlap `assetsup` with different
+meanings** — code 5 is `Unauthorized` there but `BranchAlreadyExists` in
 `assetsup`. Tracked in [SC-45].
 
 ## Tests
@@ -182,5 +181,5 @@ meanings** — code 5 is `Unauthorized` here but `BranchAlreadyExists` in
 cargo test -p contrib
 ```
 
-35 tests across [`src/tests/`](src/tests/) plus the module-level `*_test.rs`
-files.
+All 35 tests live in [`src/tests/`](src/tests/). The `*_test.rs` files at the
+top of `src/` are not compiled and never run.

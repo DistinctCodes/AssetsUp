@@ -20,7 +20,6 @@ as pre-production until an audit is complete and the open items in
 | **Asset owner** | The `owner` field of an asset | Transfer, retire, tokenize, lease, insure their own asset | Limited to that owner's assets. |
 | **Multisig signer** | Members of `owners` in `multisig-wallet` | Submit, confirm, and propose; *m* of them can execute anything | *m* compromised signers is equivalent to full wallet control. Fewer than *m* can grief by consuming ids but cannot execute. |
 | **Approver** | Addresses satisfying a `multisig-transfer` `ApprovalRule` | Approve or reject transfer requests | Enough colluding approvers can move any asset in the category they govern. |
-| **Oracle source** | Allowlisted addresses in `contrib::oracle` | Write asset valuations | Can distort valuations, which feed dividend and share calculations. |
 | **Backend signer** | The service account the API signs with | Whatever role it has been granted on-chain | It is a hot key in a server process. Grant it the narrowest role that works — registrar, never admin. |
 
 ### Who is not trusted
@@ -44,7 +43,7 @@ authenticate callers implicitly. An entrypoint is protected only if it calls
 | Contract | What an attacker gains | Highest-risk entrypoints |
 |---|---|---|
 | `assetsup` | Ownership of any registered asset; fractional share balances; undistributed dividends | `transfer_asset_ownership`, `register_asset`, `retire_asset`, `mint_tokens`, `distribute_dividends` |
-| `contrib` | Escrowed value; KYC approval status; staked balances; valuation feed | `create_escrow`, `confirm_release`, `approve_kyc`, `update_valuation`, `unstake_tokens` |
+| `contrib` | Ownership of any asset in its own registry; insurance policy and claim state | `register_asset`, `transfer_asset`, `retire_asset`, `update_claim_status` |
 | `multisig-wallet` | Anything the wallet controls | `execute_transaction`, `execute_proposal`, `emergency_unfreeze` |
 | `multisig-transfer` | Ownership of assets whose category rule it governs | `execute_transfer`, `configure_approval_rule`, `initialize` |
 | `asset-maintenance` | Falsified audit evidence; fraudulent warranty claims | `add_maintenance_record`, `file_warranty_claim`, `add_warranty_information` |
@@ -57,7 +56,7 @@ until the ones marked **blocking** are fixed.
 | # | Risk | Status |
 |---|---|---|
 | 1 | **`assetsup` does not authenticate `caller`.** `register_asset`, `update_asset_metadata`, `transfer_asset_ownership`, and `retire_asset` compare a caller-supplied `caller` argument against an allowlist/owner/admin but never call `caller.require_auth()`. Any account can name a privileged address and pass the check. `transfer_asset_ownership` is a direct asset-theft path. | **Blocking** — [SC-42] |
-| 2 | **Unguarded entrypoints in `asset-maintenance`.** `init`, `update_maintenance_schedule`, `complete_scheduled_maintenance`, `add_warranty_information`, `update_warranty_information`, `file_warranty_claim`, and `create_maintenance_alert` perform no authorization at all. Audit evidence is forgeable. | **Blocking** — [SC-42] |
+| 2 | **Unguarded entrypoints in `asset-maintenance`.** `init`, `add_warranty_information`, `update_warranty_information`, `file_warranty_claim`, and `create_maintenance_alert` perform no authorization at all. Warranty terms and claims are forgeable by anyone. | **Blocking** — [SC-42] |
 | 3 | **`initialize` is front-runnable** in `contrib` and `multisig-transfer` — neither authorizes the caller, so whoever calls first becomes admin. Deploy and initialize in the same transaction, or accept the race. | **Blocking** — [SC-42] |
 | 4 | **Admin transfer is single-step.** One typo permanently bricks administration, with no on-chain undo. | Open — [SC-48] |
 | 5 | **Arithmetic can trap rather than error.** `overflow-checks = true` turns overflow into a panic. Value paths should return typed errors. | Open — [SC-43] |
@@ -67,7 +66,8 @@ until the ones marked **blocking** are fixed.
 | 9 | **No dependency scanning.** Nothing checks for advisories in transitive dependencies. | Open — [SC-38] |
 | 10 | **Error codes collide across contracts.** The same integer means different things per contract, so a backend cannot map a code without knowing which contract produced it. | Open — [SC-45] |
 | 11 | **`multisig_transfer` has no tests**, and `multisig-wallet` and `asset-maintenance` have four each. | Open — [SC-32], [SC-40], [SC-41] |
-| 12 | **Contracts are unaudited.** No external review has been performed. | Open |
+| 12 | **Roughly 1,670 lines of `contrib` are not compiled.** Escrow, KYC, staking, oracle, tokenization, detokenization, transfer restrictions, and its `error.rs` have no `mod` declaration, so the deployed contract does not have those capabilities and has no typed errors at all. Anyone reading the source would reasonably assume otherwise. | Open — [SC-46] |
+| 13 | **Contracts are unaudited.** No external review has been performed. | Open |
 
 ## Pre-deployment checklist
 

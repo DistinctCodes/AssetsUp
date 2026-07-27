@@ -78,8 +78,8 @@ risk.
 | Entrypoint | Args | Returns | Auth | Errors |
 |---|---|---|---|---|
 | `emergency_freeze` | `caller` | `Result<()>` | `caller` | `NotAnOwner` |
-| `emergency_unfreeze` | `caller` | `Result<()>` | `caller` | `Unauthorized` |
-| `set_daily_limit` | `caller, limit` | `Result<()>` | `caller` | `Unauthorized` |
+| `emergency_unfreeze` | `caller` | `Result<()>` | `caller` (must be an owner) | `NotAnOwner` |
+| `set_daily_limit` | `caller, limit` | `Result<()>` | `caller` (must be an owner) | `NotAnOwner` |
 
 ### Reads
 

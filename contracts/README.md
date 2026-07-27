@@ -9,7 +9,7 @@ of high-value transfers, escrow and KYC, and on-chain maintenance history.
 | Crate | Directory | Deployable | Responsibility |
 |---|---|---|---|
 | `assetsup` | [`assetsup/`](assetsup/) | yes | Primary asset registry: registration, ownership transfer, tokenization, dividends, voting, leasing, insurance, detokenization. |
-| `contrib` | [`contrib/`](contrib/) | yes | Secondary registry carrying the capabilities `assetsup` does not have: escrow, KYC, staking, price oracle, and an emergency pause. |
+| `contrib` | [`contrib/`](contrib/) | yes | Secondary registry: audit log, emergency pause, insurance, leasing. Most files in this crate are **not compiled** — see below. |
 | `multisig-wallet` | [`multisig-wallet/`](multisig-wallet/) | yes | General-purpose *m-of-n* wallet: transaction submission, confirmation, execution, owner/threshold governance, emergency freeze. |
 | `multisig-transfer` | [`multisig_transfer/`](multisig_transfer/) | yes | Approval workflow for asset transfers, gated on per-category approval rules. Calls into a registry contract to move ownership. |
 | `asset-maintenance` | [`asset-maintenance/`](asset-maintenance/) | yes | On-chain maintenance history, schedules, warranties, provider registry, and alerts. |
@@ -36,14 +36,22 @@ a shared library:
   (~8,900 lines), it is the one the backend is expected to treat as the source
   of truth for asset identity and ownership, and it is the only one with
   dividends, voting, and detokenization proposals wired to a token supply.
-- **`contrib` is a second registry with a different capability set.** It carries
-  escrow, KYC, staking, and an oracle — none of which exist in `assetsup` — plus
-  its own `pause` module, which `assetsup` only partially has.
+- **`contrib` is a second, smaller registry** with an audit log, an emergency
+  pause, insurance, and leasing.
 
 Where a module name appears in both, the implementations have diverged and are
 not interchangeable. `assetsup::insurance` models policies and claims with a
 full claim state machine; `contrib::insurance` is a smaller policy/claim store.
 The same holds for `lease` and `audit`.
+
+> **`contrib` is mostly dead code.** `contrib/src/lib.rs` declares only
+> `audit`, `pause`, `types`, `insurance`, and `lease`. The other files in
+> `contrib/src/` — escrow, KYC, staking, oracle, tokenization, detokenization,
+> transfer restrictions, and its `error.rs` — have no `mod` declaration and are
+> **not compiled into the crate**, about 1,670 lines in total. So the deployed
+> `ContribContract` has no escrow, no KYC, no staking, no oracle, and no typed
+> errors, despite the source files being present. See
+> [`contrib/README.md`](contrib/README.md) before relying on any of them.
 
 Resolving this duplication — deciding which crate owns each concern — is
 tracked in [SC-46]. Until that lands, treat the two as separate contracts and
