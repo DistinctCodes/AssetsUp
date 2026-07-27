@@ -5,7 +5,10 @@ mod dividends;
 mod tokenization;
 mod voting;
 use crate::{Asset, AssetStatus, ContribContract, ContribContractClient};
-use soroban_sdk::{testutils::Address as _, testutils::Events as _, Address, BytesN, Env, String};
+use soroban_sdk::{
+    testutils::Address as _, testutils::Events as _, Address, BytesN, Env, String, Symbol,
+    TryIntoVal,
+};
 
 fn create_env() -> Env {
     Env::default()
@@ -120,15 +123,31 @@ fn test_register_asset_emits_event() {
     let asset_id = generate_asset_id(&env, 1);
     let asset = create_test_asset(&env, &owner, asset_id.clone());
 
-    let initial_events = env.events().all().len();
-
     env.mock_all_auths();
     client.register_asset(&admin, &asset);
 
-    let final_events = env.events().all().len();
-    assert!(
-        final_events > initial_events,
-        "Expected asset registered event to be emitted"
+    // `events().all()` reports the events of the most recent invocation, so
+    // this is exactly what register_asset published.
+    let events = env.events().all();
+    assert_eq!(
+        events.len(),
+        1,
+        "register_asset should emit exactly one event"
+    );
+
+    let (_contract, topics, _data) = events.last().unwrap();
+
+    let name: Symbol = topics.get(0).unwrap().try_into_val(&env).unwrap();
+    assert_eq!(
+        name,
+        Symbol::new(&env, "asset_registered"),
+        "topic 0 should name the event"
+    );
+
+    let emitted_id: BytesN<32> = topics.get(1).unwrap().try_into_val(&env).unwrap();
+    assert_eq!(
+        emitted_id, asset_id,
+        "topic 1 should be the asset id so consumers can index on it"
     );
 }
 

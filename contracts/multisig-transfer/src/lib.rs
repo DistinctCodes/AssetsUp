@@ -64,6 +64,8 @@ impl MultiSigTransferContract {
         e.storage()
             .persistent()
             .set(&storage::DataKey::NextRequestId, &1u64);
+
+        events::contract_initialized(&e, &admin, &asset_registry, utils::now(&e));
     }
 
     // ----------------------------

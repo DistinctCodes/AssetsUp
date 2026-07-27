@@ -30,6 +30,7 @@
 //! for the full entrypoint, storage, event, and error tables.
 
 mod audit;
+pub mod events;
 mod pause;
 mod types;
 
@@ -40,9 +41,7 @@ mod lease;
 mod tests;
 
 use crate::types::AssetStatus;
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, String, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -103,6 +102,8 @@ impl ContribContract {
         env.storage()
             .persistent()
             .set(&DataKey::AuthorizedRegistrar(admin.clone()), &true);
+
+        events::contract_initialized(&env, &admin);
     }
 
     pub fn get_admin(env: Env) -> Address {
@@ -124,7 +125,9 @@ impl ContribContract {
         }
         env.storage()
             .persistent()
-            .set(&DataKey::AuthorizedRegistrar(registrar), &true);
+            .set(&DataKey::AuthorizedRegistrar(registrar.clone()), &true);
+
+        events::registrar_added(&env, &registrar, &caller);
     }
 
     pub fn remove_authorized_registrar(env: Env, caller: Address, registrar: Address) {
@@ -139,7 +142,9 @@ impl ContribContract {
         }
         env.storage()
             .persistent()
-            .set(&DataKey::AuthorizedRegistrar(registrar), &false);
+            .set(&DataKey::AuthorizedRegistrar(registrar.clone()), &false);
+
+        events::registrar_removed(&env, &registrar, &caller);
     }
 
     pub fn is_authorized_registrar(env: Env, address: Address) -> bool {
@@ -204,10 +209,7 @@ impl ContribContract {
             String::from_str(&env, "Asset registered"),
         );
 
-        env.events().publish(
-            (symbol_short!("asset_reg"), asset.id.clone()),
-            (asset.owner, env.ledger().timestamp()),
-        );
+        events::asset_registered(&env, &asset.id, &asset.owner);
     }
 
     pub fn transfer_asset(env: Env, asset_id: BytesN<32>, new_owner: Address, caller: Address) {
@@ -245,10 +247,7 @@ impl ContribContract {
             String::from_str(&env, "Asset transferred"),
         );
 
-        env.events().publish(
-            (symbol_short!("asset_tra"), asset_id.clone()),
-            (old_owner, new_owner, env.ledger().timestamp()),
-        );
+        events::asset_transferred(&env, &asset_id, &old_owner, &new_owner);
     }
 
     pub fn retire_asset(env: Env, asset_id: BytesN<32>, caller: Address) {
@@ -279,10 +278,7 @@ impl ContribContract {
             String::from_str(&env, "Asset retired"),
         );
 
-        env.events().publish(
-            (symbol_short!("asset_ret"), asset_id),
-            (caller, env.ledger().timestamp()),
-        );
+        events::asset_retired(&env, &asset_id, &caller);
     }
 
     pub fn get_asset(env: Env, asset_id: BytesN<32>) -> Option<Asset> {

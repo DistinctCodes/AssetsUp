@@ -11,7 +11,7 @@ of high-value transfers, escrow and KYC, and on-chain maintenance history.
 | `assetsup` | [`assetsup/`](assetsup/) | yes | Primary asset registry: registration, ownership transfer, tokenization, dividends, voting, leasing, insurance, detokenization. |
 | `contrib` | [`contrib/`](contrib/) | yes | Secondary registry: audit log, emergency pause, insurance, leasing. Most files in this crate are **not compiled** — see below. |
 | `multisig-wallet` | [`multisig-wallet/`](multisig-wallet/) | yes | General-purpose *m-of-n* wallet: transaction submission, confirmation, execution, owner/threshold governance, emergency freeze. |
-| `multisig-transfer` | [`multisig_transfer/`](multisig_transfer/) | yes | Approval workflow for asset transfers, gated on per-category approval rules. Calls into a registry contract to move ownership. |
+| `multisig-transfer` | [`multisig-transfer/`](multisig-transfer/) | yes | Approval workflow for asset transfers, gated on per-category approval rules. Calls into a registry contract to move ownership. |
 | `asset-maintenance` | [`asset-maintenance/`](asset-maintenance/) | yes | On-chain maintenance history, schedules, warranties, provider registry, and alerts. |
 
 All five build to WASM and are deployable. `assetsup`, `contrib`,
@@ -121,7 +121,9 @@ against that checklist.
 ## Naming conventions
 
 - Crate (package) names use **hyphens**: `multisig-wallet`, `asset-maintenance`.
-- Directory names should match the package name. One exception remains today —
-  the directory `multisig_transfer/` holds the package `multisig-transfer`,
-  which is why `cargo test -p multisig_transfer` fails while
-  `-p multisig-transfer` works. Tracked in [SC-33].
+- Directory names match the package name for every crate, so
+  `cargo <cmd> -p <dirname>` works throughout. The last exception,
+  `multisig_transfer/` holding the package `multisig-transfer`, was renamed in
+  [SC-33].
+- Workspace member paths are listed bare and alphabetically — no `./` prefixes,
+  no mixed separators.

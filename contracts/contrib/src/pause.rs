@@ -14,7 +14,7 @@ pub fn pause(env: &Env, caller: Address) {
         panic!("Only admin can call this function");
     }
     env.storage().persistent().set(&DataKey::Paused, &true);
-    env.events().publish(("pause",), ());
+    crate::events::contract_paused(env, &caller);
 }
 
 pub fn unpause(env: &Env, caller: Address) {
@@ -28,7 +28,7 @@ pub fn unpause(env: &Env, caller: Address) {
         panic!("Only admin can call this function");
     }
     env.storage().persistent().set(&DataKey::Paused, &false);
-    env.events().publish(("unpause",), ());
+    crate::events::contract_unpaused(env, &caller);
 }
 
 pub fn is_paused(env: &Env) -> bool {

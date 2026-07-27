@@ -46,10 +46,7 @@ pub fn distribute_dividends(env: &Env, asset_id: u64, total_amount: i128) -> Res
     }
 
     // Emit event: (asset_id, total_amount, holder_count)
-    env.events().publish(
-        ("dividend", "distributed"),
-        (asset_id, total_amount, holders.len()),
-    );
+    crate::events::dividend_distributed(env, asset_id, total_amount, holders.len());
 
     Ok(())
 }
@@ -78,8 +75,7 @@ pub fn claim_dividends(env: &Env, asset_id: u64, holder: Address) -> Result<i128
     store.set(&holder_key, &ownership);
 
     // Emit event: (asset_id, holder, amount)
-    env.events()
-        .publish(("dividend", "claimed"), (asset_id, holder, unclaimed));
+    crate::events::dividend_claimed(env, asset_id, &holder, unclaimed);
 
     Ok(unclaimed)
 }

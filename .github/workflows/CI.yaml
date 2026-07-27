@@ -132,8 +132,33 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
             ${{ runner.os }}-cargo-
-      - name: Build contrib contract to WASM
-        run: cargo build --package contrib --target wasm32-unknown-unknown --release --verbose
+      # Every crate in the workspace is a deployable contract: each declares a
+      # `cdylib` crate-type and a `#[contract]` entrypoint. Building the whole
+      # workspace for wasm32 therefore fails the job if any contract cannot be
+      # deployed, which native compilation alone does not guarantee.
+      - name: Build all contracts to WASM
+        run: cargo build --workspace --target wasm32-unknown-unknown --release --verbose
+
+      - name: Report WASM artifact sizes
+        run: |
+          echo "### WASM artifact sizes" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Contract | Size (bytes) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---:|" >> "$GITHUB_STEP_SUMMARY"
+          for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
+            name=$(basename "$wasm" .wasm)
+            size=$(wc -c < "$wasm" | tr -d ' ')
+            printf '| %s | %s |\n' "$name" "$size" >> "$GITHUB_STEP_SUMMARY"
+          done
+          cat "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-wasm
+          path: contracts/target/wasm32-unknown-unknown/release/*.wasm
+          if-no-files-found: error
+          retention-days: 14
 
   # ─────────────────────────────────────────────
   # BACKEND — NestJS

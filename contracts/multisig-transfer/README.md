@@ -8,9 +8,10 @@ met, and is then executed — at which point this contract calls into a separate
 Contract type: `MultiSigTransferContract`. Deployable
 (`crate-type = ["lib", "cdylib"]`).
 
-> **Naming.** The directory is `multisig_transfer/` (underscore) but the package
-> is `multisig-transfer` (hyphen). Use `cargo test -p multisig-transfer`;
-> `-p multisig_transfer` will not resolve. Tracked in [SC-33].
+The directory and package names now match (`multisig-transfer`), so
+`cargo test -p multisig-transfer` resolves from the directory name like every
+other crate. This was fixed in [SC-33]; the directory was previously
+`multisig_transfer/` with an underscore.
 
 ## Relationship to `multisig-wallet`
 

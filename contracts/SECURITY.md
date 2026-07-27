@@ -65,7 +65,7 @@ until the ones marked **blocking** are fixed.
 | 8 | **No upgrade story.** No contract exposes an upgrade entrypoint and no storage-version key exists, so a storage layout change means redeploying and losing data. | Open — [SC-49] |
 | 9 | **No dependency scanning.** Nothing checks for advisories in transitive dependencies. | Open — [SC-38] |
 | 10 | **Error codes collide across contracts.** The same integer means different things per contract, so a backend cannot map a code without knowing which contract produced it. | Open — [SC-45] |
-| 11 | **`multisig_transfer` has no tests**, and `multisig-wallet` and `asset-maintenance` have four each. | Open — [SC-32], [SC-40], [SC-41] |
+| 11 | **Test coverage is uneven.** `multisig-transfer` has 10 tests for ~750 lines and no coverage of the request lifecycle itself; the auth boundaries are covered but the approval flow is not. | Partly addressed — [SC-32] |
 | 12 | **Roughly 1,670 lines of `contrib` are not compiled.** Escrow, KYC, staking, oracle, tokenization, detokenization, transfer restrictions, and its `error.rs` have no `mod` declaration, so the deployed contract does not have those capabilities and has no typed errors at all. Anyone reading the source would reasonably assume otherwise. | Open — [SC-46] |
 | 13 | **Contracts are unaudited.** No external review has been performed. | Open |
 

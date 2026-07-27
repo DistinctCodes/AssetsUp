@@ -7,6 +7,7 @@ mod admin_transfer;
 mod asset;
 mod audit_trail;
 mod auth;
+mod events;
 mod initialization;
 mod pause;
 

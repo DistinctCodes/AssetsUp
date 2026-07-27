@@ -196,15 +196,47 @@ fn retire_asset_rejects_an_unauthenticated_caller() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn update_admin_requires_the_current_admins_authorization() {
+fn admin_transfer_requires_the_current_admins_authorization() {
+    // Admin transfer is two-step ([SC-48]): the current admin nominates, and
+    // the incoming address accepts. Both halves must be authenticated, or the
+    // two-step flow would be no safer than the single-step one it replaced.
     let env = create_env();
-    let (client, _admin) = setup_unmocked(&env);
+    let (client, admin) = setup_unmocked(&env);
     let usurper = Address::generate(&env);
 
-    let res = client.try_update_admin(&usurper);
+    let res = client.try_propose_admin(&usurper);
     assert!(
         res.is_err(),
-        "admin transfer must not succeed without the current admin's auth"
+        "nominating a new admin must require the current admin's auth"
+    );
+    assert_eq!(
+        client.get_pending_admin(),
+        None,
+        "the rejected proposal must not have been recorded"
+    );
+    assert_eq!(client.get_admin(), admin, "the admin must be unchanged");
+}
+
+#[test]
+fn accepting_an_admin_transfer_requires_the_incoming_addresss_authorization() {
+    let env = create_env();
+    let (client, admin) = setup_unmocked(&env);
+    let successor = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.propose_admin(&successor);
+
+    env.set_auths(&[]);
+    let res = client.try_accept_admin();
+
+    assert!(
+        res.is_err(),
+        "acceptance must be signed by the incoming address"
+    );
+    assert_eq!(
+        client.get_admin(),
+        admin,
+        "an unaccepted proposal must leave the original admin in place"
     );
 }
 
