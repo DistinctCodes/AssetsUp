@@ -1,5 +1,34 @@
 #![no_std]
 #![allow(clippy::too_many_arguments)]
+//! # assetsup
+//!
+//! The primary AssetsUp asset registry.
+//!
+//! Assets are registered by authorized registrars, owned by an `Address`, and
+//! can be transferred, retired, tokenized into fractional shares, leased,
+//! insured, voted on, and detokenized.
+//!
+//! ## Invariants
+//!
+//! - An asset has exactly one owner at any time.
+//! - An asset id is unique; re-registering fails with `Error::AssetAlreadyExists`.
+//! - A retired asset cannot be transferred or updated.
+//! - For a tokenized asset, holder balances sum to the total token supply.
+//!
+//! ## Two asset id spaces
+//!
+//! The registry keys assets by `BytesN<32>`, while tokenization, dividends,
+//! voting, and detokenization key them by `u64`. The contract does not link the
+//! two namespaces — callers maintain the mapping.
+//!
+//! ## Relationship to `contrib`
+//!
+//! `assetsup` and `contrib` are independent contracts with separate storage
+//! that share several module names. See `contracts/README.md` for which crate
+//! owns which concern.
+//!
+//! See [`README.md`](https://github.com/DistinctCodes/AssetsUp/blob/main/contracts/assetsup/README.md)
+//! for the full entrypoint, storage, event, and error tables.
 
 use crate::error::{handle_error, Error};
 use soroban_sdk::{

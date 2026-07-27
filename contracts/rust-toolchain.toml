@@ -1,0 +1,14 @@
+# Pinned toolchain for the contracts workspace.
+#
+# Every contracts job in .github/workflows/CI.yaml reads the `channel` value
+# below, so local builds and CI always use the same compiler. Floating
+# `stable` is deliberately avoided: a new stable release can introduce clippy
+# lints that fail `-D warnings` on a pull request that changed nothing.
+#
+# Upgrading: bump `channel` in its own dedicated pull request so lint churn is
+# isolated from feature work. See contracts/README.md#toolchain.
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

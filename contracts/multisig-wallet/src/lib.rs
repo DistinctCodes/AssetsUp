@@ -1,4 +1,31 @@
 #![no_std]
+//! # multisig-wallet
+//!
+//! A general-purpose *m-of-n* multisignature wallet.
+//!
+//! Owners submit transactions, confirm them, and once the confirmation
+//! threshold is met anyone may execute them. Owner membership and the threshold
+//! itself are changed through the same confirmation flow, so no single owner can
+//! unilaterally alter the wallet.
+//!
+//! ## Invariants
+//!
+//! - The threshold is always `>= 1` and `<= owners.len()`.
+//! - A wallet always has at least two owners.
+//! - A transaction executes at most once.
+//! - A frozen wallet rejects every mutating operation except
+//!   [`MultisigWallet::emergency_unfreeze`].
+//! - One owner cannot confirm the same transaction twice.
+//!
+//! ## Not to be confused with `multisig-transfer`
+//!
+//! This crate is generic — its subject is an arbitrary transaction.
+//! `multisig-transfer` is domain-specific: its subject is always an asset
+//! transfer, its thresholds are per asset category, and it delegates execution
+//! to a registry contract. Neither calls the other.
+//!
+//! See [`README.md`](https://github.com/DistinctCodes/AssetsUp/blob/main/contracts/multisig-wallet/README.md)
+//! for the full entrypoint, storage, event, and error tables.
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Val, Vec};
 

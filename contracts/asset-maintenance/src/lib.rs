@@ -1,4 +1,29 @@
 #![no_std]
+//! # asset-maintenance
+//!
+//! Records asset maintenance history, schedules, warranties, service
+//! providers, and alerts on-chain.
+//!
+//! The maintenance history is intended as **audit evidence**: records are
+//! appended, never rewritten. Assets are referenced by `u64` id.
+//!
+//! ## Invariants
+//!
+//! - Maintenance history is append-only — no entrypoint removes or rewrites an
+//!   existing [`MaintenanceRecord`].
+//! - [`AssetStats`] is a derived rollup (total cost, downtime, service count,
+//!   health score) maintained alongside the history.
+//! - Health scores are expressed on a 1–100 scale.
+//!
+//! ## Error handling
+//!
+//! Unlike the other crates in this workspace, failures here are raised with
+//! `panic!` on a `&str` rather than a typed `contracterror`, so callers cannot
+//! distinguish failure modes by code.
+//!
+//! See [`README.md`](https://github.com/DistinctCodes/AssetsUp/blob/main/contracts/asset-maintenance/README.md)
+//! for the full entrypoint, storage, and event tables.
+
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec};
 
 mod test;
