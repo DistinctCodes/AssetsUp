@@ -16,6 +16,10 @@ import { AssetsModule } from './assets/assets.module';
 import { NotesDocsController } from './assets/notes-docs.controller';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { TransfersModule } from './transfers/transfers.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { VendorsModule } from './vendors/vendors.module';
+import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
+import { LicensesModule } from './licenses/licenses.module';
 
 @Module({
   imports: [
@@ -32,6 +36,10 @@ import { TransfersModule } from './transfers/transfers.module';
     AssetsModule,
     MaintenanceModule,
     TransfersModule,
+    InventoryModule,
+    VendorsModule,
+    PurchaseOrdersModule,
+    LicensesModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
