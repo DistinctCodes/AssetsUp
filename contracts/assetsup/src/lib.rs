@@ -46,6 +46,7 @@ pub(crate) mod branch;
 pub(crate) mod detokenization;
 pub(crate) mod dividends;
 pub(crate) mod error;
+pub(crate) mod events;
 pub(crate) mod insurance;
 pub(crate) mod lease;
 pub(crate) mod math;

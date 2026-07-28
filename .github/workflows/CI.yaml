@@ -306,8 +306,8 @@ jobs:
       - name: Build (TypeScript check)
         run: npm run build
 
-      - name: Unit tests
-        run: npm run test -- --passWithNoTests
+      - name: Unit tests with coverage
+        run: npm run test:cov
 
   # ─────────────────────────────────────────────
   # FRONTEND — Next.js

@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Package, CheckCircle2, UserCheck, Wrench } from 'lucide-react';
@@ -7,6 +8,18 @@ import { useAuthStore } from '@/store/auth.store';
 import { useReportsSummary } from '@/lib/query/hooks/useReports';
 import { StatusBadge } from '@/components/assets/status-badge';
 import { AssetStatus } from '@/lib/query/types/asset';
+
+// Lazy-load chart components so Recharts stays out of the main bundle
+const DashboardCharts = dynamic(() => import('@/features/Dashboard/DashboardCharts'), {
+  loading: () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      {[1, 2].map((i) => (
+        <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 h-64 animate-pulse" />
+      ))}
+    </div>
+  ),
+  ssr: false,
+});
 
 const statCards = [
   { label: 'Total Assets',    key: 'total',       icon: Package,      status: null },
@@ -36,6 +49,38 @@ function RowSkeleton() {
   );
 }
 
+/** Mobile stacked card for a single asset row */
+function AssetCard({
+  asset,
+}: {
+  asset: {
+    id: string;
+    assetId: string;
+    name: string;
+    status: AssetStatus;
+    department?: { name: string } | null;
+    createdAt: string;
+  };
+}) {
+  return (
+    <Link
+      href={`/assets/${asset.id}`}
+      className="block px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{asset.name}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{asset.assetId}</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {asset.department?.name ?? '—'} · {format(new Date(asset.createdAt), 'MMM d, yyyy')}
+          </p>
+        </div>
+        <StatusBadge status={asset.status} />
+      </div>
+    </Link>
+  );
+}
+
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const { data, isLoading, isError } = useReportsSummary();
@@ -62,26 +107,31 @@ export default function DashboardPage() {
           Failed to load summary data. Please try refreshing the page.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
           {isLoading
             ? statCards.map((s) => <StatSkeleton key={s.key} />)
             : statCards.map(({ label, key, icon: Icon, status }) => (
                 <Link
                   key={key}
                   href={status ? `/assets?status=${status}` : '/assets'}
-                  className="bg-white rounded-xl border border-gray-200 p-5 hover:border-gray-300 transition-colors"
+                  className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 hover:border-gray-300 transition-colors"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-gray-500">{label}</p>
-                    <Icon size={18} className="text-gray-400" />
+                    <p className="text-xs sm:text-sm text-gray-500">{label}</p>
+                    <Icon size={16} className="text-gray-400" aria-hidden="true" />
                   </div>
-                  <p className="text-3xl font-bold text-gray-900">{counts[key]}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{counts[key]}</p>
                 </Link>
               ))}
         </div>
       )}
 
-      {/* Recent assets table */}
+      {/* Charts section – lazy loaded */}
+      {!isLoading && !isError && data && (
+        <DashboardCharts data={data} />
+      )}
+
+      {/* Recent assets table – responsive */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-900">Recent Assets</h2>
@@ -90,7 +140,8 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop table — hidden on small screens */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
@@ -118,7 +169,7 @@ export default function DashboardPage() {
                   <tr
                     key={asset.id}
                     className="border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => window.location.href = `/assets/${asset.id}`}
+                    onClick={() => { window.location.href = `/assets/${asset.id}`; }}
                   >
                     <td className="px-4 py-3 font-medium text-gray-900">{asset.name}</td>
                     <td className="px-4 py-3 text-gray-500">{asset.assetId}</td>
@@ -132,6 +183,28 @@ export default function DashboardPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile stacked cards — visible only on small screens */}
+        <div className="sm:hidden">
+          {isLoading ? (
+            <div className="p-4 space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="animate-pulse h-16 bg-gray-100 rounded-lg" />
+              ))}
+            </div>
+          ) : !data?.recent?.length ? (
+            <div className="px-4 py-10 text-center text-sm text-gray-400">
+              No assets yet.{' '}
+              <Link href="/assets" className="text-gray-900 underline">
+                Register your first asset
+              </Link>
+            </div>
+          ) : (
+            data.recent.map((asset) => (
+              <AssetCard key={asset.id} asset={asset} />
+            ))
+          )}
         </div>
       </div>
     </div>

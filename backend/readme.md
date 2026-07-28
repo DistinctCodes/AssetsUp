@@ -58,6 +58,41 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Testing Conventions
+
+All modules must include unit tests covering their controllers and services. Follow these guidelines:
+
+### Test Structure
+
+- Place test files next to the code they test: `user.service.ts` → `user.service.spec.ts`
+- Use the shared test utilities from `src/test/`:
+  - `createTestingModule()` for module setup
+  - `createMockRepository()` for TypeORM repository mocks
+  - Entity fixtures from `src/test/fixtures/entities.ts`
+
+### Coverage Requirements
+
+Coverage thresholds are enforced in CI:
+
+- Lines: 80%
+- Functions: 80%
+- Branches: 70%
+- Statements: 80%
+
+Run `npm run test:cov` to check coverage locally.
+
+### Ratchet Policy
+
+When adding new modules or features:
+
+1. Maintain or improve coverage
+2. Never lower the global threshold
+3. All new code should have tests before merging
+
+See `AppController` and `AppService` for reference test examples.
+
+
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
