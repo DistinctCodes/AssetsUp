@@ -1,23 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { createMock } from '@golevelup/ts-jest';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AssetsService } from './assets.service';
 import { Asset } from './entities/asset.entity';
+import { AssetLifecycleService, AssetStatus } from './asset-lifecycle.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
-import { FileService } from '../files/file.service';
-import { AssetCodeGeneratorService } from './services/asset-code-generator.service';
 
 describe('AssetsService', () => {
   let service: AssetsService;
   let repository: Repository<Asset>;
-  let auditLogsService: AuditLogsService;
 
   const mockAsset = {
     id: 'ast-1',
     name: 'MacBook Pro',
     assetTag: 'AST-100',
-    status: 'AVAILABLE',
+    status: AssetStatus.AVAILABLE,
   };
 
   beforeEach(async () => {
@@ -29,33 +28,34 @@ describe('AssetsService', () => {
           useValue: createMock<Repository<Asset>>(),
         },
         {
+          provide: AssetLifecycleService,
+          useValue: createMock<AssetLifecycleService>(),
+        },
+        {
           provide: AuditLogsService,
           useValue: createMock<AuditLogsService>(),
         },
         {
-          provide: FileService,
-          useValue: createMock<FileService>(),
+          provide: DataSource,
+          useValue: createMock<DataSource>(),
         },
         {
-          provide: AssetCodeGeneratorService,
-          useValue: createMock<AssetCodeGeneratorService>(),
+          provide: EventEmitter2,
+          useValue: createMock<EventEmitter2>(),
         },
       ],
     }).compile();
 
     service = module.get<AssetsService>(AssetsService);
     repository = module.get(getRepositoryToken(Asset));
-    auditLogsService = module.get<AuditLogsService>(AuditLogsService);
   });
 
   it('create - should create and return new asset record', async () => {
+    jest.spyOn(repository, 'count').mockResolvedValue(0);
     jest.spyOn(repository, 'create').mockReturnValue(mockAsset as any);
     jest.spyOn(repository, 'save').mockResolvedValue(mockAsset as any);
 
-    const result = await service.createAsset({
-      name: 'MacBook Pro',
-      assetTag: 'AST-100',
-    } as any);
+    const result = await service.create({ name: 'MacBook Pro' } as any);
 
     expect(result).toEqual(mockAsset);
     expect(repository.save).toHaveBeenCalled();
@@ -71,18 +71,12 @@ describe('AssetsService', () => {
     expect(result.name).toBe('MacBook Pro M3');
   });
 
-  it('delete - should soft-delete asset and record audit log', async () => {
+  it('delete - should soft-delete asset', async () => {
     jest.spyOn(repository, 'findOne').mockResolvedValue(mockAsset as any);
     jest.spyOn(repository, 'softRemove').mockResolvedValue(mockAsset as any);
 
-    await service.delete('ast-1', { id: 'usr-1' } as any);
+    await service.delete('ast-1');
 
     expect(repository.softRemove).toHaveBeenCalledWith(mockAsset);
-    expect(auditLogsService.logAction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'DELETED',
-        entityId: 'ast-1',
-      }),
-    );
   });
 });

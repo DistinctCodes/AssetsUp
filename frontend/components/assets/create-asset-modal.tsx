@@ -7,9 +7,8 @@ import { z } from "zod";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCreateAsset } from "@/lib/query/hooks/useAssets";
+import { useCreateAsset, useCategories } from "@/lib/query/hooks/useAssets";
 import { useDepartments } from "@/lib/query/hooks/useAsset";
-import { useCategories } from "@/lib/query/hooks/useAssets";
 import { AssetStatus, AssetCondition } from "@/lib/query/types/asset";
 
 const schema = z.object({
@@ -91,6 +90,7 @@ export function CreateAssetModal({ onClose, onSuccess }: Props) {
           </h2>
           <button
             onClick={onClose}
+            aria-label="Close register asset modal"
             className="text-gray-400 hover:text-gray-600"
           >
             <X size={20} />

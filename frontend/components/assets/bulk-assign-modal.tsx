@@ -11,26 +11,26 @@ interface BulkAssignModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedIds: string[];
-  onSuccess: (updated: number, skipped: number) => void;
+  onSuccess: () => void;
 }
 
 export function BulkAssignModal({ isOpen, onClose, selectedIds, onSuccess }: BulkAssignModalProps) {
-  const [assignedToId, setAssignedToId] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
   const [departmentId, setDepartmentId] = useState<string>('');
   const bulkAssign = useBulkAssign();
 
   const handleAssign = async () => {
-    const res = await bulkAssign.mutateAsync({
-      assetIds: selectedIds,
-      assignedToId: assignedToId || undefined,
+    await bulkAssign.mutateAsync({
+      ids: selectedIds,
+      userId: userId || undefined,
       departmentId: departmentId || undefined,
     });
-    onSuccess(res.updatedCount, res.skippedCount);
+    onSuccess();
     onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Bulk Assign {selectedIds.length} Assets</DialogTitle>
@@ -38,9 +38,10 @@ export function BulkAssignModal({ isOpen, onClose, selectedIds, onSuccess }: Bul
         <div className="space-y-4 py-2">
           <div>
             <Label>Assign to User</Label>
-            <Select value={assignedToId} onValueChange={setAssignedToId}>
+            <Select value={userId} onChange={(e) => setUserId(e.target.value)}>
               <SelectTrigger><SelectValue placeholder="Select User" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="">None</SelectItem>
                 <SelectItem value="usr_1">John Doe</SelectItem>
                 <SelectItem value="usr_2">Jane Smith</SelectItem>
               </SelectContent>
@@ -48,9 +49,10 @@ export function BulkAssignModal({ isOpen, onClose, selectedIds, onSuccess }: Bul
           </div>
           <div>
             <Label>Assign to Department</Label>
-            <Select value={departmentId} onValueChange={setDepartmentId}>
+            <Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
               <SelectTrigger><SelectValue placeholder="Select Department" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="">None</SelectItem>
                 <SelectItem value="dept_1">Engineering</SelectItem>
                 <SelectItem value="dept_2">Operations</SelectItem>
               </SelectContent>

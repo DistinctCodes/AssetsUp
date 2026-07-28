@@ -51,11 +51,16 @@ export default function AssetsPage() {
       {/* Filters */}
       <div className="flex gap-3 mb-4">
         <div className="relative flex-1 max-w-sm">
+          <label htmlFor="asset-search" className="sr-only">
+            Search assets
+          </label>
           <Search
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            aria-hidden="true"
           />
           <input
+            id="asset-search"
             type="text"
             placeholder="Search by name, ID, serial number..."
             value={search}
@@ -68,8 +73,12 @@ export default function AssetsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <SlidersHorizontal size={16} className="text-gray-400" />
+          <SlidersHorizontal size={16} className="text-gray-400" aria-hidden="true" />
+          <label htmlFor="asset-status-filter" className="sr-only">
+            Filter by status
+          </label>
           <select
+            id="asset-status-filter"
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
