@@ -4,10 +4,35 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CommonModule } from './common/common.module';
+import { UsersModule } from './users/users.module';
+import { HealthModule } from './health/health.module';
+import { AuthModule } from './auth/auth.module';
+import { BranchesModule } from './branches/branches.module';
+import { DepartmentsModule } from './departments/departments.module';
+import { LocationsModule } from './locations/locations.module';
+import { CategoriesModule } from './categories/categories.module';
+import { AssetsLifecycleModule } from './assets/assets-lifecycle.module';
+import { AssetsModule } from './assets/assets.module';
+import { NotesDocsController } from './assets/notes-docs.controller';
+import { MaintenanceModule } from './maintenance/maintenance.module';
+import { TransfersModule } from './transfers/transfers.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CommonModule,
+    UsersModule,
+    HealthModule,
+    AuthModule,
+    BranchesModule,
+    DepartmentsModule,
+    LocationsModule,
+    CategoriesModule,
+    AssetsLifecycleModule,
+    AssetsModule,
+    MaintenanceModule,
+    TransfersModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -18,12 +43,12 @@ import { AppService } from './app.service';
         password: configService.get('DB_PASSWORD', 'password'),
         database: configService.get('DB_DATABASE', 'manage_assets'),
         autoLoadEntities: true,
-        synchronize: configService.get('NODE_ENV') === 'development',
+        synchronize: false,
       }),
       inject: [ConfigService],
     }),
   ],
-  controllers: [AppController],
+  controllers: [AppController, NotesDocsController],
   providers: [AppService],
 })
 export class AppModule {}
