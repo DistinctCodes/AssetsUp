@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EditAssetModal } from "@/components/assets/edit-asset-modal";
 import {
   useAsset,
   useAssetHistory,
@@ -71,13 +72,13 @@ function DetailRow({
 
 // ── ActionBadge ──────────────────────────────────────────────────────────────
 const actionColors: Record<string, string> = {
-  CREATED: "bg-green-100 text-green-700",
-  UPDATED: "bg-blue-100 text-blue-700",
-  STATUS_CHANGED: "bg-yellow-100 text-yellow-700",
-  TRANSFERRED: "bg-purple-100 text-purple-700",
-  MAINTENANCE: "bg-orange-100 text-orange-700",
-  NOTE_ADDED: "bg-gray-100 text-gray-600",
-  DOCUMENT_UPLOADED: "bg-teal-100 text-teal-700",
+  CREATED: "bg-green-100 text-green-800",
+  UPDATED: "bg-blue-100 text-blue-800",
+  STATUS_CHANGED: "bg-yellow-100 text-yellow-900",
+  TRANSFERRED: "bg-purple-100 text-purple-800",
+  MAINTENANCE: "bg-orange-100 text-orange-900",
+  NOTE_ADDED: "bg-gray-100 text-gray-700",
+  DOCUMENT_UPLOADED: "bg-teal-100 text-teal-800",
 };
 
 function ActionBadge({ action }: { action: string }) {
@@ -91,10 +92,10 @@ function ActionBadge({ action }: { action: string }) {
 
 // ── MaintenanceStatusBadge ───────────────────────────────────────────────────
 const maintenanceStatusColors: Record<string, string> = {
-  SCHEDULED: "bg-blue-100 text-blue-700",
-  IN_PROGRESS: "bg-yellow-100 text-yellow-700",
-  COMPLETED: "bg-green-100 text-green-700",
-  CANCELLED: "bg-gray-100 text-gray-500",
+  SCHEDULED: "bg-blue-100 text-blue-800",
+  IN_PROGRESS: "bg-yellow-100 text-yellow-900",
+  COMPLETED: "bg-green-100 text-green-800",
+  CANCELLED: "bg-gray-100 text-gray-700",
 };
 
 function MaintenanceStatusBadge({ status }: { status: string }) {
@@ -265,6 +266,7 @@ export default function AssetDetailPage() {
   // Modals
   const [showScheduleMaintenance, setShowScheduleMaintenance] = useState(false);
   const [showUploadDoc, setShowUploadDoc] = useState(false);
+  const [showEditAsset, setShowEditAsset] = useState(false);
 
   // Note form
   const [noteContent, setNoteContent] = useState("");
@@ -390,7 +392,7 @@ export default function AssetDetailPage() {
             <Button size="sm" variant="outline">
               <RefreshCw size={14} className="mr-1.5" /> Update Status
             </Button>
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="outline" onClick={() => setShowEditAsset(true)}>
               <Pencil size={14} className="mr-1.5" /> Edit
             </Button>
             <Button
@@ -656,6 +658,7 @@ export default function AssetDetailPage() {
                     size="sm"
                     variant="ghost"
                     className="!text-red-500"
+                    aria-label={`Delete document ${doc.name}`}
                     onClick={() => setConfirmDeleteDoc(doc.id)}
                   >
                     <Trash2 size={14} />
@@ -714,6 +717,7 @@ export default function AssetDetailPage() {
                         size="sm"
                         variant="ghost"
                         className="!text-red-500 shrink-0"
+                        aria-label="Delete note"
                         onClick={() => setConfirmDeleteNote(note.id)}
                       >
                         <Trash2 size={14} />
@@ -781,6 +785,10 @@ export default function AssetDetailPage() {
 
       {showUploadDoc && (
         <UploadDocumentModal assetId={id} onClose={() => setShowUploadDoc(false)} />
+      )}
+
+      {showEditAsset && asset && (
+        <EditAssetModal asset={asset} isOpen={showEditAsset} onClose={() => setShowEditAsset(false)} />
       )}
     </div>
   );

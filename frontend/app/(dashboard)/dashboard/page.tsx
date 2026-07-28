@@ -144,7 +144,7 @@ export default function DashboardPage() {
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
+              <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
                 <th className="px-4 py-3 text-left font-medium">Name</th>
                 <th className="px-4 py-3 text-left font-medium">Asset ID</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
@@ -157,7 +157,7 @@ export default function DashboardPage() {
                 Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
               ) : !data?.recent?.length ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-500">
                     No assets yet.{' '}
                     <Link href="/assets" className="text-gray-900 underline">
                       Register your first asset
@@ -194,7 +194,7 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : !data?.recent?.length ? (
-            <div className="px-4 py-10 text-center text-sm text-gray-400">
+            <div className="px-4 py-10 text-center text-sm text-gray-500">
               No assets yet.{' '}
               <Link href="/assets" className="text-gray-900 underline">
                 Register your first asset

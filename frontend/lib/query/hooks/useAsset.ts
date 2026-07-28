@@ -6,6 +6,7 @@ import {
   UseMutationOptions,
 } from '@tanstack/react-query';
 import { assetApiClient } from '@/lib/api/assets';
+import type { CreateAssetInput } from '@/lib/api/assets';
 import { queryKeys } from '../keys';
 import {
   Asset,
@@ -133,6 +134,22 @@ export function useTransferAsset(
     onSuccess: (updatedAsset) => {
       queryClient.setQueryData(queryKeys.assets.detail(id), updatedAsset);
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.history(id) });
+    },
+    ...options,
+  });
+}
+
+export function useUpdateAsset(
+  id: string,
+  options?: UseMutationOptions<Asset, ApiError, Partial<CreateAssetInput>>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<Asset, ApiError, Partial<CreateAssetInput>>({
+    mutationFn: (data) => assetApiClient.updateAsset(id, data),
+    onSuccess: (updatedAsset) => {
+      queryClient.setQueryData(queryKeys.assets.detail(id), updatedAsset);
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all });
     },
     ...options,
   });

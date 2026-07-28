@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CommonModule } from './common/common.module';
@@ -20,10 +21,13 @@ import { InventoryModule } from './inventory/inventory.module';
 import { VendorsModule } from './vendors/vendors.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { LicensesModule } from './licenses/licenses.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    EventEmitterModule.forRoot(),
     CommonModule,
     UsersModule,
     HealthModule,
@@ -40,6 +44,8 @@ import { LicensesModule } from './licenses/licenses.module';
     VendorsModule,
     PurchaseOrdersModule,
     LicensesModule,
+    NotificationsModule,
+    GatewayModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

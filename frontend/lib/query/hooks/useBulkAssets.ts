@@ -1,25 +1,25 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api-client';
+import { api } from '@/lib/api';
 
 export interface BulkStatusPayload {
-  assetIds: string[];
+  ids: string[];
   status: string;
 }
 
 export interface BulkAssignPayload {
-  assetIds: string[];
-  assignedToId?: string;
+  ids: string[];
+  userId?: string;
   departmentId?: string;
 }
 
 export interface BulkDeletePayload {
-  assetIds: string[];
+  ids: string[];
 }
 
 export interface BulkActionResponse {
-  updatedCount: number;
-  skippedCount: number;
-  message?: string;
+  succeeded: string[];
+  failed: { id: string; reason: string }[];
+  skipped: string[];
 }
 
 export function useBulkUpdateStatus() {

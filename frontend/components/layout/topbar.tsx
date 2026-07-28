@@ -23,9 +23,10 @@ function getPageTitle(pathname: string): string {
 
 interface TopbarProps {
   onMenuClick?: () => void;
+  menuOpen?: boolean;
 }
 
-export function Topbar({ onMenuClick }: TopbarProps) {
+export function Topbar({ onMenuClick, menuOpen }: TopbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
@@ -62,7 +63,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           className="lg:hidden flex items-center justify-center w-11 h-11 -ml-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
           aria-label="Open navigation menu"
           aria-controls="sidebar"
-          aria-expanded="false"
+          aria-expanded={menuOpen}
         >
           <Menu size={20} aria-hidden="true" />
         </button>
@@ -75,6 +76,9 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen((v) => !v)}
+          aria-label="Open user menu"
+          aria-haspopup="true"
+          aria-expanded={dropdownOpen}
           className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
         >
           <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
