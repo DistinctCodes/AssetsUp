@@ -1,212 +1,250 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { Package, CheckCircle2, UserCheck, Wrench } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { SlidersHorizontal, Check, RotateCcw, Plus, Eye } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
 import { useAuthStore } from '@/store/auth.store';
 import { useReportsSummary } from '@/lib/query/hooks/useReports';
-import { StatusBadge } from '@/components/assets/status-badge';
-import { AssetStatus } from '@/lib/query/types/asset';
+import {
+  WidgetId,
+  ALL_WIDGETS,
+  DEFAULT_WIDGET_ORDER,
+  WidgetRenderer,
+} from '@/components/dashboard/dashboard-widgets';
+import { SortableWidget } from '@/components/dashboard/sortable-widget';
 
-// Lazy-load chart components so Recharts stays out of the main bundle
-const DashboardCharts = dynamic(() => import('@/features/Dashboard/DashboardCharts'), {
-  loading: () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-      {[1, 2].map((i) => (
-        <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 h-64 animate-pulse" />
-      ))}
-    </div>
-  ),
-  ssr: false,
-});
-
-const statCards = [
-  { label: 'Total Assets',    key: 'total',       icon: Package,      status: null },
-  { label: 'Active',          key: 'active',      icon: CheckCircle2, status: AssetStatus.ACTIVE },
-  { label: 'Assigned',        key: 'assigned',    icon: UserCheck,    status: AssetStatus.ASSIGNED },
-  { label: 'In Maintenance',  key: 'maintenance', icon: Wrench,       status: AssetStatus.MAINTENANCE },
-] as const;
-
-function StatSkeleton() {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse">
-      <div className="h-4 w-24 bg-gray-200 rounded mb-3" />
-      <div className="h-8 w-16 bg-gray-200 rounded" />
-    </div>
-  );
-}
-
-function RowSkeleton() {
-  return (
-    <tr className="animate-pulse">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <td key={i} className="px-4 py-3">
-          <div className="h-4 bg-gray-200 rounded w-3/4" />
-        </td>
-      ))}
-    </tr>
-  );
-}
-
-/** Mobile stacked card for a single asset row */
-function AssetCard({
-  asset,
-}: {
-  asset: {
-    id: string;
-    assetId: string;
-    name: string;
-    status: AssetStatus;
-    department?: { name: string } | null;
-    createdAt: string;
-  };
-}) {
-  return (
-    <Link
-      href={`/assets/${asset.id}`}
-      className="block px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">{asset.name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{asset.assetId}</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {asset.department?.name ?? '—'} · {format(new Date(asset.createdAt), 'MMM d, yyyy')}
-          </p>
-        </div>
-        <StatusBadge status={asset.status} />
-      </div>
-    </Link>
-  );
+interface UserDashboardPrefs {
+  order: WidgetId[];
+  hidden: WidgetId[];
 }
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const { data, isLoading, isError } = useReportsSummary();
 
-  const counts = {
-    total:       data?.total ?? 0,
-    active:      data?.byStatus?.[AssetStatus.ACTIVE] ?? 0,
-    assigned:    data?.byStatus?.[AssetStatus.ASSIGNED] ?? 0,
-    maintenance: data?.byStatus?.[AssetStatus.MAINTENANCE] ?? 0,
-  };
+  const [widgetOrder, setWidgetOrder] = useState<WidgetId[]>(DEFAULT_WIDGET_ORDER);
+  const [hiddenWidgets, setHiddenWidgets] = useState<WidgetId[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  const storageKey = `assetsup_dashboard_prefs_${user?.id || 'default'}`;
+
+  // Hydrate preferences from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed: UserDashboardPrefs = JSON.parse(saved);
+        if (Array.isArray(parsed.order) && parsed.order.length > 0) {
+          const validOrder = parsed.order.filter((id) =>
+            ALL_WIDGETS.some((w) => w.id === id)
+          );
+          const missing = DEFAULT_WIDGET_ORDER.filter(
+            (id) => !validOrder.includes(id)
+          );
+          setWidgetOrder([...validOrder, ...missing]);
+        }
+        if (Array.isArray(parsed.hidden)) {
+          setHiddenWidgets(parsed.hidden);
+        }
+      }
+    } catch {
+      // localStorage unavailable
+    } finally {
+      setIsHydrated(true);
+    }
+  }, [storageKey]);
+
+  // Sensors for dnd-kit
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setWidgetOrder((items) => {
+        const oldIndex = items.indexOf(active.id as WidgetId);
+        const newIndex = items.indexOf(over.id as WidgetId);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  }
+
+  function handleHideWidget(id: WidgetId) {
+    if (!hiddenWidgets.includes(id)) {
+      setHiddenWidgets((prev) => [...prev, id]);
+    }
+  }
+
+  function handleShowWidget(id: WidgetId) {
+    setHiddenWidgets((prev) => prev.filter((wId) => wId !== id));
+  }
+
+  function handleSavePreferences() {
+    try {
+      const prefs: UserDashboardPrefs = {
+        order: widgetOrder,
+        hidden: hiddenWidgets,
+      };
+      localStorage.setItem(storageKey, JSON.stringify(prefs));
+    } catch {
+      // Ignore
+    }
+    setIsEditing(false);
+  }
+
+  function handleResetDefault() {
+    setWidgetOrder(DEFAULT_WIDGET_ORDER);
+    setHiddenWidgets([]);
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {
+      // Ignore
+    }
+    setIsEditing(false);
+  }
+
+  const visibleWidgets = widgetOrder.filter((id) => !hiddenWidgets.includes(id));
+  const hiddenWidgetObjects = ALL_WIDGETS.filter((w) => hiddenWidgets.includes(w.id));
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Welcome back{user ? `, ${user.firstName}` : ''}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">Here&apos;s an overview of your assets</p>
-      </div>
-
-      {/* Stat cards */}
-      {isError ? (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-5 mb-6 text-sm text-red-600">
-          Failed to load summary data. Please try refreshing the page.
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          {isLoading
-            ? statCards.map((s) => <StatSkeleton key={s.key} />)
-            : statCards.map(({ label, key, icon: Icon, status }) => (
-                <Link
-                  key={key}
-                  href={status ? `/assets?status=${status}` : '/assets'}
-                  className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 hover:border-gray-300 transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs sm:text-sm text-gray-500">{label}</p>
-                    <Icon size={16} className="text-gray-400" aria-hidden="true" />
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{counts[key]}</p>
-                </Link>
-              ))}
-        </div>
-      )}
-
-      {/* Charts section – lazy loaded */}
-      {!isLoading && !isError && data && (
-        <DashboardCharts data={data} />
-      )}
-
-      {/* Recent assets table – responsive */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">Recent Assets</h2>
-          <Link href="/assets" className="text-xs text-gray-500 hover:text-gray-900 hover:underline">
-            View all assets
-          </Link>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Welcome back{user ? `, ${user.firstName}` : ''}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">Here&apos;s an overview of your assets</p>
         </div>
 
-        {/* Desktop table — hidden on small screens */}
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
-                <th className="px-4 py-3 text-left font-medium">Name</th>
-                <th className="px-4 py-3 text-left font-medium">Asset ID</th>
-                <th className="px-4 py-3 text-left font-medium">Status</th>
-                <th className="px-4 py-3 text-left font-medium">Department</th>
-                <th className="px-4 py-3 text-left font-medium">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
-              ) : !data?.recent?.length ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">
-                    No assets yet.{' '}
-                    <Link href="/assets" className="text-gray-900 underline">
-                      Register your first asset
-                    </Link>
-                  </td>
-                </tr>
-              ) : (
-                data.recent.map((asset) => (
-                  <tr
-                    key={asset.id}
-                    className="border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => { window.location.href = `/assets/${asset.id}`; }}
-                  >
-                    <td className="px-4 py-3 font-medium text-gray-900">{asset.name}</td>
-                    <td className="px-4 py-3 text-gray-500">{asset.assetId}</td>
-                    <td className="px-4 py-3"><StatusBadge status={asset.status} /></td>
-                    <td className="px-4 py-3 text-gray-500">{asset.department?.name ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {format(new Date(asset.createdAt), 'MMM d, yyyy')}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile stacked cards — visible only on small screens */}
-        <div className="sm:hidden">
-          {isLoading ? (
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="animate-pulse h-16 bg-gray-100 rounded-lg" />
-              ))}
-            </div>
-          ) : !data?.recent?.length ? (
-            <div className="px-4 py-10 text-center text-sm text-gray-400">
-              No assets yet.{' '}
-              <Link href="/assets" className="text-gray-900 underline">
-                Register your first asset
-              </Link>
-            </div>
+        <div className="flex items-center gap-2">
+          {isEditing ? (
+            <>
+              <button
+                type="button"
+                onClick={handleResetDefault}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset to Default
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePreferences}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs transition-colors"
+              >
+                <Check className="h-3.5 w-3.5" />
+                Done Customising
+              </button>
+            </>
           ) : (
-            data.recent.map((asset) => (
-              <AssetCard key={asset.id} asset={asset} />
-            ))
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-2xs transition-colors"
+            >
+              <SlidersHorizontal className="h-4 w-4 text-gray-500" />
+              Customise Dashboard
+            </button>
           )}
         </div>
       </div>
+
+      {/* Editing Mode Banner & Hidden Widgets Drawer */}
+      {isEditing && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-indigo-900 uppercase tracking-wider">
+                Edit Mode Active
+              </p>
+              <p className="text-xs text-indigo-700 mt-0.5">
+                Drag cards by their handle to reorder, or click Hide to remove cards from view.
+              </p>
+            </div>
+          </div>
+
+          {hiddenWidgetObjects.length > 0 && (
+            <div className="pt-2 border-t border-indigo-200/80">
+              <p className="text-xs font-semibold text-indigo-900 mb-2">Hidden Cards ({hiddenWidgetObjects.length}):</p>
+              <div className="flex flex-wrap gap-2">
+                {hiddenWidgetObjects.map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => handleShowWidget(w.id)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-indigo-200 text-indigo-800 rounded-lg text-xs font-medium hover:bg-indigo-100 transition-colors"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>{w.title}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main Grid */}
+      {isError ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-sm text-red-600">
+          Failed to load summary data. Please try refreshing the page.
+        </div>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={visibleWidgets} strategy={rectSortingStrategy}>
+            <div className="space-y-6">
+              {visibleWidgets.map((id) => (
+                <SortableWidget
+                  key={id}
+                  id={id}
+                  isEditing={isEditing}
+                  onHideWidget={handleHideWidget}
+                >
+                  <WidgetRenderer id={id} data={data} isLoading={isLoading || !isHydrated} />
+                </SortableWidget>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {visibleWidgets.length === 0 && (
+        <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center bg-gray-50/50">
+          <Eye className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+          <p className="text-sm font-medium text-gray-700">All dashboard widgets are currently hidden.</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Click &quot;Customise Dashboard&quot; or &quot;Reset to Default&quot; to restore your cards.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
