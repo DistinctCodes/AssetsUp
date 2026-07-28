@@ -1,0 +1,7 @@
+# Recorded release WASM sizes in bytes.
+# Regenerate with: ./scripts/check-wasm-size.sh --baseline
+asset_maintenance 65756
+assetsup 168165
+contrib 79282
+multisig_transfer 64938
+multisig_wallet 74210

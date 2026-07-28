@@ -66,7 +66,6 @@
     "otplib": "^13.1.1",
     "papaparse": "^5.5.3",
     "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "pdfkit": "^0.17.2",
@@ -97,7 +96,6 @@
     "@types/nodemailer": "^7.0.9",
     "@types/otplib": "^7.0.0",
     "@types/papaparse": "^5.3.16",
-    "@types/passport-google-oauth20": "^2.0.17",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/pdfkit": "^0.17.3",
@@ -131,9 +129,22 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/node_modules/**",
+      "!**/*.module.ts",
+      "!**/main.ts",
+      "!**/migrations/**",
+      "!**/test/**"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "coverageThreshold": {
+      "global": {
+        "lines": 80,
+        "functions": 80,
+        "branches": 70,
+        "statements": 80
+      }
+    }
   }
 }

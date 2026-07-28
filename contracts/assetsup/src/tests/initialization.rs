@@ -56,7 +56,7 @@ fn test_get_contract_metadata() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #35)")]
+#[should_panic(expected = "Error(Contract, #107)")]
 fn test_get_contract_metadata_not_initialized() {
     let env = create_env();
 
@@ -68,7 +68,7 @@ fn test_get_contract_metadata_not_initialized() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")]
+#[should_panic(expected = "Error(Contract, #100)")]
 fn test_get_admin_not_found() {
     let env = create_env();
 

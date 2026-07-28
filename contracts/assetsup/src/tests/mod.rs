@@ -3,9 +3,12 @@ mod helpers;
 
 // Core contract tests
 mod admin;
+mod admin_transfer;
 mod asset;
 mod audit_trail;
+mod auth;
 mod initialization;
+mod pause;
 
 // Tokenization and ownership tests
 mod detokenization;
@@ -28,3 +31,12 @@ mod integration;
 mod tokenization_new;
 mod transfer_restrictions_new;
 mod voting_new;
+
+// Storage TTL policy tests
+mod ttl;
+
+// Upgrade and storage migration tests
+mod upgrade;
+
+// Property-based tests for share accounting
+mod proptests;

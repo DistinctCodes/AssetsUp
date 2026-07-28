@@ -42,7 +42,7 @@ fn test_tokenize_asset_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #10)")]
+#[should_panic(expected = "Error(Contract, #120)")]
 fn test_tokenize_asset_already_tokenized() {
     let env = Env::default();
     let (client, _) = setup(&env);
@@ -71,7 +71,7 @@ fn test_transfer_tokens_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #14)")]
+#[should_panic(expected = "Error(Contract, #124)")]
 fn test_transfer_tokens_insufficient_balance() {
     let env = Env::default();
     let (client, _) = setup(&env);
@@ -86,7 +86,7 @@ fn test_transfer_tokens_insufficient_balance() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #17)")]
+#[should_panic(expected = "Error(Contract, #127)")]
 fn test_transfer_tokens_blacklisted_recipient() {
     let env = Env::default();
     let (client, _) = setup(&env);

@@ -50,7 +50,7 @@ fn test_execute_detokenization_end_to_end() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #28)")]
+#[should_panic(expected = "Error(Contract, #160)")]
 fn test_execute_detokenization_without_votes_panics() {
     let env = Env::default();
     let client = setup(&env);
@@ -66,7 +66,7 @@ fn test_execute_detokenization_without_votes_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #29)")]
+#[should_panic(expected = "Error(Contract, #161)")]
 fn test_propose_detokenization_duplicate_panics() {
     let env = Env::default();
     let client = setup(&env);

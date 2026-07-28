@@ -1,5 +1,5 @@
 use crate::DataKey as GlobalDataKey;
-use soroban_sdk::{contracttype, symbol_short, Address, BytesN, Env, String, Vec};
+use soroban_sdk::{contracttype, Address, BytesN, Env, String, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -71,9 +71,12 @@ pub fn create_policy(env: Env, asset_id: BytesN<32>, policy_data: InsurancePolic
 
     store.set(&key, &policy_data);
 
-    env.events().publish(
-        (symbol_short!("pol_cre"), policy_data.policy_id.clone()),
-        (asset_id, policy_data.insurer, policy_data.holder),
+    crate::events::policy_created(
+        &env,
+        &policy_data.policy_id,
+        &asset_id,
+        &policy_data.insurer,
+        &policy_data.holder,
     );
 }
 
@@ -97,10 +100,7 @@ pub fn cancel_policy(env: Env, policy_id: BytesN<32>, caller: Address) {
     policy.status = PolicyStatus::Cancelled;
     store.set(&key, &policy);
 
-    env.events().publish(
-        (symbol_short!("pol_can"), policy_id),
-        (caller, env.ledger().timestamp()),
-    );
+    crate::events::policy_cancelled(&env, &policy_id, &caller);
 }
 
 pub fn is_policy_active(env: Env, policy_id: BytesN<32>) -> bool {
@@ -159,10 +159,7 @@ pub fn submit_claim(
     claims.push_back(claim.claim_id.clone());
     store.set(&list_key, &claims);
 
-    env.events().publish(
-        (symbol_short!("clm_sub"), claim.claim_id.clone()),
-        (claim.policy_id, claimant, amount),
-    );
+    crate::events::claim_submitted(&env, &claim.claim_id, &claim.policy_id, &claimant, amount);
 }
 
 pub fn update_claim_status(
@@ -184,10 +181,7 @@ pub fn update_claim_status(
     claim.status = new_status;
     store.set(&claim_key, &claim);
 
-    env.events().publish(
-        (symbol_short!("clm_upd"), claim_id),
-        (claim.status, env.ledger().timestamp()),
-    );
+    crate::events::claim_status_updated(&env, &claim_id, claim.status);
 }
 
 pub fn get_claim(env: Env, claim_id: BytesN<32>) -> InsuranceClaim {

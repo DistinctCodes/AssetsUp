@@ -1,16 +1,38 @@
 [workspace]
 resolver = "2"
+
+# Naming convention: crate (package) names use hyphens, matching Rust ecosystem
+# norms, and every directory name matches its package name. That keeps
+# `cargo <cmd> -p <dirname>` working for all five crates. Member paths are
+# listed bare and alphabetically — no `./` prefixes, no mixed separators.
 members = [
-  "./asset-maintenance",
+  "asset-maintenance",
   "assetsup",
   "contrib",
+  "multisig-transfer",
   "multisig-wallet",
-  "multisig_transfer",
 ]
 
 [workspace.dependencies]
-soroban-sdk = "22"
+soroban-sdk = "23"
 
+# Deployable WASM is charged for by size and subject to a ledger size limit, so
+# the release profile is tuned for the smallest artifact that is still safe.
 [profile.release]
-opt-level = "z"
+opt-level = "z"        # optimize for size over speed
+lto = true             # cross-crate inlining and dead code elimination
+codegen-units = 1      # one unit lets LLVM see the whole crate at once
+strip = "symbols"      # symbol names are dead weight on-chain
+debug = 0              # no debug info in a deployed artifact
+panic = "abort"        # unwinding tables are unusable in Soroban anyway
+# Kept deliberately. Overflow checks cost a little size and gas, but these
+# contracts move asset value and share counts; a silent wrap is worse than a
+# trapped transaction. Converting the traps into typed errors is [SC-43].
 overflow-checks = true
+
+# Same size profile, but with debug assertions left on so a testnet deployment
+# reports precondition failures instead of silently misbehaving. Never use for
+# mainnet: debug assertions change failure behaviour and add size.
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true

@@ -41,7 +41,7 @@ fn test_cast_vote_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #22)")]
+#[should_panic(expected = "Error(Contract, #141)")]
 fn test_cast_vote_double_vote_panics() {
     let env = Env::default();
     let client = setup(&env);
@@ -56,7 +56,7 @@ fn test_cast_vote_double_vote_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #21)")]
+#[should_panic(expected = "Error(Contract, #140)")]
 fn test_cast_vote_below_threshold_panics() {
     let env = Env::default();
     let client = setup(&env);

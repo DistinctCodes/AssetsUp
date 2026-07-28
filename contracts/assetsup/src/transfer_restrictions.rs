@@ -15,10 +15,7 @@ pub fn set_transfer_restriction(
     store.set(&key, &restriction);
 
     // Emit event: (asset_id, require_accredited)
-    env.events().publish(
-        ("transfer", "restriction_set"),
-        (asset_id, restriction.require_accredited),
-    );
+    crate::events::restriction_set(env, asset_id, restriction.require_accredited);
 
     Ok(())
 }
@@ -39,8 +36,7 @@ pub fn add_to_whitelist(env: &Env, asset_id: u64, address: Address) -> Result<()
     store.set(&key, &whitelist);
 
     // Emit event: (asset_id, address)
-    env.events()
-        .publish(("transfer", "whitelist_added"), (asset_id, address));
+    crate::events::whitelist_added(env, asset_id, &address);
 
     Ok(())
 }
@@ -58,8 +54,7 @@ pub fn remove_from_whitelist(env: &Env, asset_id: u64, address: Address) -> Resu
         store.set(&key, &whitelist);
 
         // Emit event: (asset_id, address)
-        env.events()
-            .publish(("transfer", "whitelist_removed"), (asset_id, address));
+        crate::events::whitelist_removed(env, asset_id, &address);
     }
 
     Ok(())

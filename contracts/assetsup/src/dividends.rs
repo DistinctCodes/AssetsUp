@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::math;
 use crate::types::{OwnershipRecord, TokenDataKey, TokenizedAsset};
 use soroban_sdk::{Address, Env, Vec};
 
@@ -27,20 +28,25 @@ pub fn distribute_dividends(env: &Env, asset_id: u64, total_amount: i128) -> Res
         let holder_key = TokenDataKey::TokenHolder(asset_id, holder.clone());
         let mut ownership: OwnershipRecord = store.get(&holder_key).ok_or(Error::HolderNotFound)?;
 
-        // Calculate proportional dividend: (balance / total_supply) * total_amount
-        let proportion = (ownership.balance * total_amount) / tokenized_asset.total_supply;
+        // Proportional dividend: balance/total_supply of total_amount.
+        //
+        // Written naively as (balance * total_amount) / total_supply this
+        // overflows whenever the intermediate product exceeds i128::MAX, even
+        // though the quotient is small. Rounds down; the remainder stays with
+        // the contract. See crate::math for the rounding rationale.
+        let proportion = math::mul_div(
+            ownership.balance,
+            total_amount,
+            tokenized_asset.total_supply,
+        )?;
 
-        // Add to unclaimed dividends
-        ownership.unclaimed_dividends += proportion;
+        ownership.unclaimed_dividends = math::add(ownership.unclaimed_dividends, proportion)?;
 
         store.set(&holder_key, &ownership);
     }
 
     // Emit event: (asset_id, total_amount, holder_count)
-    env.events().publish(
-        ("dividend", "distributed"),
-        (asset_id, total_amount, holders.len()),
-    );
+    crate::events::dividend_distributed(env, asset_id, total_amount, holders.len());
 
     Ok(())
 }
@@ -69,8 +75,7 @@ pub fn claim_dividends(env: &Env, asset_id: u64, holder: Address) -> Result<i128
     store.set(&holder_key, &ownership);
 
     // Emit event: (asset_id, holder, amount)
-    env.events()
-        .publish(("dividend", "claimed"), (asset_id, holder, unclaimed));
+    crate::events::dividend_claimed(env, asset_id, &holder, unclaimed);
 
     Ok(unclaimed)
 }

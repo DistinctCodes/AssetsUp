@@ -134,10 +134,7 @@ pub fn execute_detokenization(env: &Env, asset_id: u64, proposal_id: u64) -> Res
     store.set(&proposal_key, &executed_proposal);
 
     // Emit event: (asset_id, proposal_id, total_supply_removed)
-    env.events().publish(
-        ("detokenization", "asset_detokenized"),
-        (asset_id, proposal_id, total_supply),
-    );
+    crate::events::asset_detokenized(env, asset_id, proposal_id, total_supply);
 
     Ok(())
 }

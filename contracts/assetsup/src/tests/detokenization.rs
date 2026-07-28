@@ -32,7 +32,7 @@ fn test_propose_detokenization_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #29)")]
+#[should_panic(expected = "Error(Contract, #161)")]
 fn test_propose_detokenization_already_proposed() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -59,7 +59,7 @@ fn test_propose_detokenization_already_proposed() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #11)")]
+#[should_panic(expected = "Error(Contract, #121)")]
 fn test_propose_detokenization_not_tokenized() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -108,7 +108,7 @@ fn test_execute_detokenization_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #28)")]
+#[should_panic(expected = "Error(Contract, #160)")]
 fn test_execute_detokenization_not_approved() {
     let env = create_env();
     let (admin, user1, user2, _) = create_mock_addresses(&env);
@@ -142,7 +142,7 @@ fn test_execute_detokenization_not_approved() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #24)")]
+#[should_panic(expected = "Error(Contract, #143)")]
 fn test_execute_detokenization_no_proposal() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);

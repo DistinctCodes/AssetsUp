@@ -1,44 +1,176 @@
 import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { User } from '../users/entities/user.entity';
+import { AuthService } from './auth.service';
+import { GetUser } from './decorators/get-user.decorator';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+
+@ApiTags('Auth')
+@Controller('api/auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  @ApiOperation({ summary: 'Create new user account' })
+  @ApiResponse({ status: 201, description: 'User successfully registered' })
+  @ApiResponse({ status: 400, description: 'Weak payload or validation error' })
+  @ApiResponse({ status: 409, description: 'Email already exists' })
+  async register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
+  }
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Authenticate user and return JWT' })
+  @ApiResponse({ status: 200, description: 'Successfully authenticated' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Invalidate current session' })
+  @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  async logout() {
+    // Stateless JWT logout response
+    return { message: 'Logged out successfully' };
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get current authenticated user's profile" })
+  @ApiResponse({ status: 200, description: 'Profile retrieved' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async me(@GetUser() user: User) {
+    return this.authService.getCurrentUser(user);
+  }
+}
   Controller,
   Post,
   Body,
-  Get,
   UseGuards,
-  Req,
+  Get,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { LoginUserDto } from './dto/login-user.dto';
+import { JwtAuthGuard } from './guard/jwt.auth.guard';
+import { RolesGuard } from './guard/roles.guard';
+import { Roles } from './decorators/roles.decorators';
+import { UserRole } from '../users/enums/userRoles.enum';
+import { User } from '../users/entities/user.entity';
+import { CurrentUser } from './decorators/current.user.decorators';
+import { Public } from './decorators/public.decorator';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ResendOtpDto } from './dto/resend-otp.dto';
+import { SendPasswordResetOtpDto } from './dto/send-password-reset-otp.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
+  @Post('register')
+  @HttpCode(HttpStatus.CREATED)
+  create(@Body() createUserDto: CreateUserDto) {
+    return this.authService.createUser(createUserDto);
+  }
+
+  @Public()
+  @Post('verify-otp')
+  @HttpCode(HttpStatus.OK)
+  verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
+    return this.authService.verifyOtp(verifyOtpDto);
+  }
+  @Public()
+  @Post('resend-verification-otp')
+  @HttpCode(HttpStatus.OK)
+  resendVerificationOtp(@Body() resendOtpDto: ResendOtpDto) {
+    return this.authService.resendVerificationOtp(resendOtpDto.email);
+  }
+
+  @Post('register-admin')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles(UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  createAdmin(@Body() createUserDto: CreateUserDto) {
+    return this.authService.createAdminUser(createUserDto);
+  }
+  @Public()
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  login(@Body() loginUserDto: LoginUserDto) {
+    return this.authService.login(loginUserDto);
+  }
+  @Public()
+  @Post('refresh-token')
+  @HttpCode(HttpStatus.OK)
+  refreshToken(@Body('refreshToken') refreshToken: string) {
+    return this.authService.refreshToken(refreshToken);
+  }
+
+  @Get('current-user')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  retrieveCurrentUser(@CurrentUser() user: User) {
+    return user;
+  }
+
+  @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  async forgotPassword(@Body('email') email: string) {
-    await this.authService.forgotPassword(email);
-    return { message: 'If the email exists, a reset link has been sent.' };
+  forgotPassword(
+    @Body() sendPasswordResetOtpDto: SendPasswordResetOtpDto,
+  ) {
+    return this.authService.requestResetPasswordOtp(sendPasswordResetOtpDto);
   }
 
+  @Public()
+  @Post('send-reset-password-otp')
+  @HttpCode(HttpStatus.OK)
+  requestResetPasswordOtp(
+    @Body() sendPasswordResetOtpDto: SendPasswordResetOtpDto,
+  ) {
+    return this.authService.requestResetPasswordOtp(sendPasswordResetOtpDto);
+  }
+  @Public()
+  @Post('resend-reset-password-otp')
+  @HttpCode(HttpStatus.OK)
+  resendResetPasswordVerificationOtp(@Body() resendOtpDto: ResendOtpDto) {
+    return this.authService.resendResetPasswordVerificationOtp(resendOtpDto);
+  }
+
+  @Public()
+  @Post('verify-reset-password-otp')
+  @HttpCode(HttpStatus.OK)
+  verifyResetPasswordOtp(@Body() verifyOtpDto: VerifyOtpDto) {
+    return this.authService.verifyResetPasswordOtp(verifyOtpDto);
+  }
+
+  @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
-  async resetPassword(@Body() body: any) {
-    await this.authService.resetPassword(body.token, body.newPassword);
-    return { message: 'Password has been reset successfully.' };
-  }
-
-  @Get('google')
-  @UseGuards(AuthGuard('google'))
-  async googleAuth() {
-    // Initiates the Google OAuth flow
-  }
-
-  @Get('google/callback')
-  @UseGuards(AuthGuard('google'))
-  async googleAuthRedirect(@Req() req: any) {
-    // user is attached to req by the strategy
-    return req.user;
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(resetPasswordDto);
   }
 }

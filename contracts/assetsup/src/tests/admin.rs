@@ -2,13 +2,16 @@ use crate::tests::helpers::*;
 use soroban_sdk::{testutils::Address as _, Address};
 
 #[test]
-fn test_update_admin_success() {
+fn test_admin_transfer_success() {
     let env = create_env();
     let (admin, new_admin, _, _) = create_mock_addresses(&env);
     let client = initialize_contract(&env, &admin);
 
     env.mock_all_auths();
-    client.update_admin(&new_admin);
+    // Admin transfer is now two-step: propose, then the incoming address
+    // accepts.
+    client.propose_admin(&new_admin);
+    client.accept_admin();
 
     // Verify admin was updated
     assert_eq!(client.get_admin(), new_admin);
@@ -21,8 +24,8 @@ fn test_update_admin_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #39)")]
-fn test_update_admin_zero_address() {
+#[should_panic(expected = "Error(Contract, #173)")]
+fn test_propose_admin_zero_address() {
     let env = create_env();
     let admin = Address::generate(&env);
     let client = initialize_contract(&env, &admin);
@@ -35,7 +38,7 @@ fn test_update_admin_zero_address() {
     env.mock_all_auths();
 
     // Should panic with InvalidOwnerAddress error
-    client.update_admin(&zero_address);
+    client.propose_admin(&zero_address);
 }
 
 #[test]
@@ -92,7 +95,7 @@ fn test_remove_authorized_registrar() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_remove_admin_from_registrars() {
     let env = create_env();
     let admin = Address::generate(&env);

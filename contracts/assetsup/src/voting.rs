@@ -36,10 +36,7 @@ pub fn cast_vote(env: &Env, asset_id: u64, proposal_id: u64, voter: Address) -> 
     store.set(&tally_key, &new_tally);
 
     // Emit event: (asset_id, proposal_id, voter, weight)
-    env.events().publish(
-        ("voting", "vote_cast"),
-        (asset_id, proposal_id, voter, ownership.balance),
-    );
+    crate::events::vote_cast(env, asset_id, proposal_id, &voter, ownership.balance);
 
     Ok(())
 }

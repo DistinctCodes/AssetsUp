@@ -1,0 +1,18 @@
+[package]
+name = "multisig-transfer"
+version = "0.1.0"
+edition = "2021"
+# Deployed as WASM to Stellar, never published to crates.io.
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+# Cross-contract integration tests register the real registry ([SC-51]).
+assetsup = { path = "../assetsup" }

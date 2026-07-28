@@ -98,7 +98,7 @@ fn test_distribute_dividends_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #27)")]
+#[should_panic(expected = "Error(Contract, #151)")]
 fn test_distribute_dividends_invalid_amount() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -125,7 +125,7 @@ fn test_distribute_dividends_invalid_amount() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #27)")]
+#[should_panic(expected = "Error(Contract, #151)")]
 fn test_distribute_dividends_not_enabled() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -183,7 +183,7 @@ fn test_claim_dividends_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #26)")]
+#[should_panic(expected = "Error(Contract, #150)")]
 fn test_claim_dividends_none_to_claim() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
