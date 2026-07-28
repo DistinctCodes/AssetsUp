@@ -1,6 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
 
 /**
  * Create a testing module with common providers
@@ -22,7 +20,7 @@ export async function createTestingModule(
  * Create a mock repository
  * Useful for mocking TypeORM repositories in tests
  */
-export function createMockRepository<T = any>() {
+export function createMockRepository() {
   return {
     find: jest.fn(),
     findOne: jest.fn(),
