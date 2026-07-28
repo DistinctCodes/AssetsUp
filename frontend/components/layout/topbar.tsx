@@ -59,10 +59,12 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
-          className="lg:hidden text-gray-500 hover:text-gray-900"
-          aria-label="Open menu"
+          className="lg:hidden flex items-center justify-center w-11 h-11 -ml-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          aria-label="Open navigation menu"
+          aria-controls="sidebar"
+          aria-expanded="false"
         >
-          <Menu size={20} />
+          <Menu size={20} aria-hidden="true" />
         </button>
         <h1 className="text-sm font-semibold text-gray-900">
           {getPageTitle(pathname)}

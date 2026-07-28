@@ -1,4 +1,3 @@
-// frontend/app/(dashboard)/reports/page.tsx
 "use client";
 
 import Link from "next/link";
@@ -8,6 +7,7 @@ import { clsx } from "clsx";
 import { useReportsSummary } from "@/lib/query/hooks/useReports";
 import { AssetStatus } from "@/lib/query/types/asset";
 import { StatusBadge } from "@/components/assets/status-badge";
+import { DateRangeSelector } from "@/features/Dashboard/DateRangeSelector";
 
 const STATUS_COLORS: Record<AssetStatus, string> = {
   [AssetStatus.ACTIVE]: "bg-green-500",
@@ -47,6 +47,16 @@ export default function ReportsPage() {
         <p className="text-sm text-gray-500 mt-1">Asset inventory overview</p>
       </div>
 
+      {/* Date Range Selector */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+        <DateRangeSelector
+          onChange={(range) => {
+            // In a real implementation, the API call would filter by these dates
+            console.log('Date range changed:', range);
+          }}
+        />
+      </div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-5 col-span-2 lg:col-span-1">
@@ -70,7 +80,7 @@ export default function ReportsPage() {
         {/* By Status bar */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <BarChart3 size={15} className="text-gray-400" />
+            <BarChart3 size={15} className="text-gray-400" aria-hidden="true" />
             Assets by Status
           </h2>
           <div className="space-y-3">
@@ -91,6 +101,11 @@ export default function ReportsPage() {
                         STATUS_COLORS[status],
                       )}
                       style={{ width: `${pct}%` }}
+                      role="progressbar"
+                      aria-valuenow={pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${status.toLowerCase()}: ${pct}%`}
                     />
                   </div>
                 </div>
@@ -102,7 +117,7 @@ export default function ReportsPage() {
         {/* By Category */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <BarChart3 size={15} className="text-gray-400" />
+            <BarChart3 size={15} className="text-gray-400" aria-hidden="true" />
             Assets by Category
           </h2>
           {topCategories.length === 0 ? (
@@ -114,8 +129,8 @@ export default function ReportsPage() {
                 return (
                   <div key={name}>
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>{name}</span>
-                      <span>
+                      <span className="truncate flex-1">{name}</span>
+                      <span className="ml-2">
                         {count} ({pct}%)
                       </span>
                     </div>
@@ -123,6 +138,11 @@ export default function ReportsPage() {
                       <div
                         className="h-full rounded-full bg-gray-900 transition-all"
                         style={{ width: `${pct}%` }}
+                        role="progressbar"
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${name}: ${pct}%`}
                       />
                     </div>
                   </div>
@@ -137,7 +157,7 @@ export default function ReportsPage() {
         {/* By Department */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <BarChart3 size={15} className="text-gray-400" />
+            <BarChart3 size={15} className="text-gray-400" aria-hidden="true" />
             Assets by Department
           </h2>
           {topDepartments.length === 0 ? (
@@ -149,8 +169,8 @@ export default function ReportsPage() {
                 return (
                   <div key={name}>
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>{name}</span>
-                      <span>
+                      <span className="truncate flex-1">{name}</span>
+                      <span className="ml-2">
                         {count} ({pct}%)
                       </span>
                     </div>
@@ -158,6 +178,11 @@ export default function ReportsPage() {
                       <div
                         className="h-full rounded-full bg-blue-500 transition-all"
                         style={{ width: `${pct}%` }}
+                        role="progressbar"
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${name}: ${pct}%`}
                       />
                     </div>
                   </div>
@@ -171,7 +196,7 @@ export default function ReportsPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-              <Package size={15} className="text-gray-400" />
+              <Package size={15} className="text-gray-400" aria-hidden="true" />
               Recently Added
             </h2>
             <Link
@@ -193,11 +218,11 @@ export default function ReportsPage() {
                   href={`/assets/${asset.id}`}
                   className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 -mx-2 px-2 rounded-lg transition-colors"
                 >
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
                       {asset.name}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">
                       {asset.assetId} · {asset.category?.name ?? "—"} ·{" "}
                       {format(new Date(asset.createdAt), "MMM d, yyyy")}
                     </p>
