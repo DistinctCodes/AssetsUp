@@ -9,6 +9,9 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { BranchesModule } from './branches/branches.module';
 import { DepartmentsModule } from './departments/departments.module';
+import { LocationsModule } from './locations/locations.module';
+import { CategoriesModule } from './categories/categories.module';
+import { AssetsLifecycleModule } from './assets/assets-lifecycle.module';
 
 @Module({
   imports: [
@@ -19,6 +22,9 @@ import { DepartmentsModule } from './departments/departments.module';
     AuthModule,
     BranchesModule,
     DepartmentsModule,
+    LocationsModule,
+    CategoriesModule,
+    AssetsLifecycleModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
