@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Advisories are published continuously, so a lockfile that was clean at
+  # merge time can become vulnerable without anything in the repo changing.
+  # This re-runs the audit weekly against the committed Cargo.lock.
+  schedule:
+    - cron: "0 6 * * 1"
 
 env:
   CARGO_TERM_COLOR: always
@@ -158,6 +163,93 @@ jobs:
           name: contract-wasm
           path: contracts/target/wasm32-unknown-unknown/release/*.wasm
           if-no-files-found: error
+          retention-days: 14
+
+  security:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      # The advisory database is a git clone of ~200MB of history; caching it
+      # keyed on the week keeps the job to a few seconds on most runs while
+      # still refreshing regularly.
+      - name: Cache advisory database
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/advisory-db
+          key: advisory-db-${{ github.run_id }}
+          restore-keys: advisory-db-
+
+      - name: Cache audit tooling
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-audit
+            ~/.cargo/bin/cargo-deny
+          key: ${{ runner.os }}-audit-tools-v1
+
+      - name: Install cargo-audit and cargo-deny
+        run: |
+          command -v cargo-audit >/dev/null || cargo install --locked cargo-audit
+          command -v cargo-deny  >/dev/null || cargo install --locked cargo-deny
+
+      # Gates on actual vulnerabilities. Deliberately not --deny warnings:
+      # that promotes *yanked* crates to errors, and soroban-sdk pins yanked
+      # versions of spin and keccak inside its own tree that no cargo update
+      # can resolve. Yanked and unmaintained advisories are handled by cargo
+      # deny below, where deny.toml records each one with a reason and a review
+      # date rather than failing the build indefinitely.
+      - name: cargo audit
+        run: cargo audit --file Cargo.lock
+
+      # Covers advisories, the license allowlist, duplicate versions, and
+      # source registries. See contracts/deny.toml for the triage process.
+      - name: cargo deny
+        run: cargo deny --all-features check
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/target
+          key: ${{ runner.os }}-cargo-cov-${{ hashFiles('contracts/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cov-
+            ${{ runner.os }}-cargo-
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate coverage
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+
+      # Enforces the per-crate floor as well as the workspace threshold. A
+      # workspace average hides a crate with no tests at all, which is exactly
+      # how multisig_transfer reached 755 lines with zero coverage.
+      - name: Check coverage thresholds
+        run: ./scripts/check-coverage.sh
+
+      - name: Upload lcov report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: contracts/lcov.info
           retention-days: 14
 
   # ─────────────────────────────────────────────

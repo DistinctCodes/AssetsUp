@@ -35,6 +35,8 @@ mod event_tests;
 pub mod events;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_coverage;
 mod types;
 
 pub use crate::errors::Error;

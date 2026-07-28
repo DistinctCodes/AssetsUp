@@ -7,3 +7,5 @@ test_snapshots/
 # deployments/testnet.example.json documents the shape.
 deployments/*
 !deployments/*.example.json
+# Coverage reports produced by cargo-llvm-cov.
+lcov.info
