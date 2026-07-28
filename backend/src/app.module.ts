@@ -6,6 +6,9 @@ import { AppService } from './app.service';
 import { CommonModule } from './common/common.module';
 import { UsersModule } from './users/users.module';
 import { HealthModule } from './health/health.module';
+import { AuthModule } from './auth/auth.module';
+import { BranchesModule } from './branches/branches.module';
+import { DepartmentsModule } from './departments/departments.module';
 
 @Module({
   imports: [
@@ -13,6 +16,9 @@ import { HealthModule } from './health/health.module';
     CommonModule,
     UsersModule,
     HealthModule,
+    AuthModule,
+    BranchesModule,
+    DepartmentsModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
