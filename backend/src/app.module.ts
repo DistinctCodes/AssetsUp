@@ -1,13 +1,14 @@
-// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CommonModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -18,7 +19,7 @@ import { AppService } from './app.service';
         password: configService.get('DB_PASSWORD', 'password'),
         database: configService.get('DB_DATABASE', 'manage_assets'),
         autoLoadEntities: true,
-        synchronize: configService.get('NODE_ENV') === 'development',
+        synchronize: false,
       }),
       inject: [ConfigService],
     }),
