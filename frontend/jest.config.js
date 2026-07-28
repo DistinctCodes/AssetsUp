@@ -1,19 +1,15 @@
-/** @type {import('jest').Config} */
-const config = {
-  testEnvironment: "jsdom",
-  transform: {
-    "^.+\\.tsx?$": [
-      "ts-jest",
-      {
-        tsconfig: {
-          jsx: "react-jsx",
-        },
-      },
-    ],
-  },
+const nextJest = require('next/jest');
+
+const createJestConfig = nextJest({
+  dir: './',
+});
+
+const customJestConfig = {
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
-    "^@/(.*)$": "<rootDir>/$1",
+    '^@/(.*)$': '<rootDir>/$1',
   },
 };
 
-module.exports = config;
+module.exports = createJestConfig(customJestConfig);

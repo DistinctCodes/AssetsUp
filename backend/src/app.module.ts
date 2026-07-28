@@ -12,6 +12,7 @@ import { DepartmentsModule } from './departments/departments.module';
 import { LocationsModule } from './locations/locations.module';
 import { CategoriesModule } from './categories/categories.module';
 import { AssetsLifecycleModule } from './assets/assets-lifecycle.module';
+import { AssetsModule } from './assets/assets.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AssetsLifecycleModule } from './assets/assets-lifecycle.module';
     LocationsModule,
     CategoriesModule,
     AssetsLifecycleModule,
+    AssetsModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
