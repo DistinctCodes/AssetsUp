@@ -14,3 +14,5 @@ soroban-sdk = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+# Property-based tests for share-accounting invariants ([SC-50]).
+proptest = "1"

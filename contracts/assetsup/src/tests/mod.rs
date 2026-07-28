@@ -7,7 +7,6 @@ mod admin_transfer;
 mod asset;
 mod audit_trail;
 mod auth;
-mod events;
 mod initialization;
 mod pause;
 
@@ -35,3 +34,9 @@ mod voting_new;
 
 // Storage TTL policy tests
 mod ttl;
+
+// Upgrade and storage migration tests
+mod upgrade;
+
+// Property-based tests for share accounting
+mod proptests;

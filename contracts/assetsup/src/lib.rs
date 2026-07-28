@@ -30,16 +30,22 @@
 //! See [`README.md`](https://github.com/DistinctCodes/AssetsUp/blob/main/contracts/assetsup/README.md)
 //! for the full entrypoint, storage, event, and error tables.
 
-use crate::error::{handle_error, Error};
-use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, String, Vec};
+#[cfg(test)]
+extern crate std;
 
-pub(crate) mod asset;
+use crate::error::{handle_error, Error};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec,
+};
+
+// `Asset` is part of the contract's public ABI (it is a `register_asset`
+// argument), so the module is public for cross-contract integration tests.
+pub mod asset;
 pub(crate) mod audit;
 pub(crate) mod branch;
 pub(crate) mod detokenization;
 pub(crate) mod dividends;
 pub(crate) mod error;
-pub mod events;
 pub(crate) mod insurance;
 pub(crate) mod lease;
 pub(crate) mod math;
@@ -47,6 +53,7 @@ pub(crate) mod tokenization;
 pub(crate) mod transfer_restrictions;
 pub(crate) mod ttl;
 pub(crate) mod types;
+pub mod upgrade;
 pub(crate) mod voting;
 
 #[cfg(test)]
@@ -62,6 +69,8 @@ pub enum DataKey {
     TotalAssetCount,
     ContractMetadata,
     AuthorizedRegistrar(Address),
+    /// Layout version the stored data conforms to. See `upgrade`.
+    StorageVersion,
     /// Address that has been proposed as the next admin but has not yet
     /// accepted. Absent when no transfer is in flight.
     PendingAdmin,
@@ -107,6 +116,10 @@ impl AssetUpContract {
             .persistent()
             .set(&DataKey::AuthorizedRegistrar(admin.clone()), &true);
 
+        // Stamp the layout version so a later upgrade knows what it is
+        // migrating from.
+        upgrade::set_version(&env, upgrade::CURRENT_VERSION);
+
         // Extend on write, not only on read. A freshly written entry gets the
         // network's minimum lifetime, which is short; without this the whole
         // contract configuration can be archived before anyone reads it, and a
@@ -115,9 +128,8 @@ impl AssetUpContract {
         ttl::extend_persistent(&env, &DataKey::Paused);
         ttl::extend_persistent(&env, &DataKey::TotalAssetCount);
         ttl::extend_persistent(&env, &DataKey::ContractMetadata);
-        ttl::extend_persistent(&env, &DataKey::AuthorizedRegistrar(admin.clone()));
-
-        events::contract_initialized(&env, &admin);
+        ttl::extend_persistent(&env, &DataKey::StorageVersion);
+        ttl::extend_persistent(&env, &DataKey::AuthorizedRegistrar(admin));
 
         Ok(())
     }
@@ -231,7 +243,10 @@ impl AssetUpContract {
         );
 
         // Emit event
-        events::asset_registered(&env, &asset.id, &asset.owner);
+        env.events().publish(
+            (symbol_short!("asset_reg"),),
+            (asset.owner, asset.id, env.ledger().timestamp()),
+        );
 
         Ok(())
     }
@@ -346,7 +361,10 @@ impl AssetUpContract {
         );
 
         // Emit event
-        events::asset_updated(&env, &asset_id, &caller);
+        env.events().publish(
+            (symbol_short!("asset_upd"),),
+            (asset_id, caller, env.ledger().timestamp()),
+        );
 
         Ok(())
     }
@@ -426,7 +444,10 @@ impl AssetUpContract {
         );
 
         // Emit event
-        events::asset_transferred(&env, &asset_id, &old_owner, &new_owner);
+        env.events().publish(
+            (symbol_short!("asset_tx"),),
+            (asset_id, old_owner, new_owner, env.ledger().timestamp()),
+        );
 
         Ok(())
     }
@@ -470,7 +491,10 @@ impl AssetUpContract {
         );
 
         // Emit event
-        events::asset_retired(&env, &asset_id, &caller);
+        env.events().publish(
+            (symbol_short!("asset_ret"),),
+            (asset_id, caller, env.ledger().timestamp()),
+        );
 
         Ok(())
     }
@@ -567,7 +591,10 @@ impl AssetUpContract {
             .persistent()
             .set(&DataKey::PendingAdmin, &new_admin);
 
-        events::admin_proposed(&env, &current_admin, &new_admin);
+        env.events().publish(
+            (symbol_short!("adm_prop"),),
+            (current_admin, new_admin, env.ledger().timestamp()),
+        );
 
         Ok(())
     }
@@ -598,7 +625,10 @@ impl AssetUpContract {
             .persistent()
             .set(&DataKey::AuthorizedRegistrar(pending.clone()), &true);
 
-        events::admin_changed(&env, &old_admin, &pending);
+        env.events().publish(
+            (symbol_short!("admin_chg"),),
+            (old_admin, pending, env.ledger().timestamp()),
+        );
 
         Ok(())
     }
@@ -616,7 +646,10 @@ impl AssetUpContract {
 
         env.storage().persistent().remove(&DataKey::PendingAdmin);
 
-        events::admin_proposal_cancelled(&env, &current_admin, &pending);
+        env.events().publish(
+            (symbol_short!("adm_cncl"),),
+            (current_admin, pending, env.ledger().timestamp()),
+        );
 
         Ok(())
     }
@@ -624,6 +657,49 @@ impl AssetUpContract {
     /// The address currently nominated to become admin, if any.
     pub fn get_pending_admin(env: Env) -> Option<Address> {
         env.storage().persistent().get(&DataKey::PendingAdmin)
+    }
+
+    /// Replaces this contract's WASM in place, keeping the contract id and all
+    /// storage.
+    ///
+    /// Admin-gated and emits an event. Deliberately **not** blocked by the
+    /// pause: an upgrade is how you fix the incident that caused the pause.
+    ///
+    /// This does not migrate storage. If the new build changes a stored
+    /// layout, call [`Self::migrate`] immediately afterwards — see
+    /// `contracts/UPGRADE.md`.
+    pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) -> Result<(), Error> {
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+
+        env.deployer()
+            .update_current_contract_wasm(new_wasm_hash.clone());
+
+        upgrade::emit_upgraded(&env, &admin, &new_wasm_hash, upgrade::CURRENT_VERSION);
+        Ok(())
+    }
+
+    /// Brings stored data up to the layout this build expects.
+    ///
+    /// Idempotent: running it when already current is a no-op, so a retried or
+    /// duplicated migration transaction cannot corrupt state.
+    pub fn migrate(env: Env) -> Result<u32, Error> {
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+
+        let from = upgrade::stored_version(&env);
+        let to = upgrade::migrate_from(&env, from)?;
+
+        if from != to {
+            upgrade::emit_migrated(&env, from, to);
+        }
+
+        Ok(to)
+    }
+
+    /// The storage layout version the stored data currently conforms to.
+    pub fn storage_version(env: Env) -> u32 {
+        upgrade::stored_version(&env)
     }
 
     pub fn add_authorized_registrar(env: Env, registrar: Address) -> Result<(), Error> {
@@ -634,9 +710,7 @@ impl AssetUpContract {
 
         env.storage()
             .persistent()
-            .set(&DataKey::AuthorizedRegistrar(registrar.clone()), &true);
-
-        events::registrar_added(&env, &registrar);
+            .set(&DataKey::AuthorizedRegistrar(registrar), &true);
         Ok(())
     }
 
@@ -653,9 +727,7 @@ impl AssetUpContract {
 
         env.storage()
             .persistent()
-            .set(&DataKey::AuthorizedRegistrar(registrar.clone()), &false);
-
-        events::registrar_removed(&env, &registrar);
+            .set(&DataKey::AuthorizedRegistrar(registrar), &false);
         Ok(())
     }
 
@@ -666,7 +738,10 @@ impl AssetUpContract {
         env.storage().persistent().set(&DataKey::Paused, &true);
 
         // Emit event
-        events::contract_paused(&env, &admin);
+        env.events().publish(
+            (symbol_short!("c_pause"),),
+            (admin, env.ledger().timestamp()),
+        );
 
         Ok(())
     }
@@ -678,7 +753,10 @@ impl AssetUpContract {
         env.storage().persistent().set(&DataKey::Paused, &false);
 
         // Emit event
-        events::contract_unpaused(&env, &admin);
+        env.events().publish(
+            (symbol_short!("c_unpause"),),
+            (admin, env.ledger().timestamp()),
+        );
 
         Ok(())
     }
