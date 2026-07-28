@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import DashboardPage from '../app/(dashboard)/dashboard/page';
+import DashboardPage from '@/app/(dashboard)/dashboard/page';
 
 // Mock TanStack Query hook & Auth Store
 jest.mock('@/lib/query/hooks/useReports', () => ({
