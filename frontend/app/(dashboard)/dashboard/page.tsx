@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { format } from 'date-fns';
+import { Package, CheckCircle2, UserCheck, Wrench, SlidersHorizontal, Check, RotateCcw, Plus, Eye } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -16,7 +20,6 @@ import {
   rectSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable';
-import { SlidersHorizontal, Check, RotateCcw, Plus, Eye } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useReportsSummary } from '@/lib/query/hooks/useReports';
 import {
@@ -50,7 +53,6 @@ export default function DashboardPage() {
       if (saved) {
         const parsed: UserDashboardPrefs = JSON.parse(saved);
         if (Array.isArray(parsed.order) && parsed.order.length > 0) {
-          // Merge missing default widgets if any
           const validOrder = parsed.order.filter((id) =>
             ALL_WIDGETS.some((w) => w.id === id)
           );
@@ -64,7 +66,7 @@ export default function DashboardPage() {
         }
       }
     } catch {
-      // localStorage unavailable or invalid JSON
+      // localStorage unavailable
     } finally {
       setIsHydrated(true);
     }
@@ -111,7 +113,7 @@ export default function DashboardPage() {
       };
       localStorage.setItem(storageKey, JSON.stringify(prefs));
     } catch {
-      // Ignore localStorage write error
+      // Ignore
     }
     setIsEditing(false);
   }
