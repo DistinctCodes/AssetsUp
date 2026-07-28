@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Advisories are published continuously, so a lockfile that was clean at
+  # merge time can become vulnerable without anything in the repo changing.
+  # This re-runs the audit weekly against the committed Cargo.lock.
+  schedule:
+    - cron: "0 6 * * 1"
 
 env:
   CARGO_TERM_COLOR: always
