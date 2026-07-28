@@ -1,10 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { Package, CheckCircle2, UserCheck, Wrench, SlidersHorizontal, Check, RotateCcw, Plus, Eye } from 'lucide-react';
+import { SlidersHorizontal, Check, RotateCcw, Plus, Eye } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
