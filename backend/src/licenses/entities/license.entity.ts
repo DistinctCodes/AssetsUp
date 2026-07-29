@@ -1,8 +1,20 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 export enum LicenseType {
   PERPETUAL = 'PERPETUAL',
   SUBSCRIPTION = 'SUBSCRIPTION',
+}
+
+export enum BillingPeriod {
+  MONTHLY = 'MONTHLY',
+  YEARLY = 'YEARLY',
+  ONE_TIME = 'ONE_TIME',
 }
 
 @Entity('software_licenses')
@@ -19,8 +31,15 @@ export class License {
   @Column({ select: false })
   licenseKey: string;
 
-  @Column({ type: 'enum', enum: LicenseType, default: LicenseType.SUBSCRIPTION })
+  @Column({
+    type: 'enum',
+    enum: LicenseType,
+    default: LicenseType.SUBSCRIPTION,
+  })
   type: LicenseType;
+
+  @Column({ type: 'enum', enum: BillingPeriod, default: BillingPeriod.YEARLY })
+  billingPeriod: BillingPeriod;
 
   @Column({ type: 'integer', default: 1 })
   seatsTotal: number;
@@ -42,6 +61,9 @@ export class License {
 
   @Column({ default: false })
   autoRenew: boolean;
+
+  @Column({ nullable: true })
+  notes?: string;
 
   @CreateDateColumn()
   createdAt: Date;

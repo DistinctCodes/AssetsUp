@@ -59,9 +59,12 @@ export class AssetsService {
         { s: `%${query.search}%` },
       );
     }
-    if (query?.categoryId) qb.andWhere('asset.categoryId = :c', { c: query.categoryId });
-    if (query?.departmentId) qb.andWhere('asset.departmentId = :d', { d: query.departmentId });
-    if (query?.locationId) qb.andWhere('asset.locationId = :l', { l: query.locationId });
+    if (query?.categoryId)
+      qb.andWhere('asset.categoryId = :c', { c: query.categoryId });
+    if (query?.departmentId)
+      qb.andWhere('asset.departmentId = :d', { d: query.departmentId });
+    if (query?.locationId)
+      qb.andWhere('asset.locationId = :l', { l: query.locationId });
     if (query?.status) qb.andWhere('asset.status = :st', { st: query.status });
 
     const [items, total] = await qb.getManyAndCount();
@@ -82,7 +85,8 @@ export class AssetsService {
 
   async create(dto: Partial<Asset>) {
     const count = await this.assetRepo.count();
-    const assetTag = dto.assetTag || `AST-${String(count + 1).padStart(5, '0')}`;
+    const assetTag =
+      dto.assetTag || `AST-${String(count + 1).padStart(5, '0')}`;
     const asset = this.assetRepo.create({ ...dto, assetTag });
     return this.assetRepo.save(asset);
   }
@@ -282,9 +286,15 @@ export class AssetsService {
           return;
         }
         try {
-          this.lifecycle.validateTransition(asset.status as AssetStatus, dto.status);
+          this.lifecycle.validateTransition(
+            asset.status as AssetStatus,
+            dto.status,
+          );
         } catch (err: any) {
-          failed.push({ id, reason: err.message || 'Invalid status transition' });
+          failed.push({
+            id,
+            reason: err.message || 'Invalid status transition',
+          });
           return;
         }
         const previousStatus = asset.status;
@@ -302,9 +312,13 @@ export class AssetsService {
           note: `Status changed from ${previousStatus} to ${dto.status}`,
           fieldChanges: { previousStatus, newStatus: dto.status },
         });
-        this.audit.logAction('BULK_STATUS_UPDATE', 'Asset', id, actorId, {
-          previousStatus,
-          newStatus: dto.status,
+        this.audit.logAction({
+          action: 'STATUS_CHANGED',
+          entityType: 'asset',
+          entityId: id,
+          actorId,
+          previousValue: { status: previousStatus },
+          newValue: { status: dto.status },
         });
         succeeded.push(id);
       });
@@ -315,7 +329,9 @@ export class AssetsService {
 
   async bulkAssign(dto: BulkAssignDto, actorId?: string): Promise<BulkResult> {
     if (!dto.userId && !dto.departmentId) {
-      throw new BadRequestException('At least one of userId or departmentId is required');
+      throw new BadRequestException(
+        'At least one of userId or departmentId is required',
+      );
     }
 
     const succeeded: string[] = [];
@@ -340,11 +356,20 @@ export class AssetsService {
           eventType: 'ASSIGNED',
           actorUserId: actorId || 'system',
           note: `Bulk assignment update`,
-          fieldChanges: { previous, new: { userId: dto.userId, departmentId: dto.departmentId } },
+          fieldChanges: {
+            previous,
+            new: { userId: dto.userId, departmentId: dto.departmentId },
+          },
         });
-        this.audit.logAction('BULK_ASSIGN', 'Asset', id, actorId, {
-          userId: dto.userId,
-          departmentId: dto.departmentId,
+        this.audit.logAction({
+          action: 'UPDATED',
+          entityType: 'asset',
+          entityId: id,
+          actorId,
+          newValue: {
+            assignedToUserId: dto.userId,
+            departmentId: dto.departmentId,
+          },
         });
         succeeded.push(id);
       });
@@ -371,7 +396,12 @@ export class AssetsService {
           actorUserId: actorId || 'system',
           note: 'Bulk soft delete',
         });
-        this.audit.logAction('BULK_DELETE', 'Asset', id, actorId);
+        this.audit.logAction({
+          action: 'DELETED',
+          entityType: 'asset',
+          entityId: id,
+          actorId,
+        });
         succeeded.push(id);
       });
     }

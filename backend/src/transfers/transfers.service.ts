@@ -1,7 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AssetTransfer, TransferStatus } from './entities/asset-transfer.entity';
+import {
+  AssetTransfer,
+  TransferStatus,
+} from './entities/asset-transfer.entity';
 
 @Injectable()
 export class TransfersService {
@@ -21,7 +28,10 @@ export class TransfersService {
   }
 
   async create(dto: Partial<AssetTransfer>) {
-    const tr = this.transferRepo.create({ ...dto, status: TransferStatus.PENDING });
+    const tr = this.transferRepo.create({
+      ...dto,
+      status: TransferStatus.PENDING,
+    });
     return this.transferRepo.save(tr);
   }
 

@@ -330,6 +330,30 @@ pub struct LeaseExpired {
 }
 
 // ---------------------------------------------------------------------------
+// Upgrade and migration
+// ---------------------------------------------------------------------------
+
+/// The contract WASM was upgraded.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractUpgraded {
+    #[topic]
+    pub admin: Address,
+    pub new_wasm_hash: BytesN<32>,
+    pub version: u32,
+    pub timestamp: u64,
+}
+
+/// Storage was migrated from one layout version to another.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractMigrated {
+    pub from_version: u32,
+    pub to_version: u32,
+    pub timestamp: u64,
+}
+
+// ---------------------------------------------------------------------------
 // Emission helpers
 // ---------------------------------------------------------------------------
 
@@ -613,6 +637,25 @@ pub fn lease_cancelled(env: &Env, lease_id: &BytesN<32>, caller: &Address) {
 pub fn lease_expired(env: &Env, lease_id: &BytesN<32>) {
     LeaseExpired {
         lease_id: lease_id.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn contract_upgraded(env: &Env, admin: &Address, new_wasm_hash: &BytesN<32>, version: u32) {
+    ContractUpgraded {
+        admin: admin.clone(),
+        new_wasm_hash: new_wasm_hash.clone(),
+        version,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn contract_migrated(env: &Env, from_version: u32, to_version: u32) {
+    ContractMigrated {
+        from_version,
+        to_version,
         timestamp: env.ledger().timestamp(),
     }
     .publish(env);

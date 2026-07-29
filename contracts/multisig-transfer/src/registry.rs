@@ -61,6 +61,7 @@ pub fn asset_is_retired(
     Ok(info.1 == STATUS_RETIRED)
 }
 
+#[allow(dead_code)]
 pub fn get_owner(
     e: &Env,
     registry: &Address,

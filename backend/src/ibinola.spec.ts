@@ -23,7 +23,9 @@ describe('ibinola Modules (BE-96, BE-95, BE-94, BE-93)', () => {
   it('VendorsService creates vendor records', async () => {
     const mockRepo = {
       create: jest.fn().mockImplementation((dto) => dto),
-      save: jest.fn().mockImplementation((dto) => Promise.resolve({ id: 'v-1', ...dto })),
+      save: jest
+        .fn()
+        .mockImplementation((dto) => Promise.resolve({ id: 'v-1', ...dto })),
     };
     const service = new VendorsService(mockRepo as any);
     const vendor = await service.create({ name: 'Acme Corp', code: 'ACME' });
@@ -47,9 +49,12 @@ describe('ibinola Modules (BE-96, BE-95, BE-94, BE-93)', () => {
       findOne: jest.fn().mockResolvedValue(lic),
       save: jest.fn().mockImplementation((dto) => Promise.resolve(dto)),
     };
-    const service = new LicensesService(mockRepo as any);
+    const mockSeatRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+    const service = new LicensesService(mockRepo as any, mockSeatRepo as any);
 
-    await expect(service.assign('lic-1', 'u-1')).rejects.toThrow(
+    await expect(service.assign('lic-1', { userId: 'u-1' })).rejects.toThrow(
       'No available seats remaining for this license',
     );
   });

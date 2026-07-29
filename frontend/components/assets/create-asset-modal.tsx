@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCreateAsset, useCategories } from "@/lib/query/hooks/useAssets";
 import { useDepartments } from "@/lib/query/hooks/useAsset";
+import { useLocations } from "@/lib/query/hooks/useLocations";
+import { flattenLocationsForSelect } from "@/lib/api/locations";
 import { AssetStatus, AssetCondition } from "@/lib/query/types/asset";
 
 const schema = z.object({
@@ -19,6 +21,7 @@ const schema = z.object({
   manufacturer: z.string().optional(),
   model: z.string().optional(),
   location: z.string().optional(),
+  locationId: z.string().optional(),
   condition: z.nativeEnum(AssetCondition).optional(),
   status: z.nativeEnum(AssetStatus).optional(),
   purchasePrice: z.string().optional(),
@@ -35,6 +38,8 @@ interface Props {
 export function CreateAssetModal({ onClose, onSuccess }: Props) {
   const { data: departments = [] } = useDepartments();
   const { data: categories = [] } = useCategories();
+  const { data: locations = [] } = useLocations();
+  const locationOptions = flattenLocationsForSelect(locations);
   const createAsset = useCreateAsset();
 
   const {
@@ -60,6 +65,7 @@ export function CreateAssetModal({ onClose, onSuccess }: Props) {
         manufacturer: values.manufacturer || undefined,
         model: values.model || undefined,
         location: values.location || undefined,
+        locationId: values.locationId || undefined,
         condition: values.condition,
         status: values.status,
         purchasePrice: values.purchasePrice
@@ -161,13 +167,28 @@ export function CreateAssetModal({ onClose, onSuccess }: Props) {
               placeholder="SN-12345"
               {...register("serialNumber")}
             />
-            <Input
-              id="location"
-              label="Location"
-              placeholder="Floor 2, Room 204"
-              {...register("location")}
-            />
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">Location</label>
+              <select
+                {...register("locationId")}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              >
+                <option value="">Unassigned</option>
+                {locationOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          <Input
+            id="location"
+            label="Location notes (optional)"
+            placeholder="e.g. desk 4, near the window"
+            {...register("location")}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <Input

@@ -30,6 +30,7 @@ export interface AssetListFilters {
   condition?: string;
   categoryId?: string;
   departmentId?: string;
+  locationId?: string;
   page?: number;
   limit?: number;
 }
@@ -54,6 +55,7 @@ export interface CreateAssetInput {
   status?: string;
   condition?: string;
   location?: string;
+  locationId?: string;
   assignedToId?: string;
   manufacturer?: string;
   model?: string;

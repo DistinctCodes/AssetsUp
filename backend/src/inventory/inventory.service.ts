@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InventoryItem } from './entities/inventory-item.entity';
@@ -27,7 +31,13 @@ export class InventoryService {
     return this.itemRepo.save(item);
   }
 
-  async recordMovement(itemId: string, type: 'IN' | 'OUT' | 'ADJUSTMENT', quantity: number, reason?: string, userId?: string) {
+  async recordMovement(
+    itemId: string,
+    type: 'IN' | 'OUT' | 'ADJUSTMENT',
+    quantity: number,
+    reason?: string,
+    userId?: string,
+  ) {
     const item = await this.findById(itemId);
     let newQty = item.quantityOnHand;
 
@@ -43,7 +53,15 @@ export class InventoryService {
     await this.itemRepo.save(item);
 
     const mList = this.movements.get(itemId) || [];
-    const mov = { id: `m_${Date.now()}`, itemId, type, quantity, reason, actorUserId: userId || 'usr-1', timestamp: new Date() };
+    const mov = {
+      id: `m_${Date.now()}`,
+      itemId,
+      type,
+      quantity,
+      reason,
+      actorUserId: userId || 'usr-1',
+      timestamp: new Date(),
+    };
     mList.unshift(mov);
     this.movements.set(itemId, mList);
 
