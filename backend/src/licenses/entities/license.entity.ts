@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 export enum LicenseType {
   PERPETUAL = 'PERPETUAL',
@@ -19,7 +25,11 @@ export class License {
   @Column({ select: false })
   licenseKey: string;
 
-  @Column({ type: 'enum', enum: LicenseType, default: LicenseType.SUBSCRIPTION })
+  @Column({
+    type: 'enum',
+    enum: LicenseType,
+    default: LicenseType.SUBSCRIPTION,
+  })
   type: LicenseType;
 
   @Column({ type: 'integer', default: 1 })

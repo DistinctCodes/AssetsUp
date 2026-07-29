@@ -16,7 +16,8 @@ export class MaintenanceService {
 
   async findById(id: string) {
     const record = await this.maintenanceRepo.findOne({ where: { id } });
-    if (!record) throw new NotFoundException(`Maintenance record ${id} not found`);
+    if (!record)
+      throw new NotFoundException(`Maintenance record ${id} not found`);
     return record;
   }
 

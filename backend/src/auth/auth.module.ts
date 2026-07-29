@@ -9,19 +9,22 @@ import { User } from '../users/entities/user.entity';
 import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RolesGuard } from './guards/roles.guard';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
     ConfigModule,
     TypeOrmModule.forFeature([User]),
     UsersModule,
+    AuditLogsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET', 'secretKey'),
         signOptions: {
-          expiresIn: (configService.get<string>('JWT_EXPIRATION') ?? '7d') as any,
+          expiresIn: (configService.get<string>('JWT_EXPIRATION') ??
+            '7d') as any,
         },
       }),
     }),

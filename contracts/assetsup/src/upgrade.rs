@@ -21,9 +21,10 @@
 //! each step needs, and is **idempotent**: running it twice is a no-op, so a
 //! retried or duplicated migration transaction cannot corrupt state.
 
-use soroban_sdk::{symbol_short, Address, BytesN, Env};
+use soroban_sdk::{Address, BytesN, Env};
 
 use crate::error::Error;
+use crate::events;
 use crate::DataKey;
 
 /// The storage layout version this build of the contract expects.
@@ -87,21 +88,10 @@ pub fn migrate_from(env: &Env, from: u32) -> Result<u32, Error> {
 
 /// Emits the upgrade event.
 pub fn emit_upgraded(env: &Env, admin: &Address, new_wasm_hash: &BytesN<32>, version: u32) {
-    env.events().publish(
-        (symbol_short!("upgraded"),),
-        (
-            admin.clone(),
-            new_wasm_hash.clone(),
-            version,
-            env.ledger().timestamp(),
-        ),
-    );
+    events::contract_upgraded(env, admin, new_wasm_hash, version);
 }
 
 /// Emits the migration event.
 pub fn emit_migrated(env: &Env, from: u32, to: u32) {
-    env.events().publish(
-        (symbol_short!("migrated"),),
-        (from, to, env.ledger().timestamp()),
-    );
+    events::contract_migrated(env, from, to);
 }

@@ -1,5 +1,13 @@
-import { Entity, Column, Index, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { Exclude } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
 
 export enum UserRole {
   ADMIN = 'ADMIN',
@@ -9,9 +17,11 @@ export enum UserRole {
 
 @Entity('users')
 export class User {
+  @ApiProperty({ description: 'User UUID' })
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @ApiProperty({ example: 'user@example.com' })
   @Index({ unique: true })
   @Column()
   email: string;
@@ -20,12 +30,15 @@ export class User {
   @Exclude({ toPlainOnly: true })
   passwordHash: string;
 
+  @ApiProperty({ example: 'John' })
   @Column()
   firstName: string;
 
+  @ApiProperty({ example: 'Doe' })
   @Column()
   lastName: string;
 
+  @ApiProperty({ enum: UserRole })
   @Column({ type: 'enum', enum: UserRole, default: UserRole.EMPLOYEE })
   role: UserRole;
 
@@ -43,6 +56,10 @@ export class User {
 
   @Column({ nullable: true })
   lastLoginAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  @Exclude({ toPlainOnly: true })
+  refreshTokenHash?: string;
 
   @CreateDateColumn()
   createdAt: Date;

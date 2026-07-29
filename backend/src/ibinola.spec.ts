@@ -23,7 +23,9 @@ describe('ibinola Modules (BE-96, BE-95, BE-94, BE-93)', () => {
   it('VendorsService creates vendor records', async () => {
     const mockRepo = {
       create: jest.fn().mockImplementation((dto) => dto),
-      save: jest.fn().mockImplementation((dto) => Promise.resolve({ id: 'v-1', ...dto })),
+      save: jest
+        .fn()
+        .mockImplementation((dto) => Promise.resolve({ id: 'v-1', ...dto })),
     };
     const service = new VendorsService(mockRepo as any);
     const vendor = await service.create({ name: 'Acme Corp', code: 'ACME' });
