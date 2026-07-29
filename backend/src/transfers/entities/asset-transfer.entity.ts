@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 export enum TransferStatus {
   PENDING = 'PENDING',
@@ -28,7 +34,11 @@ export class AssetTransfer {
   @Column({ nullable: true })
   approvedByUserId?: string;
 
-  @Column({ type: 'enum', enum: TransferStatus, default: TransferStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: TransferStatus,
+    default: TransferStatus.PENDING,
+  })
   status: TransferStatus;
 
   @Column({ nullable: true })

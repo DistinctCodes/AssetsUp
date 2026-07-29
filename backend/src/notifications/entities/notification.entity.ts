@@ -26,7 +26,11 @@ export class Notification {
   @Column({ nullable: true })
   message?: string;
 
-  @Column({ type: 'enum', enum: NotificationType, default: NotificationType.INFO })
+  @Column({
+    type: 'enum',
+    enum: NotificationType,
+    default: NotificationType.INFO,
+  })
   type: NotificationType;
 
   @Column({ default: false })

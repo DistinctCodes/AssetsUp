@@ -66,7 +66,9 @@ describe('AssetsService', () => {
     jest.spyOn(repository, 'findOne').mockResolvedValue(mockAsset as any);
     jest.spyOn(repository, 'save').mockResolvedValue(updatedAsset as any);
 
-    const result = await service.update('ast-1', { name: 'MacBook Pro M3' } as any);
+    const result = await service.update('ast-1', {
+      name: 'MacBook Pro M3',
+    } as any);
 
     expect(result.name).toBe('MacBook Pro M3');
   });

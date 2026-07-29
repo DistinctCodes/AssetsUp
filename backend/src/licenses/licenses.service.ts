@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { License } from './entities/license.entity';
@@ -28,7 +32,9 @@ export class LicensesService {
   async assign(id: string, userIdOrAssetId: string) {
     const lic = await this.findById(id);
     if (lic.seatsUsed >= lic.seatsTotal) {
-      throw new ConflictException('No available seats remaining for this license');
+      throw new ConflictException(
+        'No available seats remaining for this license',
+      );
     }
     lic.seatsUsed += 1;
     return this.licenseRepo.save(lic);

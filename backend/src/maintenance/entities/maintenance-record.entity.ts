@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 export enum MaintenanceStatus {
   SCHEDULED = 'SCHEDULED',
@@ -21,7 +27,11 @@ export class MaintenanceRecord {
   @Column({ nullable: true })
   description?: string;
 
-  @Column({ type: 'enum', enum: MaintenanceStatus, default: MaintenanceStatus.SCHEDULED })
+  @Column({
+    type: 'enum',
+    enum: MaintenanceStatus,
+    default: MaintenanceStatus.SCHEDULED,
+  })
   status: MaintenanceStatus;
 
   @Column({ nullable: true })

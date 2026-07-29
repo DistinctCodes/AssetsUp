@@ -27,8 +27,11 @@ import { Notification } from '../notifications/entities/notification.entity';
  */
 @WebSocketGateway({
   cors: (req, callback) => {
-    const configService = (EventsGateway as any).configService as ConfigService | undefined;
-    const origin = configService?.get('FRONTEND_URL') || 'http://localhost:3000';
+    const configService = (EventsGateway as any).configService as
+      | ConfigService
+      | undefined;
+    const origin =
+      configService?.get('FRONTEND_URL') || 'http://localhost:3000';
     callback(null, { origin, credentials: true });
   },
 })
@@ -80,13 +83,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     const queryToken = client.handshake.query.token;
     if (typeof queryToken === 'string') return queryToken;
-    if (Array.isArray(queryToken) && queryToken.length > 0) return queryToken[0];
+    if (Array.isArray(queryToken) && queryToken.length > 0)
+      return queryToken[0];
     return undefined;
   }
 
   @OnEvent('notification.new')
   emitNotificationNew(notification: Notification) {
-    this.server.to(`user:${notification.userId}`).emit('notification.new', notification);
+    this.server
+      .to(`user:${notification.userId}`)
+      .emit('notification.new', notification);
   }
 
   @OnEvent('asset.status_changed')
@@ -97,10 +103,14 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     newStatus: string;
   }) {
     if (payload.departmentId) {
-      this.server.to(`department:${payload.departmentId}`).emit('asset.status_changed', payload);
+      this.server
+        .to(`department:${payload.departmentId}`)
+        .emit('asset.status_changed', payload);
     }
     // Also notify any user watching the asset via a public asset room.
-    this.server.to(`asset:${payload.assetId}`).emit('asset.status_changed', payload);
+    this.server
+      .to(`asset:${payload.assetId}`)
+      .emit('asset.status_changed', payload);
   }
 
   @OnEvent('maintenance.due')
@@ -112,7 +122,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     scheduledDate: string;
   }) {
     if (payload.departmentId) {
-      this.server.to(`department:${payload.departmentId}`).emit('maintenance.due', payload);
+      this.server
+        .to(`department:${payload.departmentId}`)
+        .emit('maintenance.due', payload);
     }
     this.server.to(`asset:${payload.assetId}`).emit('maintenance.due', payload);
   }

@@ -7,7 +7,12 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { User } from '../users/entities/user.entity';
 import { AuthService } from './auth.service';
 import { GetUser } from './decorators/get-user.decorator';
@@ -38,16 +43,18 @@ export class AuthController {
   }
 
   @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Invalidate current session' })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
-  async logout() {
-    return { message: 'Logged out successfully' };
+  async logout(@GetUser() user: User) {
+    return this.authService.logout(user.id);
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: "Get current authenticated user's profile" })
   @ApiResponse({ status: 200, description: 'Profile retrieved' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -63,12 +70,14 @@ export class AuthController {
     return this.authService.forgotPassword(email);
   }
 
-  @Post('refresh-token')
+  @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access token' })
-  @ApiResponse({ status: 200, description: 'Token refreshed' })
-  @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  async refreshToken(@Body('refreshToken') refreshToken: string) {
+  @ApiOperation({
+    summary: 'Exchange refresh token for new access + refresh token pair',
+  })
+  @ApiResponse({ status: 200, description: 'New token pair issued' })
+  @ApiResponse({ status: 401, description: 'Invalid or reused refresh token' })
+  async refresh(@Body('refreshToken') refreshToken: string) {
     return this.authService.refreshToken(refreshToken);
   }
 }

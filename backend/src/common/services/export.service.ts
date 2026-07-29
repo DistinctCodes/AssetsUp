@@ -26,7 +26,8 @@ export class ExportService {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
     // Write header row
-    const headerRow = columns.map((col) => this.escapeCsvField(col.header)).join(',') + '\n';
+    const headerRow =
+      columns.map((col) => this.escapeCsvField(col.header)).join(',') + '\n';
     res.write(headerRow);
 
     // Stream rows dynamically
@@ -86,9 +87,14 @@ export class ExportService {
    */
   private escapeCsvField(val: any): string {
     if (val === null || val === undefined) return '""';
-    
+
     let str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-    if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+    if (
+      str.includes('"') ||
+      str.includes(',') ||
+      str.includes('\n') ||
+      str.includes('\r')
+    ) {
       str = `"${str.replace(/"/g, '""')}"`;
     } else {
       str = `"${str}"`;
