@@ -57,6 +57,18 @@ const PAUSE_EXEMPT: &[(&str, &str)] = &[
         "claim_dividends",
         "user exit path: freezing it would trap funds users have already earned",
     ),
+    (
+        "upgrade",
+        "an upgrade is how you fix the incident that caused the pause",
+    ),
+    (
+        "migrate",
+        "must run after upgrade to bring storage up to date",
+    ),
+    (
+        "storage_version",
+        "read-only: returns the current storage layout version",
+    ),
 ];
 
 /// Reads never mutate, so they are not in scope for the pause.

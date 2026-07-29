@@ -29,7 +29,8 @@ export class LicensesService {
     return this.licenseRepo.save(lic);
   }
 
-  async assign(id: string, userIdOrAssetId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async assign(id: string, _userIdOrAssetId: string) {
     const lic = await this.findById(id);
     if (lic.seatsUsed >= lic.seatsTotal) {
       throw new ConflictException(
