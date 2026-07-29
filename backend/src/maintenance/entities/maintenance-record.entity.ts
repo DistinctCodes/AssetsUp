@@ -13,6 +13,12 @@ export enum MaintenanceStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export enum MaintenanceType {
+  PREVENTIVE = 'PREVENTIVE',
+  CORRECTIVE = 'CORRECTIVE',
+  SCHEDULED = 'SCHEDULED',
+}
+
 @Entity('maintenance_records')
 export class MaintenanceRecord {
   @PrimaryGeneratedColumn('uuid')
@@ -29,6 +35,13 @@ export class MaintenanceRecord {
 
   @Column({
     type: 'enum',
+    enum: MaintenanceType,
+    default: MaintenanceType.SCHEDULED,
+  })
+  type: MaintenanceType;
+
+  @Column({
+    type: 'enum',
     enum: MaintenanceStatus,
     default: MaintenanceStatus.SCHEDULED,
   })
@@ -36,6 +49,9 @@ export class MaintenanceRecord {
 
   @Column({ nullable: true })
   vendorId?: string;
+
+  @Column({ nullable: true })
+  performedByUserId?: string;
 
   @Column({ type: 'integer', default: 0 })
   cost: number;
@@ -48,6 +64,9 @@ export class MaintenanceRecord {
 
   @Column({ nullable: true })
   completedDate?: Date;
+
+  @Column({ nullable: true })
+  notes?: string;
 
   @CreateDateColumn()
   createdAt: Date;

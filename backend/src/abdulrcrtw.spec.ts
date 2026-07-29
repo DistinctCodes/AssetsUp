@@ -32,6 +32,7 @@ describe('abdulrcrtw Modules (BE-92, BE-91, BE-90, BE-89)', () => {
       assetId: 'ast-1',
       title: 'Screen repair',
       cost: 15000,
+      scheduledDate: '2026-01-01',
     });
     expect(rec.cost).toBe(15000);
   });

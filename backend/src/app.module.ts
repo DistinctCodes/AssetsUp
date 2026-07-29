@@ -21,6 +21,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { VendorsModule } from './vendors/vendors.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { LicensesModule } from './licenses/licenses.module';
+import { AuditsModule } from './audits/audits.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
@@ -45,6 +46,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     VendorsModule,
     PurchaseOrdersModule,
     LicensesModule,
+    AuditsModule,
     NotificationsModule,
     GatewayModule,
     AuditLogsModule,

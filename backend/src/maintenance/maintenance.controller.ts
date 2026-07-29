@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -6,6 +14,8 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { MaintenanceService } from './maintenance.service';
+import { CreateMaintenanceRecordDto } from './dto/create-maintenance-record.dto';
+import { UpdateMaintenanceRecordDto } from './dto/update-maintenance-record.dto';
 
 @ApiTags('maintenance')
 @ApiBearerAuth('JWT-auth')
@@ -14,16 +24,32 @@ export class MaintenanceController {
   constructor(private readonly maintenanceService: MaintenanceService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all maintenance records' })
+  @ApiOperation({
+    summary: 'List all maintenance records across assets, with filters',
+  })
   @ApiResponse({ status: 200, description: 'List of maintenance records' })
-  findAll() {
-    return this.maintenanceService.findAll();
+  findAll(
+    @Query('assetId') assetId?: string,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.maintenanceService.findAll({
+      assetId,
+      status,
+      type,
+      departmentId,
+      from,
+      to,
+    });
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a maintenance record' })
   @ApiResponse({ status: 201, description: 'Maintenance record created' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateMaintenanceRecordDto) {
     return this.maintenanceService.create(dto);
   }
 
@@ -38,7 +64,7 @@ export class MaintenanceController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a maintenance record' })
   @ApiResponse({ status: 200, description: 'Maintenance record updated' })
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateMaintenanceRecordDto) {
     return this.maintenanceService.update(id, dto);
   }
 }

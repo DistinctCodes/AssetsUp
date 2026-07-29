@@ -13,7 +13,10 @@ describe('femaleotaku Modules (BE-88, BE-87, BE-85, BE-84)', () => {
         .fn()
         .mockImplementation((dto) => Promise.resolve({ id: 'loc-1', ...dto })),
     };
-    const service = new LocationsService(mockRepo as any);
+    const mockAssetRepo = {
+      count: jest.fn().mockResolvedValue(0),
+    };
+    const service = new LocationsService(mockRepo as any, mockAssetRepo as any);
     const loc = await service.create({ name: 'Building A', code: 'BLD-A' });
     expect(loc.name).toBe('Building A');
   });

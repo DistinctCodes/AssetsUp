@@ -11,6 +11,12 @@ export enum LicenseType {
   SUBSCRIPTION = 'SUBSCRIPTION',
 }
 
+export enum BillingPeriod {
+  MONTHLY = 'MONTHLY',
+  YEARLY = 'YEARLY',
+  ONE_TIME = 'ONE_TIME',
+}
+
 @Entity('software_licenses')
 export class License {
   @PrimaryGeneratedColumn('uuid')
@@ -32,6 +38,9 @@ export class License {
   })
   type: LicenseType;
 
+  @Column({ type: 'enum', enum: BillingPeriod, default: BillingPeriod.YEARLY })
+  billingPeriod: BillingPeriod;
+
   @Column({ type: 'integer', default: 1 })
   seatsTotal: number;
 
@@ -52,6 +61,9 @@ export class License {
 
   @Column({ default: false })
   autoRenew: boolean;
+
+  @Column({ nullable: true })
+  notes?: string;
 
   @CreateDateColumn()
   createdAt: Date;

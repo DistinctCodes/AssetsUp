@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Param, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -6,6 +14,9 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { LicensesService } from './licenses.service';
+import { CreateLicenseDto } from './dto/create-license.dto';
+import { UpdateLicenseDto } from './dto/update-license.dto';
+import { AssignSeatDto } from './dto/assign-seat.dto';
 
 @ApiTags('licenses')
 @ApiBearerAuth('JWT-auth')
@@ -23,7 +34,7 @@ export class LicensesController {
   @Post()
   @ApiOperation({ summary: 'Create a software license' })
   @ApiResponse({ status: 201, description: 'License created' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateLicenseDto) {
     return this.licensesService.create(dto);
   }
 
@@ -35,10 +46,46 @@ export class LicensesController {
     return this.licensesService.findById(id);
   }
 
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a license' })
+  update(@Param('id') id: string, @Body() dto: UpdateLicenseDto) {
+    return this.licensesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a license' })
+  delete(@Param('id') id: string) {
+    return this.licensesService.delete(id);
+  }
+
+  @Post(':id/reveal-key')
+  @ApiOperation({
+    summary:
+      'Reveal the plaintext license key (explicit click-to-reveal action)',
+  })
+  revealKey(@Param('id') id: string) {
+    return this.licensesService.revealKey(id);
+  }
+
+  @Get(':id/assignments')
+  @ApiOperation({ summary: 'List active seat assignments for a license' })
+  getAssignments(@Param('id') id: string) {
+    return this.licensesService.getAssignments(id);
+  }
+
   @Post(':id/assign')
-  @ApiOperation({ summary: 'Assign a license seat' })
+  @ApiOperation({ summary: 'Assign a license seat to a user' })
   @ApiResponse({ status: 201, description: 'License seat assigned' })
-  assign(@Param('id') id: string, @Body('assigneeId') assigneeId: string) {
-    return this.licensesService.assign(id, assigneeId);
+  assign(@Param('id') id: string, @Body() dto: AssignSeatDto) {
+    return this.licensesService.assign(id, dto);
+  }
+
+  @Post(':id/assignments/:assignmentId/unassign')
+  @ApiOperation({ summary: 'Release a seat assignment' })
+  unassign(
+    @Param('id') id: string,
+    @Param('assignmentId') assignmentId: string,
+  ) {
+    return this.licensesService.unassign(id, assignmentId);
   }
 }

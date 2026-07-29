@@ -1,115 +1,75 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
-import { Menu, User, ChevronDown } from "lucide-react";
-import { useAuthStore } from "@/store/auth.store";
+import { Download } from "lucide-react";
+import { Button } from "./button";
 
-const pageTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/assets": "Assets",
-  "/users": "Users",
-  "/departments": "Organisation",
-  "/reports": "Reports",
-  "/settings": "Settings",
-};
-
-function getPageTitle(pathname: string): string {
-  for (const [prefix, title] of Object.entries(pageTitles)) {
-    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return title;
+function toCsvValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const str = String(value);
+  if (/[",\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
   }
-  return "Dashboard";
+  return str;
 }
 
-interface TopbarProps {
-  onMenuClick?: () => void;
+/** Converts an array of flat objects into CSV text (header row + one row per record). */
+export function toCsv<T extends Record<string, unknown>>(
+  rows: T[],
+  columns: { key: keyof T; label: string }[],
+): string {
+  const header = columns.map((c) => toCsvValue(c.label)).join(",");
+  const lines = rows.map((row) =>
+    columns.map((c) => toCsvValue(row[c.key])).join(","),
+  );
+  return [header, ...lines].join("\n");
 }
 
-export function Topbar({ onMenuClick }: TopbarProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { user, logout } = useAuthStore();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+/** Triggers a browser download of the given CSV text. */
+export function downloadCsv(filename: string, csvText: string) {
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
-  const handleLogout = async () => {
-    setDropdownOpen(false);
-    await logout();
-    router.push("/login");
-  };
+export function exportToCsv<T extends Record<string, unknown>>(
+  filename: string,
+  rows: T[],
+  columns: { key: keyof T; label: string }[],
+) {
+  downloadCsv(filename, toCsv(rows, columns));
+}
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+interface CsvExportButtonProps<T extends Record<string, unknown>> {
+  filename: string;
+  rows: T[];
+  columns: { key: keyof T; label: string }[];
+  label?: string;
+  disabled?: boolean;
+}
 
-  const initials = user
-    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
-    : "?";
-
+export function CsvExportButton<T extends Record<string, unknown>>({
+  filename,
+  rows,
+  columns,
+  label = "Export CSV",
+  disabled,
+}: CsvExportButtonProps<T>) {
   return (
-    <header className="fixed top-0 left-0 lg:left-60 right-0 h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6 z-20">
-      {/* Left: hamburger (mobile) + page title */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onMenuClick}
-          className="lg:hidden text-gray-500 hover:text-gray-900"
-          aria-label="Open menu"
-        >
-          <Menu size={20} />
-        </button>
-        <h1 className="text-sm font-semibold text-gray-900">
-          {getPageTitle(pathname)}
-        </h1>
-      </div>
-
-      {/* Right: user dropdown */}
-      <div className="relative" ref={dropdownRef}>
-        <button
-          onClick={() => setDropdownOpen((v) => !v)}
-          className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
-        >
-          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-            {user ? (
-              <span className="text-xs font-semibold text-gray-700">{initials}</span>
-            ) : (
-              <User size={15} className="text-gray-500" />
-            )}
-          </div>
-          {user && (
-            <div className="hidden sm:block text-left">
-              <p className="text-sm font-medium text-gray-900 leading-none">
-                {user.firstName} {user.lastName}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5 capitalize">{user.role}</p>
-            </div>
-          )}
-          <ChevronDown size={14} className="text-gray-400 hidden sm:block" />
-        </button>
-
-        {dropdownOpen && (
-          <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-md py-1 z-50">
-            <button
-              onClick={() => { setDropdownOpen(false); router.push("/settings"); }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              View Profile
-            </button>
-            <button
-              onClick={handleLogout}
-              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
-            >
-              Logout
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      disabled={disabled || rows.length === 0}
+      onClick={() => exportToCsv(filename, rows, columns)}
+    >
+      <Download size={15} className="mr-1.5" />
+      {label}
+    </Button>
   );
 }

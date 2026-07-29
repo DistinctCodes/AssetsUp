@@ -35,4 +35,26 @@ export const queryKeys = {
     all: ['reports'] as const,
     summary: () => [...queryKeys.reports.all, 'summary'] as const,
   },
+  locations: {
+    all: ['locations'] as const,
+    list: () => [...queryKeys.locations.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.locations.all, 'detail', id] as const,
+  },
+  licenses: {
+    all: ['licenses'] as const,
+    list: () => [...queryKeys.licenses.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.licenses.all, 'detail', id] as const,
+    assignments: (id: string) => [...queryKeys.licenses.detail(id), 'assignments'] as const,
+  },
+  maintenance: {
+    all: ['maintenance'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [...queryKeys.maintenance.all, 'list', filters ?? {}] as const,
+    detail: (id: string) => [...queryKeys.maintenance.all, 'detail', id] as const,
+  },
+  audits: {
+    all: ['audits'] as const,
+    list: () => [...queryKeys.audits.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.audits.all, 'detail', id] as const,
+  },
 } as const;
