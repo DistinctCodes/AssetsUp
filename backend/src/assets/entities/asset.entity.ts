@@ -6,7 +6,21 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Category } from '../../categories/entities/category.entity';
+import { Department } from '../../departments/entities/department.entity';
+import { Location } from '../../locations/entities/location.entity';
+import { User } from '../../users/entities/user.entity';
+
+/** Relations loaded whenever a single asset is returned to the frontend. */
+export const ASSET_DETAIL_RELATIONS = [
+  'category',
+  'department',
+  'location',
+  'assignedTo',
+];
 
 @Entity('assets')
 export class Asset {
@@ -32,11 +46,27 @@ export class Asset {
   @Column({ nullable: true })
   locationId?: string;
 
-  @Column({ nullable: true })
-  assignedToUserId?: string;
+  @Column({ nullable: true, type: 'varchar' })
+  assignedToUserId?: string | null;
 
   @Column({ nullable: true })
   branchId?: string;
+
+  @ManyToOne(() => Category, { nullable: true })
+  @JoinColumn({ name: 'categoryId' })
+  category?: Category | null;
+
+  @ManyToOne(() => Department, { nullable: true })
+  @JoinColumn({ name: 'departmentId' })
+  department?: Department | null;
+
+  @ManyToOne(() => Location, { nullable: true })
+  @JoinColumn({ name: 'locationId' })
+  location?: Location | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'assignedToUserId' })
+  assignedTo?: User | null;
 
   @Column({ default: 'AVAILABLE' })
   status: string;
