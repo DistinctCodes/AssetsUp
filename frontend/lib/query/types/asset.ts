@@ -49,6 +49,7 @@ export interface Asset {
   condition: AssetCondition;
   department: Department;
   location: string | null;
+  locationId?: string | null;
   assignedTo: AssetUser | null;
   imageUrls: string[] | null;
   customFields: Record<string, unknown> | null;

@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUpdateAsset } from '@/lib/query/hooks/useAsset';
+import { useLocations } from '@/lib/query/hooks/useLocations';
+import { flattenLocationsForSelect } from '@/lib/api/locations';
 import type { Asset } from '@/lib/query/types/asset';
 
 interface EditAssetModalProps {
@@ -19,16 +21,20 @@ export function EditAssetModal({ asset, isOpen, onClose }: EditAssetModalProps) 
   const [name, setName] = useState(asset.name);
   const [description, setDescription] = useState(asset.description || '');
   const [location, setLocation] = useState(asset.location || '');
+  const [locationId, setLocationId] = useState(asset.locationId || '');
   const [manufacturer, setManufacturer] = useState(asset.manufacturer || '');
   const [model, setModel] = useState(asset.model || '');
   const [serialNumber, setSerialNumber] = useState(asset.serialNumber || '');
   const updateAsset = useUpdateAsset(asset.id, { onSuccess: onClose });
+  const { data: locations = [] } = useLocations();
+  const locationOptions = flattenLocationsForSelect(locations);
 
   useEffect(() => {
     if (isOpen) {
       setName(asset.name);
       setDescription(asset.description || '');
       setLocation(asset.location || '');
+      setLocationId(asset.locationId || '');
       setManufacturer(asset.manufacturer || '');
       setModel(asset.model || '');
       setSerialNumber(asset.serialNumber || '');
@@ -41,6 +47,7 @@ export function EditAssetModal({ asset, isOpen, onClose }: EditAssetModalProps) 
       name,
       description: description || undefined,
       location: location || undefined,
+      locationId: locationId || undefined,
       manufacturer: manufacturer || undefined,
       model: model || undefined,
       serialNumber: serialNumber || undefined,
@@ -64,7 +71,23 @@ export function EditAssetModal({ asset, isOpen, onClose }: EditAssetModalProps) 
               <Textarea id="edit-description" value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
             <div>
-              <Label htmlFor="edit-location">Location</Label>
+              <Label htmlFor="edit-locationId">Location</Label>
+              <select
+                id="edit-locationId"
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              >
+                <option value="">Unassigned</option>
+                {locationOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="edit-location">Location notes (optional)</Label>
               <Input id="edit-location" value={location} onChange={(e) => setLocation(e.target.value)} />
             </div>
             <div>

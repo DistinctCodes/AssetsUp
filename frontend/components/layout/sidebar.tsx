@@ -13,12 +13,20 @@ import {
   Settings,
   LogOut,
   X,
+  MapPin,
+  KeyRound,
+  Wrench,
+  ClipboardCheck,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/assets", label: "Assets", icon: Package },
+  { href: "/locations", label: "Locations", icon: MapPin },
+  { href: "/maintenance", label: "Maintenance", icon: Wrench },
+  { href: "/audits", label: "Audits", icon: ClipboardCheck },
+  { href: "/licenses", label: "Licenses", icon: KeyRound },
   { href: "/users", label: "Users", icon: Users },
   { href: "/departments", label: "Organisation", icon: Building2 },
   { href: "/reports", label: "Reports", icon: BarChart3 },

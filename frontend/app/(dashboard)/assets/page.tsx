@@ -1,27 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Plus, Search, SlidersHorizontal } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Search, SlidersHorizontal, MapPin, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { CreateAssetModal } from "@/components/assets/create-asset-modal";
 import { useAssets } from "@/lib/query/hooks/useAssets";
+import { useLocations } from "@/lib/query/hooks/useLocations";
 import { AssetStatus, AssetCondition } from "@/lib/query/types/asset";
 
 const STATUS_OPTIONS = ["All", ...Object.values(AssetStatus)];
 
 export default function AssetsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [locationId, setLocationId] = useState(searchParams.get("locationId") || "");
+
+  const { data: locations = [] } = useLocations();
+  const activeLocation = locations.find((l) => l.id === locationId);
 
   const { data, isLoading, refetch } = useAssets({
     search: search || undefined,
     status: (status as AssetStatus) || undefined,
+    locationId: locationId || undefined,
     page,
     limit: 20,
   });
@@ -95,6 +102,26 @@ export default function AssetsPage() {
           </select>
         </div>
       </div>
+
+      {activeLocation && (
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-gray-100 text-xs font-medium text-gray-700">
+            <MapPin size={12} />
+            {activeLocation.name}
+            <button
+              onClick={() => {
+                setLocationId("");
+                setPage(1);
+                router.replace("/assets");
+              }}
+              aria-label="Clear location filter"
+              className="p-0.5 hover:bg-gray-200 rounded-full"
+            >
+              <X size={12} />
+            </button>
+          </span>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
