@@ -24,6 +24,7 @@ import { LicensesModule } from './licenses/licenses.module';
 import { AuditsModule } from './audits/audits.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { GatewayModule } from './gateway/gateway.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { GatewayModule } from './gateway/gateway.module';
     AuditsModule,
     NotificationsModule,
     GatewayModule,
+    AuditLogsModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

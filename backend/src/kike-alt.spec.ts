@@ -7,7 +7,9 @@ describe('kike-alt Modules (BE-79, BE-78, BE-77, BE-76)', () => {
     const mockRepo = {
       findOne: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockImplementation((dto) => dto),
-      save: jest.fn().mockImplementation((dto) => Promise.resolve({ id: 'u-1', ...dto })),
+      save: jest
+        .fn()
+        .mockImplementation((dto) => Promise.resolve({ id: 'u-1', ...dto })),
     };
     const service = new UsersService(mockRepo as any);
 
@@ -26,7 +28,9 @@ describe('kike-alt Modules (BE-79, BE-78, BE-77, BE-76)', () => {
 
   it('UsersService refuses self role change', async () => {
     const service = new UsersService({} as any);
-    await expect(service.updateRole('u-1', UserRole.ADMIN, 'u-1')).rejects.toThrow('Cannot change your own role');
+    await expect(
+      service.updateRole('u-1', UserRole.ADMIN, 'u-1'),
+    ).rejects.toThrow('Cannot change your own role');
   });
 
   it('HealthController returns liveness and readiness status', () => {

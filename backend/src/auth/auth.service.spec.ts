@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { createMock } from '@golevelup/ts-jest';
 import * as bcrypt from 'bcryptjs';
@@ -19,6 +20,7 @@ describe('AuthService', () => {
     firstName: 'John',
     lastName: 'Doe',
     role: UserRole.EMPLOYEE,
+    refreshTokenHash: null,
   };
 
   beforeEach(async () => {
@@ -33,6 +35,15 @@ describe('AuthService', () => {
           provide: JwtService,
           useValue: createMock<JwtService>(),
         },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(
+              (key: string, defaultValue?: string) =>
+                defaultValue ?? 'mock-value',
+            ),
+          },
+        },
       ],
     }).compile();
 
@@ -43,7 +54,9 @@ describe('AuthService', () => {
 
   describe('register', () => {
     it('should throw ConflictException when email already exists', async () => {
-      jest.spyOn(usersService, 'findByEmail').mockResolvedValue(mockUser as any);
+      jest
+        .spyOn(usersService, 'findByEmail')
+        .mockResolvedValue(mockUser as any);
 
       await expect(
         authService.register({
@@ -74,11 +87,18 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should throw UnauthorizedException on wrong password', async () => {
-      jest.spyOn(usersService, 'findByEmail').mockResolvedValue(mockUser as any);
-      jest.spyOn(bcrypt, 'compare').mockImplementation(() => Promise.resolve(false));
+      jest
+        .spyOn(usersService, 'findByEmail')
+        .mockResolvedValue(mockUser as any);
+      jest
+        .spyOn(bcrypt, 'compare')
+        .mockImplementation(() => Promise.resolve(false));
 
       await expect(
-        authService.login({ email: 'test@example.com', password: 'WrongPassword' }),
+        authService.login({
+          email: 'test@example.com',
+          password: 'WrongPassword',
+        }),
       ).rejects.toThrow(UnauthorizedException);
     });
   });

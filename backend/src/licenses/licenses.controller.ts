@@ -7,31 +7,41 @@ import {
   Param,
   Body,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { LicensesService } from './licenses.service';
 import { CreateLicenseDto } from './dto/create-license.dto';
 import { UpdateLicenseDto } from './dto/update-license.dto';
 import { AssignSeatDto } from './dto/assign-seat.dto';
 
 @ApiTags('licenses')
+@ApiBearerAuth('JWT-auth')
 @Controller('licenses')
 export class LicensesController {
   constructor(private readonly licensesService: LicensesService) {}
 
   @Get()
   @ApiOperation({ summary: 'List software licenses (redacts license keys)' })
+  @ApiResponse({ status: 200, description: 'List of licenses' })
   findAll() {
     return this.licensesService.findAll();
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a software license' })
+  @ApiResponse({ status: 201, description: 'License created' })
   create(@Body() dto: CreateLicenseDto) {
     return this.licensesService.create(dto);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get license details' })
+  @ApiResponse({ status: 200, description: 'License details' })
+  @ApiResponse({ status: 404, description: 'License not found' })
   findOne(@Param('id') id: string) {
     return this.licensesService.findById(id);
   }
@@ -65,6 +75,7 @@ export class LicensesController {
 
   @Post(':id/assign')
   @ApiOperation({ summary: 'Assign a license seat to a user' })
+  @ApiResponse({ status: 201, description: 'License seat assigned' })
   assign(@Param('id') id: string, @Body() dto: AssignSeatDto) {
     return this.licensesService.assign(id, dto);
   }

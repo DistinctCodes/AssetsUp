@@ -1,7 +1,13 @@
-import { Controller, Get, Post, Delete, Param, Body, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Post, Param, Body, Req } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 @ApiTags('assets')
+@ApiBearerAuth('JWT-auth')
 @Controller('assets/:id')
 export class NotesDocsController {
   private notes = new Map<string, any[]>();
@@ -9,13 +15,19 @@ export class NotesDocsController {
 
   @Get('notes')
   @ApiOperation({ summary: 'Get asset notes' })
+  @ApiResponse({ status: 200, description: 'List of notes' })
   getNotes(@Param('id') assetId: string) {
     return this.notes.get(assetId) || [];
   }
 
   @Post('notes')
   @ApiOperation({ summary: 'Add an asset note' })
-  addNote(@Param('id') assetId: string, @Body('content') content: string, @Req() req: any) {
+  @ApiResponse({ status: 201, description: 'Note added' })
+  addNote(
+    @Param('id') assetId: string,
+    @Body('content') content: string,
+    @Req() req: any,
+  ) {
     const list = this.notes.get(assetId) || [];
     const note = {
       id: `n_${Date.now()}`,
@@ -31,15 +43,23 @@ export class NotesDocsController {
 
   @Get('documents')
   @ApiOperation({ summary: 'Get asset document attachments' })
+  @ApiResponse({ status: 200, description: 'List of documents' })
   getDocuments(@Param('id') assetId: string) {
     return this.docs.get(assetId) || [];
   }
 
   @Post('documents')
   @ApiOperation({ summary: 'Attach a document to an asset' })
+  @ApiResponse({ status: 201, description: 'Document attached' })
   addDocument(
     @Param('id') assetId: string,
-    @Body() body: { title: string; fileUrl: string; fileType?: string; fileSizeBytes?: number },
+    @Body()
+    body: {
+      title: string;
+      fileUrl: string;
+      fileType?: string;
+      fileSizeBytes?: number;
+    },
     @Req() req: any,
   ) {
     const list = this.docs.get(assetId) || [];

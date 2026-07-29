@@ -11,13 +11,37 @@ export enum AssetStatus {
 }
 
 const ALLOWED_TRANSITIONS: Record<AssetStatus, AssetStatus[]> = {
-  [AssetStatus.AVAILABLE]: [AssetStatus.ASSIGNED, AssetStatus.IN_MAINTENANCE, AssetStatus.IN_TRANSIT, AssetStatus.RETIRED, AssetStatus.LOST],
-  [AssetStatus.ASSIGNED]: [AssetStatus.AVAILABLE, AssetStatus.IN_MAINTENANCE, AssetStatus.IN_TRANSIT, AssetStatus.RETIRED, AssetStatus.LOST],
-  [AssetStatus.IN_MAINTENANCE]: [AssetStatus.AVAILABLE, AssetStatus.ASSIGNED, AssetStatus.RETIRED],
-  [AssetStatus.IN_TRANSIT]: [AssetStatus.AVAILABLE, AssetStatus.ASSIGNED, AssetStatus.LOST],
+  [AssetStatus.AVAILABLE]: [
+    AssetStatus.ASSIGNED,
+    AssetStatus.IN_MAINTENANCE,
+    AssetStatus.IN_TRANSIT,
+    AssetStatus.RETIRED,
+    AssetStatus.LOST,
+  ],
+  [AssetStatus.ASSIGNED]: [
+    AssetStatus.AVAILABLE,
+    AssetStatus.IN_MAINTENANCE,
+    AssetStatus.IN_TRANSIT,
+    AssetStatus.RETIRED,
+    AssetStatus.LOST,
+  ],
+  [AssetStatus.IN_MAINTENANCE]: [
+    AssetStatus.AVAILABLE,
+    AssetStatus.ASSIGNED,
+    AssetStatus.RETIRED,
+  ],
+  [AssetStatus.IN_TRANSIT]: [
+    AssetStatus.AVAILABLE,
+    AssetStatus.ASSIGNED,
+    AssetStatus.LOST,
+  ],
   [AssetStatus.RETIRED]: [AssetStatus.DISPOSED],
   [AssetStatus.DISPOSED]: [],
-  [AssetStatus.LOST]: [AssetStatus.AVAILABLE, AssetStatus.RETIRED, AssetStatus.DISPOSED],
+  [AssetStatus.LOST]: [
+    AssetStatus.AVAILABLE,
+    AssetStatus.RETIRED,
+    AssetStatus.DISPOSED,
+  ],
 };
 
 @Injectable()
@@ -28,12 +52,22 @@ export class AssetLifecycleService {
     if (fromStatus === toStatus) return true;
     const allowed = ALLOWED_TRANSITIONS[fromStatus] || [];
     if (!allowed.includes(toStatus)) {
-      throw new BadRequestException(`Cannot transition asset status from ${fromStatus} to ${toStatus}`);
+      throw new BadRequestException(
+        `Cannot transition asset status from ${fromStatus} to ${toStatus}`,
+      );
     }
     return true;
   }
 
-  recordHistory(assetId: string, event: { eventType: string; actorUserId: string; note?: string; fieldChanges?: any }) {
+  recordHistory(
+    assetId: string,
+    event: {
+      eventType: string;
+      actorUserId: string;
+      note?: string;
+      fieldChanges?: any;
+    },
+  ) {
     const list = this.history.get(assetId) || [];
     const entry = {
       id: `h_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
