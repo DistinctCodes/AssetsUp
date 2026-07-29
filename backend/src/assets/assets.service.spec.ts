@@ -7,6 +7,7 @@ import { AssetsService } from './assets.service';
 import { Asset } from './entities/asset.entity';
 import { AssetLifecycleService, AssetStatus } from './asset-lifecycle.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AssetHistoryService } from './asset-history.service';
 
 describe('AssetsService', () => {
   let service: AssetsService;
@@ -34,6 +35,10 @@ describe('AssetsService', () => {
         {
           provide: AuditLogsService,
           useValue: createMock<AuditLogsService>(),
+        },
+        {
+          provide: AssetHistoryService,
+          useValue: createMock<AssetHistoryService>(),
         },
         {
           provide: DataSource,

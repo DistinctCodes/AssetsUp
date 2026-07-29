@@ -6,12 +6,18 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Asset } from './entities/asset.entity';
+import { Asset, ASSET_DETAIL_RELATIONS } from './entities/asset.entity';
 import { AssetLifecycleService, AssetStatus } from './asset-lifecycle.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AssetHistoryService } from './asset-history.service';
+import { AssetHistoryAction } from './entities/asset-history-event.entity';
+import { Department } from '../departments/entities/department.entity';
+import { User } from '../users/entities/user.entity';
 import { BulkStatusDto } from './dto/bulk-status.dto';
 import { BulkAssignDto } from './dto/bulk-assign.dto';
 import { BulkDeleteDto } from './dto/bulk-delete.dto';
+import { UpdateAssetStatusDto } from './dto/update-asset-status.dto';
+import { TransferAssetDto } from './dto/transfer-asset.dto';
 
 export interface BulkResult {
   succeeded: string[];
@@ -26,6 +32,7 @@ export class AssetsService {
     private readonly assetRepo: Repository<Asset>,
     private readonly lifecycle: AssetLifecycleService,
     private readonly audit: AuditLogsService,
+    private readonly history: AssetHistoryService,
     private readonly dataSource: DataSource,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -93,6 +100,173 @@ export class AssetsService {
   async delete(id: string) {
     const asset = await this.findById(id);
     return this.assetRepo.softRemove(asset);
+  }
+
+  /** Load an asset with the relations the frontend detail cache expects. */
+  async findDetail(id: string) {
+    const asset = await this.assetRepo.findOne({
+      where: { id },
+      relations: ASSET_DETAIL_RELATIONS,
+    });
+    if (!asset) throw new NotFoundException(`Asset ${id} not found`);
+    return asset;
+  }
+
+  async updateStatus(id: string, dto: UpdateAssetStatusDto, actorId?: string) {
+    const newStatus = this.lifecycle.normalizeStatus(dto.status);
+
+    await this.dataSource.transaction(async (manager) => {
+      const asset = await manager.findOne(Asset, { where: { id } });
+      if (!asset) throw new NotFoundException(`Asset ${id} not found`);
+
+      const previousStatus = asset.status;
+      if (previousStatus === newStatus) return;
+
+      this.lifecycle.validateTransition(previousStatus as AssetStatus, newStatus);
+
+      asset.status = newStatus;
+      await manager.save(asset);
+
+      await this.history.record(
+        {
+          assetId: id,
+          action: AssetHistoryAction.STATUS_CHANGED,
+          description: dto.reason
+            ? `Status changed from ${previousStatus} to ${newStatus}: ${dto.reason}`
+            : `Status changed from ${previousStatus} to ${newStatus}`,
+          previousValue: { status: previousStatus },
+          newValue: { status: newStatus },
+          performedById: actorId,
+        },
+        manager,
+      );
+
+      this.eventEmitter.emit('asset.status_changed', {
+        assetId: id,
+        departmentId: asset.departmentId,
+        previousStatus,
+        newStatus,
+      });
+      this.audit.logAction('ASSET_STATUS_CHANGE', 'Asset', id, actorId, {
+        previousStatus,
+        newStatus,
+        reason: dto.reason,
+      });
+    });
+
+    return this.findDetail(id);
+  }
+
+  async transfer(id: string, dto: TransferAssetDto, actorId?: string) {
+    // `null` is a meaningful assignedToId (unassign), so test for presence not truthiness
+    const targetsDepartment = dto.departmentId !== undefined;
+    const targetsAssignee = dto.assignedToId !== undefined;
+    if (!targetsDepartment && !targetsAssignee) {
+      throw new BadRequestException(
+        'At least one of departmentId or assignedToId is required',
+      );
+    }
+
+    const note = dto.note ?? dto.notes;
+
+    await this.dataSource.transaction(async (manager) => {
+      const asset = await manager.findOne(Asset, { where: { id } });
+      if (!asset) throw new NotFoundException(`Asset ${id} not found`);
+
+      if (dto.departmentId) {
+        const department = await manager.findOne(Department, {
+          where: { id: dto.departmentId },
+        });
+        if (!department) {
+          throw new BadRequestException(`Department ${dto.departmentId} not found`);
+        }
+      }
+      if (dto.assignedToId) {
+        const user = await manager.findOne(User, { where: { id: dto.assignedToId } });
+        if (!user) {
+          throw new BadRequestException(`User ${dto.assignedToId} not found`);
+        }
+      }
+
+      const previous = {
+        departmentId: asset.departmentId ?? null,
+        assignedToId: asset.assignedToUserId ?? null,
+        status: asset.status,
+      };
+
+      if (dto.departmentId !== undefined) asset.departmentId = dto.departmentId;
+      if (targetsAssignee) {
+        const assignedToId = dto.assignedToId ?? null;
+        asset.assignedToUserId = assignedToId;
+        // Assigning a holder flips the asset to ASSIGNED; clearing it frees the asset.
+        const derivedStatus = assignedToId
+          ? AssetStatus.ASSIGNED
+          : AssetStatus.AVAILABLE;
+        if (
+          previous.assignedToId !== assignedToId &&
+          asset.status !== derivedStatus
+        ) {
+          this.lifecycle.validateTransition(asset.status as AssetStatus, derivedStatus);
+          asset.status = derivedStatus;
+        }
+      }
+
+      await manager.save(asset);
+
+      const next = {
+        departmentId: asset.departmentId ?? null,
+        assignedToId: asset.assignedToUserId ?? null,
+        status: asset.status,
+      };
+
+      await this.history.record(
+        {
+          assetId: id,
+          action: AssetHistoryAction.TRANSFERRED,
+          description: this.describeTransfer(previous, next, note),
+          previousValue: previous,
+          newValue: next,
+          performedById: actorId,
+        },
+        manager,
+      );
+
+      this.eventEmitter.emit('asset.transferred', {
+        assetId: id,
+        previous,
+        new: next,
+        actorId,
+      });
+      this.audit.logAction('ASSET_TRANSFER', 'Asset', id, actorId, {
+        previous,
+        new: next,
+        note,
+      });
+    });
+
+    return this.findDetail(id);
+  }
+
+  private describeTransfer(
+    previous: { departmentId: string | null; assignedToId: string | null },
+    next: { departmentId: string | null; assignedToId: string | null },
+    note?: string,
+  ) {
+    const parts: string[] = [];
+    if (previous.departmentId !== next.departmentId) {
+      parts.push(
+        `department ${previous.departmentId ?? 'none'} → ${next.departmentId ?? 'none'}`,
+      );
+    }
+    if (previous.assignedToId !== next.assignedToId) {
+      parts.push(
+        `assignee ${previous.assignedToId ?? 'none'} → ${next.assignedToId ?? 'none'}`,
+      );
+    }
+    const summary = parts.length
+      ? `Asset transferred: ${parts.join(', ')}`
+      : 'Asset transfer recorded with no field changes';
+    return note ? `${summary}. Note: ${note}` : summary;
   }
 
   async bulkStatus(dto: BulkStatusDto, actorId?: string): Promise<BulkResult> {

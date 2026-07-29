@@ -10,6 +10,27 @@ export enum AssetStatus {
   LOST = 'LOST',
 }
 
+/**
+ * Status values accepted on the wire: the canonical statuses plus the aliases
+ * the frontend AssetStatus enum uses (ACTIVE, MAINTENANCE).
+ */
+export enum AssetStatusInput {
+  AVAILABLE = 'AVAILABLE',
+  ACTIVE = 'ACTIVE',
+  ASSIGNED = 'ASSIGNED',
+  IN_MAINTENANCE = 'IN_MAINTENANCE',
+  MAINTENANCE = 'MAINTENANCE',
+  IN_TRANSIT = 'IN_TRANSIT',
+  RETIRED = 'RETIRED',
+  DISPOSED = 'DISPOSED',
+  LOST = 'LOST',
+}
+
+const STATUS_ALIASES: Record<string, AssetStatus> = {
+  ACTIVE: AssetStatus.AVAILABLE,
+  MAINTENANCE: AssetStatus.IN_MAINTENANCE,
+};
+
 const ALLOWED_TRANSITIONS: Record<AssetStatus, AssetStatus[]> = {
   [AssetStatus.AVAILABLE]: [
     AssetStatus.ASSIGNED,
@@ -47,6 +68,24 @@ const ALLOWED_TRANSITIONS: Record<AssetStatus, AssetStatus[]> = {
 @Injectable()
 export class AssetLifecycleService {
   private history = new Map<string, any[]>();
+
+  /**
+   * Resolve a wire status value to its canonical AssetStatus, rejecting anything
+   * outside the enum with a 400.
+   */
+  normalizeStatus(status: string): AssetStatus {
+    if (!status) {
+      throw new BadRequestException('status is required');
+    }
+    const upper = String(status).toUpperCase();
+    const resolved = STATUS_ALIASES[upper] ?? (upper as AssetStatus);
+    if (!Object.values(AssetStatus).includes(resolved)) {
+      throw new BadRequestException(
+        `Invalid asset status "${status}". Allowed values: ${Object.values(AssetStatusInput).join(', ')}`,
+      );
+    }
+    return resolved;
+  }
 
   validateTransition(fromStatus: AssetStatus, toStatus: AssetStatus) {
     if (fromStatus === toStatus) return true;

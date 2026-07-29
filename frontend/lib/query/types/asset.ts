@@ -125,11 +125,14 @@ export interface AssetNote {
 // Input types for mutations
 export interface UpdateAssetStatusInput {
   status: AssetStatus;
+  reason?: string;
 }
 
+/** At least one of `departmentId` or `assignedToId` must be provided. */
 export interface TransferAssetInput {
-  departmentId: string;
-  assignedToId?: string;
+  departmentId?: string;
+  /** A user id assigns the asset; `null` clears the assignment. */
+  assignedToId?: string | null;
   location?: string;
   notes?: string;
 }
