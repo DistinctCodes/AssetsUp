@@ -24,4 +24,10 @@ export class BranchesService {
     const branch = this.branchRepo.create(dto);
     return this.branchRepo.save(branch);
   }
+
+  async update(id: string, dto: Partial<Branch>) {
+    const branch = await this.findById(id);
+    Object.assign(branch, dto);
+    return this.branchRepo.save(branch);
+  }
 }
