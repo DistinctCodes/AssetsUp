@@ -16,6 +16,8 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { VendorsService } from './vendors.service';
+import { CreateVendorDto } from './dto/create-vendor.dto';
+import { UpdateVendorDto } from './dto/update-vendor.dto';
 
 @ApiTags('vendors')
 @ApiBearerAuth('JWT-auth')
@@ -33,7 +35,7 @@ export class VendorsController {
   @Post()
   @ApiOperation({ summary: 'Create a vendor' })
   @ApiResponse({ status: 201, description: 'Vendor created' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateVendorDto) {
     return this.vendorsService.create(dto);
   }
 
@@ -48,7 +50,7 @@ export class VendorsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a vendor' })
   @ApiResponse({ status: 200, description: 'Vendor updated' })
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateVendorDto) {
     return this.vendorsService.update(id, dto);
   }
 
