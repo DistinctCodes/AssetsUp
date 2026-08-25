@@ -25,6 +25,7 @@ import { AuditsModule } from './audits/audits.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { StellarModule } from './stellar/stellar.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     NotificationsModule,
     GatewayModule,
     AuditLogsModule,
+    StellarModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

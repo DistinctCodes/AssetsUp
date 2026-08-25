@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { Menu, User, ChevronDown } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
+import { WalletButton } from "@/components/wallet/wallet-button";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -76,8 +77,10 @@ export function Topbar({ onMenuClick, menuOpen }: TopbarProps) {
         </h1>
       </div>
 
-      {/* Right: user dropdown */}
-      <div className="relative" ref={dropdownRef}>
+      {/* Right: wallet button + user dropdown */}
+      <div className="flex items-center gap-3">
+        <WalletButton />
+        <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen((v) => !v)}
           aria-label="Open user menu"
@@ -119,6 +122,7 @@ export function Topbar({ onMenuClick, menuOpen }: TopbarProps) {
             </button>
           </div>
         )}
+      </div>
       </div>
     </header>
   );
