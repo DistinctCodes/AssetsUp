@@ -28,13 +28,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let message = 'Internal server error';
     let error = 'InternalServerError';
 
-    if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-      message = exceptionResponse.message || message;
-      error = exceptionResponse.error || error;
-    } else if (typeof exceptionResponse === 'string') {
-      message = exceptionResponse;
-    } else if (exception instanceof Error) {
-      message = exception.message;
+    if (exception instanceof HttpException) {
+      if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+        message = exceptionResponse.message || message;
+        error = exceptionResponse.error || error;
+      } else if (typeof exceptionResponse === 'string') {
+        message = exceptionResponse;
+      }
     }
 
     this.logger.error(
