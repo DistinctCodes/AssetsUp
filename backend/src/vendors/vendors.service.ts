@@ -4,10 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { ILike, Not, Repository } from 'typeorm';
 import { Vendor } from './entities/vendor.entity';
-import { POStatus } from '../purchase-orders/entities/purchase-order.entity';
-import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity';
+import { PurchaseOrder, POStatus } from '../purchase-orders/entities/purchase-order.entity';
+import { PaginationQueryDto, PaginatedResponse } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class VendorsService {
@@ -18,8 +18,16 @@ export class VendorsService {
     private readonly poRepo: Repository<PurchaseOrder>,
   ) {}
 
-  async findAll() {
-    return this.vendorRepo.find();
+  async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<Vendor>> {
+    const { page = 1, limit = 20, search } = query;
+    const where = search ? { name: ILike(`%${search}%`) } : {};
+    const [items, total] = await this.vendorRepo.findAndCount({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { createdAt: 'DESC' },
+    });
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findById(id: string) {
