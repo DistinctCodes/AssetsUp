@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -6,10 +6,12 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { PurchaseOrdersService } from './purchase-orders.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('purchase-orders')
 @ApiBearerAuth('JWT-auth')
 @Controller('purchase-orders')
+@UseGuards(JwtAuthGuard)
 export class PurchaseOrdersController {
   constructor(private readonly poService: PurchaseOrdersService) {}
 

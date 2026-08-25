@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -6,10 +6,12 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { BranchesService } from './branches.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('branches')
 @ApiBearerAuth('JWT-auth')
 @Controller('branches')
+@UseGuards(JwtAuthGuard)
 export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 
