@@ -27,6 +27,7 @@ import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EditAssetModal } from "@/components/assets/edit-asset-modal";
+import { InlineEdit } from "@/components/assets/inline-edit";
 import {
   useAsset,
   useAssetHistory,
@@ -382,7 +383,12 @@ export default function AssetDetailPage() {
             )}
             <div className="flex items-center gap-2 mt-3">
               <StatusBadge status={asset.status} />
-              <ConditionBadge condition={asset.condition} />
+              <InlineEdit
+                value={asset.condition}
+                label="Condition"
+                onSave={async (val) => { /* TODO: call API */ }}
+                display={<ConditionBadge condition={asset.condition} />}
+              />
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap print:hidden">
@@ -467,9 +473,17 @@ export default function AssetDetailPage() {
               <DetailRow
                 label="Current Value"
                 value={
-                  asset.currentValue != null
-                    ? `$${Number(asset.currentValue).toLocaleString()}`
-                    : undefined
+                  <InlineEdit
+                    value={asset.currentValue}
+                    label="Current Value"
+                    type="number"
+                    onSave={async (val) => { /* TODO: call API */ }}
+                    display={
+                      asset.currentValue != null
+                        ? `$${Number(asset.currentValue).toLocaleString()}`
+                        : "—"
+                    }
+                  />
                 }
               />
               <DetailRow

@@ -16,6 +16,8 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Assets Up",
   description: "Modern Assets and Inventory Management Platform",
+  manifest: "/manifest.json",
+  themeColor: "#111827",
 };
 
 export default function RootLayout({
