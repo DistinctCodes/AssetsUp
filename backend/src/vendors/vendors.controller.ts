@@ -8,6 +8,7 @@ import {
   Post,
   Patch,
   Body,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,6 +19,7 @@ import {
 import { VendorsService } from './vendors.service';
 import { CreateVendorDto } from './dto/create-vendor.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 
 @ApiTags('vendors')
 @ApiBearerAuth('JWT-auth')
@@ -27,9 +29,9 @@ export class VendorsController {
 
   @Get()
   @ApiOperation({ summary: 'List all vendors/suppliers' })
-  @ApiResponse({ status: 200, description: 'List of vendors' })
-  findAll() {
-    return this.vendorsService.findAll();
+  @ApiResponse({ status: 200, description: 'Paginated list of vendors' })
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.vendorsService.findAll(query);
   }
 
   @Post()
