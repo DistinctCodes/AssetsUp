@@ -6,6 +6,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { TransfersService } from './transfers.service';
+import { CreateTransferDto } from './dto/create-transfer.dto';
 
 @ApiTags('transfers')
 @ApiBearerAuth('JWT-auth')
@@ -23,7 +24,7 @@ export class TransfersController {
   @Post()
   @ApiOperation({ summary: 'Request an asset transfer' })
   @ApiResponse({ status: 201, description: 'Transfer request created' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateTransferDto) {
     return this.transfersService.create(dto);
   }
 
