@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, Param } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -6,6 +6,8 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { BranchesService } from './branches.service';
+import { CreateBranchDto } from './dto/create-branch.dto';
+import { UpdateBranchDto } from './dto/update-branch.dto';
 
 @ApiTags('branches')
 @ApiBearerAuth('JWT-auth')
@@ -23,7 +25,7 @@ export class BranchesController {
   @Post()
   @ApiOperation({ summary: 'Create a branch' })
   @ApiResponse({ status: 201, description: 'Branch created' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateBranchDto) {
     return this.branchesService.create(dto);
   }
 
@@ -33,5 +35,12 @@ export class BranchesController {
   @ApiResponse({ status: 404, description: 'Branch not found' })
   findOne(@Param('id') id: string) {
     return this.branchesService.findById(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a branch' })
+  @ApiResponse({ status: 200, description: 'Branch updated' })
+  update(@Param('id') id: string, @Body() dto: UpdateBranchDto) {
+    return this.branchesService.update(id, dto);
   }
 }
