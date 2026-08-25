@@ -54,4 +54,24 @@ export class TransfersService {
     tr.rejectionReason = reason;
     return this.transferRepo.save(tr);
   }
+
+  async cancel(id: string) {
+    const tr = await this.findById(id);
+    if (tr.status !== TransferStatus.PENDING) {
+      throw new BadRequestException('Only pending transfers can be cancelled');
+    }
+    tr.status = TransferStatus.CANCELLED;
+    return this.transferRepo.save(tr);
+  }
+
+  async complete(id: string) {
+    const tr = await this.findById(id);
+    if (tr.status !== TransferStatus.APPROVED) {
+      throw new BadRequestException(
+        'Only approved transfers can be completed',
+      );
+    }
+    tr.status = TransferStatus.COMPLETED;
+    return this.transferRepo.save(tr);
+  }
 }

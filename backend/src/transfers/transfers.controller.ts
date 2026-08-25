@@ -49,4 +49,18 @@ export class TransfersController {
   reject(@Param('id') id: string, @Body('reason') reason: string) {
     return this.transfersService.reject(id, reason || 'Rejected by manager');
   }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel a pending asset transfer' })
+  @ApiResponse({ status: 200, description: 'Transfer cancelled' })
+  cancel(@Param('id') id: string) {
+    return this.transfersService.cancel(id);
+  }
+
+  @Post(':id/complete')
+  @ApiOperation({ summary: 'Mark an approved transfer as completed' })
+  @ApiResponse({ status: 200, description: 'Transfer completed' })
+  complete(@Param('id') id: string) {
+    return this.transfersService.complete(id);
+  }
 }
