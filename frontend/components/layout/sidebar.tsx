@@ -17,6 +17,8 @@ import {
   KeyRound,
   Wrench,
   ClipboardCheck,
+  Store,
+  FileText,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -24,6 +26,8 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/assets", label: "Assets", icon: Package },
   { href: "/locations", label: "Locations", icon: MapPin },
+  { href: "/vendors", label: "Vendors", icon: Store },
+  { href: "/purchase-orders", label: "Purchase Orders", icon: FileText },
   { href: "/maintenance", label: "Maintenance", icon: Wrench },
   { href: "/audits", label: "Audits", icon: ClipboardCheck },
   { href: "/licenses", label: "Licenses", icon: KeyRound },
