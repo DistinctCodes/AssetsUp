@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Patch,
+  Body,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -40,5 +50,15 @@ export class VendorsController {
   @ApiResponse({ status: 200, description: 'Vendor updated' })
   update(@Param('id') id: string, @Body() dto: any) {
     return this.vendorsService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a vendor' })
+  @ApiResponse({ status: 204, description: 'Vendor deleted' })
+  @ApiResponse({ status: 400, description: 'Vendor has open purchase orders' })
+  @ApiResponse({ status: 404, description: 'Vendor not found' })
+  delete(@Param('id') id: string) {
+    return this.vendorsService.delete(id);
   }
 }
