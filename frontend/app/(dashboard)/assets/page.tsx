@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Search, SlidersHorizontal, MapPin, X } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, MapPin, X, Package, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
@@ -49,10 +49,16 @@ export default function AssetsPage() {
               : "No assets yet"}
           </p>
         </div>
-        <Button onClick={() => setShowModal(true)}>
-          <Plus size={16} className="mr-1.5" />
-          Register Asset
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => router.push("/assets/import")}>
+            <Upload size={16} className="mr-1.5" />
+            Bulk Import
+          </Button>
+          <Button onClick={() => setShowModal(true)}>
+            <Plus size={16} className="mr-1.5" />
+            Register Asset
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -178,7 +184,16 @@ export default function AssetsPage() {
                       {asset.assetId}
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {asset.name}
+                      <div className="flex items-center gap-2">
+                        {asset.imageUrls?.[0] ? (
+                          <img src={asset.imageUrls[0]} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" loading="lazy" />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <Package className="w-4 h-4 text-gray-400" />
+                          </div>
+                        )}
+                        {asset.name}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {asset.category?.name ?? "—"}
