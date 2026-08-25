@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Req } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -7,6 +7,7 @@ import {
 } from '@nestjs/swagger';
 import { TransfersService } from './transfers.service';
 import { CreateTransferDto } from './dto/create-transfer.dto';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 
 @ApiTags('transfers')
 @ApiBearerAuth('JWT-auth')
@@ -16,9 +17,9 @@ export class TransfersController {
 
   @Get()
   @ApiOperation({ summary: 'List all asset transfers' })
-  @ApiResponse({ status: 200, description: 'List of transfers' })
-  findAll() {
-    return this.transfersService.findAll();
+  @ApiResponse({ status: 200, description: 'Paginated list of transfers' })
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.transfersService.findAll(query);
   }
 
   @Post()
