@@ -5,9 +5,10 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import { Department } from './entities/department.entity';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { PaginationQueryDto, PaginatedResponse } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class DepartmentsService {
@@ -17,8 +18,16 @@ export class DepartmentsService {
     @Optional() private readonly auditLogsService?: AuditLogsService,
   ) {}
 
-  async findAll() {
-    return this.deptRepo.find();
+  async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<Department>> {
+    const { page = 1, limit = 20, search } = query;
+    const where = search ? { name: ILike(`%${search}%`) } : {};
+    const [items, total] = await this.deptRepo.findAndCount({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { createdAt: 'DESC' },
+    });
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findById(id: string) {
