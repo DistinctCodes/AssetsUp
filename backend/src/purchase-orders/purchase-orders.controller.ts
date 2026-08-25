@@ -6,6 +6,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { PurchaseOrdersService } from './purchase-orders.service';
+import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 
 @ApiTags('purchase-orders')
 @ApiBearerAuth('JWT-auth')
@@ -23,7 +24,7 @@ export class PurchaseOrdersController {
   @Post()
   @ApiOperation({ summary: 'Create a purchase order' })
   @ApiResponse({ status: 201, description: 'Purchase order created' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreatePurchaseOrderDto) {
     return this.poService.create(dto);
   }
 
