@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, Param, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -8,6 +8,7 @@ import {
 import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 
 @ApiTags('branches')
 @ApiBearerAuth('JWT-auth')
@@ -17,9 +18,9 @@ export class BranchesController {
 
   @Get()
   @ApiOperation({ summary: 'List all branches' })
-  @ApiResponse({ status: 200, description: 'List of branches' })
-  findAll() {
-    return this.branchesService.findAll();
+  @ApiResponse({ status: 200, description: 'Paginated list of branches' })
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.branchesService.findAll(query);
   }
 
   @Post()
