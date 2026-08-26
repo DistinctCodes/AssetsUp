@@ -76,7 +76,8 @@ describe('useCommandPalette', () => {
   });
 
   it('should toggle the palette when Cmd+K (Mac) is pressed', () => {
-    renderHook(() => useCommandPalette());
+    const { result } = renderHook(() => useCommandPalette());
+    expect(result.current.isOpen).toBe(false);
     
     // Dispatch Cmd+K keydown event (metaKey is Cmd on Mac)
     const cmdKEvent = new KeyboardEvent('keydown', {
@@ -87,6 +88,10 @@ describe('useCommandPalette', () => {
     document.dispatchEvent(cmdKEvent);
     
     expect(preventDefaultSpy).toHaveBeenCalled();
+    act(() => {
+      jest.runAllTimers();
+    });
+    expect(result.current.isOpen).toBe(true);
   });
 
   it('should not toggle for other key combinations', () => {
