@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -37,10 +46,39 @@ export class PurchaseOrdersController {
     return this.poService.findById(id);
   }
 
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a draft purchase order' })
+  @ApiResponse({ status: 200, description: 'Purchase order updated' })
+  update(@Param('id') id: string, @Body() dto: any) {
+    return this.poService.update(id, dto);
+  }
+
+  @Post(':id/submit')
+  @ApiOperation({ summary: 'Submit a draft purchase order for approval' })
+  @ApiResponse({ status: 200, description: 'Purchase order submitted' })
+  submit(@Param('id') id: string) {
+    return this.poService.submit(id);
+  }
+
+  @Post(':id/approve')
+  @ApiOperation({ summary: 'Approve a submitted purchase order' })
+  @ApiResponse({ status: 200, description: 'Purchase order approved' })
+  approve(@Param('id') id: string, @Req() req: any) {
+    const approverId = req.user?.id || 'usr-1';
+    return this.poService.approve(id, approverId);
+  }
+
   @Post(':id/receive')
   @ApiOperation({ summary: 'Receive purchase order line items' })
   @ApiResponse({ status: 200, description: 'Purchase order received' })
   receive(@Param('id') id: string) {
     return this.poService.receive(id);
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel a draft or submitted purchase order' })
+  @ApiResponse({ status: 200, description: 'Purchase order cancelled' })
+  cancel(@Param('id') id: string) {
+    return this.poService.cancel(id);
   }
 }

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -35,5 +44,19 @@ export class BranchesController {
   @ApiResponse({ status: 404, description: 'Branch not found' })
   findOne(@Param('id') id: string) {
     return this.branchesService.findById(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a branch' })
+  @ApiResponse({ status: 200, description: 'Branch updated' })
+  update(@Param('id') id: string, @Body() dto: any) {
+    return this.branchesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a branch' })
+  @ApiResponse({ status: 200, description: 'Branch deleted' })
+  delete(@Param('id') id: string) {
+    return this.branchesService.delete(id);
   }
 }

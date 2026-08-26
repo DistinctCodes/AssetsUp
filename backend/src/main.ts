@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 function validateEnv() {
@@ -27,6 +28,9 @@ async function bootstrap() {
   validateEnv();
 
   const app = await NestFactory.create(AppModule);
+
+  // Set secure HTTP response headers (CSP, HSTS, X-Frame-Options, etc.).
+  app.use(helmet());
 
   // Enable CORS for frontend
   app.enableCors({

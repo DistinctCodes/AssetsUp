@@ -104,6 +104,18 @@ export class Asset {
   @Column({ default: false })
   isDigital: boolean;
 
+  @Column({ nullable: true })
+  depreciationMethod?: string;
+
+  @Column({ nullable: true })
+  usefulLifeMonths?: number;
+
+  @Column({ nullable: true })
+  salvageValue?: number;
+
+  @Column({ nullable: true, type: 'decimal', precision: 14, scale: 2 })
+  currentValue?: number;
+
   @CreateDateColumn()
   createdAt: Date;
 
