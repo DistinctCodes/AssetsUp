@@ -1,14 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { Branch } from './entities/branch.entity';
 import { PaginationQueryDto, PaginatedResponse } from '../common/dto/pagination.dto';
+import { Asset } from '../assets/entities/asset.entity';
 
 @Injectable()
 export class BranchesService {
   constructor(
     @InjectRepository(Branch)
     private readonly branchRepo: Repository<Branch>,
+    @InjectRepository(Asset)
+    private readonly assetRepo: Repository<Asset>,
   ) {}
 
   async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<Branch>> {
@@ -38,5 +45,18 @@ export class BranchesService {
     const branch = await this.findById(id);
     Object.assign(branch, dto);
     return this.branchRepo.save(branch);
+  }
+
+  async delete(id: string) {
+    const branch = await this.findById(id);
+    const assetCount = await this.assetRepo.count({
+      where: { branchId: id },
+    });
+    if (assetCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete branch: ${assetCount} asset(s) are still assigned to it`,
+      );
+    }
+    return this.branchRepo.remove(branch);
   }
 }

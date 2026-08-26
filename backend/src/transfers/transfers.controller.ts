@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Param, Body, Req, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  Req,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -8,10 +17,12 @@ import {
 import { TransfersService } from './transfers.service';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 import { PaginationQueryDto } from '../common/dto/pagination.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('transfers')
 @ApiBearerAuth('JWT-auth')
 @Controller('transfers')
+@UseGuards(JwtAuthGuard)
 export class TransfersController {
   constructor(private readonly transfersService: TransfersService) {}
 
@@ -50,5 +61,19 @@ export class TransfersController {
   @ApiResponse({ status: 200, description: 'Transfer rejected' })
   reject(@Param('id') id: string, @Body('reason') reason: string) {
     return this.transfersService.reject(id, reason || 'Rejected by manager');
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel a pending asset transfer' })
+  @ApiResponse({ status: 200, description: 'Transfer cancelled' })
+  cancel(@Param('id') id: string) {
+    return this.transfersService.cancel(id);
+  }
+
+  @Post(':id/complete')
+  @ApiOperation({ summary: 'Mark an approved transfer as completed' })
+  @ApiResponse({ status: 200, description: 'Transfer completed' })
+  complete(@Param('id') id: string) {
+    return this.transfersService.complete(id);
   }
 }

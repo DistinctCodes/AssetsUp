@@ -17,6 +17,9 @@ import {
   KeyRound,
   Wrench,
   ClipboardCheck,
+  Bell,
+  FileText,
+  Store,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -24,6 +27,8 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/assets", label: "Assets", icon: Package },
   { href: "/locations", label: "Locations", icon: MapPin },
+  { href: "/vendors", label: "Vendors", icon: Store },
+  { href: "/purchase-orders", label: "Purchase Orders", icon: FileText },
   { href: "/maintenance", label: "Maintenance", icon: Wrench },
   { href: "/audits", label: "Audits", icon: ClipboardCheck },
   { href: "/licenses", label: "Licenses", icon: KeyRound },
@@ -144,7 +149,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         aria-label="Main navigation"
         aria-hidden={!open ? "true" : undefined}
         className={clsx(
-          "fixed left-0 top-0 h-full w-60 bg-white border-r border-gray-200 flex flex-col z-30 transition-transform duration-200",
+          "fixed left-0 top-0 h-full w-60 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col z-30 transition-transform duration-200",
           // Safe-area inset for notched devices
           "pb-[env(safe-area-inset-bottom)]",
           "lg:translate-x-0",
@@ -207,8 +212,21 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           })}
         </nav>
 
-        {/* Bottom: Settings + Logout */}
+        {/* Bottom: Notifications + Settings + Logout */}
         <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
+          <Link
+            href="/notifications"
+            aria-current={pathname === "/notifications" ? "page" : undefined}
+            className={clsx(
+              "flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
+              pathname === "/notifications"
+                ? "bg-gray-100 text-gray-900"
+                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50",
+            )}
+          >
+            <Bell size={17} aria-hidden="true" />
+            Notifications
+          </Link>
           <Link
             href="/settings"
             aria-current={pathname.startsWith("/settings") ? "page" : undefined}

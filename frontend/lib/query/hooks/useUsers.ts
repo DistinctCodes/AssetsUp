@@ -5,6 +5,7 @@ import {
   AppUser,
   UserRole,
   UpdateProfileInput,
+  InviteUserInput,
 } from "@/lib/api/users";
 
 const usersKeys = {
@@ -33,6 +34,26 @@ export function useUpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation<AppUser, Error, UpdateProfileInput>({
     mutationFn: (data) => usersApiClient.updateProfile(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: usersKeys.all });
+    },
+  });
+}
+
+export function useToggleUserActive() {
+  const queryClient = useQueryClient();
+  return useMutation<AppUser, Error, { id: string; isActive: boolean }>({
+    mutationFn: ({ id, isActive }) => usersApiClient.toggleActive(id, isActive),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: usersKeys.all });
+    },
+  });
+}
+
+export function useInviteUser() {
+  const queryClient = useQueryClient();
+  return useMutation<AppUser, Error, InviteUserInput>({
+    mutationFn: (data) => usersApiClient.inviteUser(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: usersKeys.all });
     },

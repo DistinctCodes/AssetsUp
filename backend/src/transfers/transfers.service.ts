@@ -10,12 +10,15 @@ import {
   TransferStatus,
 } from './entities/asset-transfer.entity';
 import { PaginationQueryDto, PaginatedResponse } from '../common/dto/pagination.dto';
+import { Asset } from '../assets/entities/asset.entity';
 
 @Injectable()
 export class TransfersService {
   constructor(
     @InjectRepository(AssetTransfer)
     private readonly transferRepo: Repository<AssetTransfer>,
+    @InjectRepository(Asset)
+    private readonly assetRepo: Repository<Asset>,
   ) {}
 
   async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<AssetTransfer>> {
@@ -47,9 +50,20 @@ export class TransfersService {
     if (tr.status !== TransferStatus.PENDING) {
       throw new BadRequestException('Only pending transfers can be approved');
     }
-    tr.status = TransferStatus.APPROVED;
-    tr.approvedByUserId = approverUserId;
-    return this.transferRepo.save(tr);
+
+    await this.transferRepo.manager.transaction(async (manager) => {
+      tr.status = TransferStatus.APPROVED;
+      tr.approvedByUserId = approverUserId;
+      await manager.save(tr);
+
+      const asset = await manager.findOneBy(Asset, { id: tr.assetId });
+      if (asset) {
+        asset.departmentId = tr.toDepartmentId;
+        await manager.save(asset);
+      }
+    });
+
+    return this.findById(id);
   }
 
   async reject(id: string, reason: string) {
@@ -59,6 +73,26 @@ export class TransfersService {
     }
     tr.status = TransferStatus.REJECTED;
     tr.rejectionReason = reason;
+    return this.transferRepo.save(tr);
+  }
+
+  async cancel(id: string) {
+    const tr = await this.findById(id);
+    if (tr.status !== TransferStatus.PENDING) {
+      throw new BadRequestException('Only pending transfers can be cancelled');
+    }
+    tr.status = TransferStatus.CANCELLED;
+    return this.transferRepo.save(tr);
+  }
+
+  async complete(id: string) {
+    const tr = await this.findById(id);
+    if (tr.status !== TransferStatus.APPROVED) {
+      throw new BadRequestException(
+        'Only approved transfers can be completed',
+      );
+    }
+    tr.status = TransferStatus.COMPLETED;
     return this.transferRepo.save(tr);
   }
 }

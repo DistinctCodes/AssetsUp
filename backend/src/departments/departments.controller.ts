@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,10 +17,12 @@ import {
 } from '@nestjs/swagger';
 import { DepartmentsService } from './departments.service';
 import { PaginationQueryDto } from '../common/dto/pagination.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('departments')
 @ApiBearerAuth('JWT-auth')
 @Controller('departments')
+@UseGuards(JwtAuthGuard)
 export class DepartmentsController {
   constructor(private readonly deptService: DepartmentsService) {}
 

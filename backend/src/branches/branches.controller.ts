@@ -1,4 +1,14 @@
-import { Controller, Get, Patch, Post, Body, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -9,10 +19,12 @@ import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { PaginationQueryDto } from '../common/dto/pagination.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('branches')
 @ApiBearerAuth('JWT-auth')
 @Controller('branches')
+@UseGuards(JwtAuthGuard)
 export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 
@@ -43,5 +55,12 @@ export class BranchesController {
   @ApiResponse({ status: 200, description: 'Branch updated' })
   update(@Param('id') id: string, @Body() dto: UpdateBranchDto) {
     return this.branchesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a branch' })
+  @ApiResponse({ status: 200, description: 'Branch deleted' })
+  delete(@Param('id') id: string) {
+    return this.branchesService.delete(id);
   }
 }

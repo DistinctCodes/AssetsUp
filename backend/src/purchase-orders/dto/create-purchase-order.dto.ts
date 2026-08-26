@@ -1,4 +1,4 @@
-import { IsInt, IsMin, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreatePurchaseOrderDto {
   @IsOptional()
@@ -7,7 +7,7 @@ export class CreatePurchaseOrderDto {
 
   @IsOptional()
   @IsInt()
-  @IsMin(0)
+  @Min(0)
   totalAmount?: number;
 
   @IsOptional()

@@ -27,6 +27,8 @@ import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EditAssetModal } from "@/components/assets/edit-asset-modal";
+import { InlineEdit } from "@/components/assets/inline-edit";
+import { PhotoGallery } from "@/components/assets/photo-gallery";
 import {
   useAsset,
   useAssetHistory,
@@ -382,7 +384,12 @@ export default function AssetDetailPage() {
             )}
             <div className="flex items-center gap-2 mt-3">
               <StatusBadge status={asset.status} />
-              <ConditionBadge condition={asset.condition} />
+              <InlineEdit
+                value={asset.condition}
+                label="Condition"
+                onSave={async (val) => { /* TODO: call API */ }}
+                display={<ConditionBadge condition={asset.condition} />}
+              />
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap print:hidden">
@@ -434,7 +441,7 @@ export default function AssetDetailPage() {
 
       {/* ── Overview ── */}
       {tab === "overview" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="text-sm font-semibold text-gray-900 mb-4">Asset Details</h2>
             <dl className="space-y-3">
@@ -467,9 +474,17 @@ export default function AssetDetailPage() {
               <DetailRow
                 label="Current Value"
                 value={
-                  asset.currentValue != null
-                    ? `$${Number(asset.currentValue).toLocaleString()}`
-                    : undefined
+                  <InlineEdit
+                    value={asset.currentValue}
+                    label="Current Value"
+                    type="number"
+                    onSave={async (val) => { /* TODO: call API */ }}
+                    display={
+                      asset.currentValue != null
+                        ? `$${Number(asset.currentValue).toLocaleString()}`
+                        : "—"
+                    }
+                  />
                 }
               />
               <DetailRow
@@ -497,6 +512,16 @@ export default function AssetDetailPage() {
                 value={format(new Date(asset.updatedAt), "MMM d, yyyy")}
               />
             </dl>
+          </div>
+
+          {/* Photos */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <PhotoGallery
+              images={asset.imageUrls ?? []}
+              onUpload={async (file) => { /* TODO: call API */ }}
+              onDelete={async (idx) => { /* TODO: call API */ }}
+              onSetPrimary={(idx) => { /* TODO: reorder imageUrls */ }}
+            />
           </div>
 
           {/* QR Code - visible in print */}

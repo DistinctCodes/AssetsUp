@@ -4,7 +4,29 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+function validateEnv() {
+  const required = ['JWT_SECRET', 'JWT_REFRESH_SECRET'];
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}. ` +
+        'Set them before starting the server. There are no built-in defaults for security reasons.',
+    );
+  }
+  const minLen = 32;
+  for (const key of required) {
+    const val = process.env[key]!;
+    if (val.length < minLen) {
+      throw new Error(
+        `${key} must be at least ${minLen} characters long for security.`,
+      );
+    }
+  }
+}
+
 async function bootstrap() {
+  validateEnv();
+
   const app = await NestFactory.create(AppModule);
 
   // Set secure HTTP response headers (CSP, HSTS, X-Frame-Options, etc.).
