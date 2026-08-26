@@ -34,8 +34,10 @@ export default function AuditLogPage() {
             className="text-sm border border-gray-300 rounded-lg px-3 py-2"
           >
             <option value="ALL">All Entities</option>
-            <option value="Asset">Asset</option>
-            <option value="User">User</option>
+            <option value="asset">Asset</option>
+            <option value="user">User</option>
+            <option value="department">Department</option>
+            <option value="auth">Auth</option>
           </select>
           <select
             value={filters.action || 'ALL'}
