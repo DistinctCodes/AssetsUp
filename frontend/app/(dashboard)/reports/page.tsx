@@ -9,7 +9,7 @@ import { AssetStatus } from "@/lib/query/types/asset";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { DateRangeSelector } from "@/features/Dashboard/DateRangeSelector";
 
-const STATUS_COLORS: Record<AssetStatus, string> = {
+const STATUS_COLORS: Partial<Record<AssetStatus, string>> = {
   [AssetStatus.ACTIVE]: "bg-green-500",
   [AssetStatus.ASSIGNED]: "bg-blue-500",
   [AssetStatus.MAINTENANCE]: "bg-yellow-500",
