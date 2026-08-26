@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Patch,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -6,6 +18,9 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { VendorsService } from './vendors.service';
+import { CreateVendorDto } from './dto/create-vendor.dto';
+import { UpdateVendorDto } from './dto/update-vendor.dto';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('vendors')
@@ -17,15 +32,15 @@ export class VendorsController {
 
   @Get()
   @ApiOperation({ summary: 'List all vendors/suppliers' })
-  @ApiResponse({ status: 200, description: 'List of vendors' })
-  findAll() {
-    return this.vendorsService.findAll();
+  @ApiResponse({ status: 200, description: 'Paginated list of vendors' })
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.vendorsService.findAll(query);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a vendor' })
   @ApiResponse({ status: 201, description: 'Vendor created' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateVendorDto) {
     return this.vendorsService.create(dto);
   }
 
@@ -40,7 +55,17 @@ export class VendorsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a vendor' })
   @ApiResponse({ status: 200, description: 'Vendor updated' })
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateVendorDto) {
     return this.vendorsService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a vendor' })
+  @ApiResponse({ status: 204, description: 'Vendor deleted' })
+  @ApiResponse({ status: 400, description: 'Vendor has open purchase orders' })
+  @ApiResponse({ status: 404, description: 'Vendor not found' })
+  delete(@Param('id') id: string) {
+    return this.vendorsService.delete(id);
   }
 }

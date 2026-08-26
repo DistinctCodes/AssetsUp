@@ -5,6 +5,7 @@ import {
   Patch,
   Param,
   Body,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -15,6 +16,8 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { PurchaseOrdersService } from './purchase-orders.service';
+import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('purchase-orders')
@@ -26,15 +29,15 @@ export class PurchaseOrdersController {
 
   @Get()
   @ApiOperation({ summary: 'List all purchase orders' })
-  @ApiResponse({ status: 200, description: 'List of purchase orders' })
-  findAll() {
-    return this.poService.findAll();
+  @ApiResponse({ status: 200, description: 'Paginated list of purchase orders' })
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.poService.findAll(query);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a purchase order' })
   @ApiResponse({ status: 201, description: 'Purchase order created' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreatePurchaseOrderDto) {
     return this.poService.create(dto);
   }
 

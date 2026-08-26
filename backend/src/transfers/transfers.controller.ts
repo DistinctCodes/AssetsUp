@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Param, Body, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  Req,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -6,6 +15,8 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { TransfersService } from './transfers.service';
+import { CreateTransferDto } from './dto/create-transfer.dto';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('transfers')
@@ -17,15 +28,15 @@ export class TransfersController {
 
   @Get()
   @ApiOperation({ summary: 'List all asset transfers' })
-  @ApiResponse({ status: 200, description: 'List of transfers' })
-  findAll() {
-    return this.transfersService.findAll();
+  @ApiResponse({ status: 200, description: 'Paginated list of transfers' })
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.transfersService.findAll(query);
   }
 
   @Post()
   @ApiOperation({ summary: 'Request an asset transfer' })
   @ApiResponse({ status: 201, description: 'Transfer request created' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateTransferDto) {
     return this.transfersService.create(dto);
   }
 

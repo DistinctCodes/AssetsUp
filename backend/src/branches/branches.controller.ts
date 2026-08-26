@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -15,6 +16,9 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { BranchesService } from './branches.service';
+import { CreateBranchDto } from './dto/create-branch.dto';
+import { UpdateBranchDto } from './dto/update-branch.dto';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('branches')
@@ -26,15 +30,15 @@ export class BranchesController {
 
   @Get()
   @ApiOperation({ summary: 'List all branches' })
-  @ApiResponse({ status: 200, description: 'List of branches' })
-  findAll() {
-    return this.branchesService.findAll();
+  @ApiResponse({ status: 200, description: 'Paginated list of branches' })
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.branchesService.findAll(query);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a branch' })
   @ApiResponse({ status: 201, description: 'Branch created' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateBranchDto) {
     return this.branchesService.create(dto);
   }
 
@@ -49,7 +53,7 @@ export class BranchesController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a branch' })
   @ApiResponse({ status: 200, description: 'Branch updated' })
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateBranchDto) {
     return this.branchesService.update(id, dto);
   }
 

@@ -9,6 +9,7 @@ import {
   AssetTransfer,
   TransferStatus,
 } from './entities/asset-transfer.entity';
+import { PaginationQueryDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { Asset } from '../assets/entities/asset.entity';
 
 @Injectable()
@@ -20,8 +21,14 @@ export class TransfersService {
     private readonly assetRepo: Repository<Asset>,
   ) {}
 
-  async findAll() {
-    return this.transferRepo.find();
+  async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<AssetTransfer>> {
+    const { page = 1, limit = 20 } = query;
+    const [items, total] = await this.transferRepo.findAndCount({
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { createdAt: 'DESC' },
+    });
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findById(id: string) {

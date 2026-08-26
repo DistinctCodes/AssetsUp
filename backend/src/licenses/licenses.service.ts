@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import { License } from './entities/license.entity';
 import { LicenseSeatAssignment } from './entities/license-seat-assignment.entity';
 import { CreateLicenseDto } from './dto/create-license.dto';
@@ -20,6 +20,7 @@ export class LicensesService {
     private readonly licenseRepo: Repository<License>,
     @InjectRepository(LicenseSeatAssignment)
     private readonly seatRepo: Repository<LicenseSeatAssignment>,
+    private readonly dataSource: DataSource,
   ) {}
 
   private withRenewalFlag(license: License) {
@@ -90,28 +91,37 @@ export class LicensesService {
   }
 
   async assign(licenseId: string, dto: { userId: string }) {
-    const lic = await this.licenseRepo.findOne({ where: { id: licenseId } });
-    if (!lic) throw new NotFoundException(`License ${licenseId} not found`);
-    if (lic.seatsUsed >= lic.seatsTotal) {
-      throw new ConflictException(
-        'No available seats remaining for this license',
-      );
-    }
+    return this.dataSource.transaction(async (manager) => {
+      // Pessimistic write lock prevents concurrent over-allocation
+      const lic = await manager.findOne(License, {
+        where: { id: licenseId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!lic) throw new NotFoundException(`License ${licenseId} not found`);
 
-    const existing = await this.seatRepo.findOne({
-      where: { licenseId, userId: dto.userId, unassignedAt: IsNull() },
-    });
-    if (existing) {
-      throw new ConflictException(
-        'This user already holds a seat for this license',
-      );
-    }
+      if (lic.seatsUsed >= lic.seatsTotal) {
+        throw new ConflictException(
+          'No available seats remaining for this license',
+        );
+      }
 
-    const assignment = this.seatRepo.create({ licenseId, userId: dto.userId });
-    await this.seatRepo.save(assignment);
-    lic.seatsUsed += 1;
-    await this.licenseRepo.save(lic);
-    return this.findById(licenseId);
+      const existing = await manager.findOne(LicenseSeatAssignment, {
+        where: { licenseId, userId: dto.userId, unassignedAt: IsNull() },
+      });
+      if (existing) {
+        throw new ConflictException(
+          'This user already holds a seat for this license',
+        );
+      }
+
+      const assignment = manager.create(LicenseSeatAssignment, {
+        licenseId,
+        userId: dto.userId,
+      });
+      await manager.save(assignment);
+      lic.seatsUsed += 1;
+      await manager.save(lic);
+    }).then(() => this.findById(licenseId));
   }
 
   async unassign(licenseId: string, assignmentId: string) {

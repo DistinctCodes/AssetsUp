@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -15,6 +16,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { DepartmentsService } from './departments.service';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('departments')
@@ -26,9 +28,9 @@ export class DepartmentsController {
 
   @Get()
   @ApiOperation({ summary: 'List all departments' })
-  @ApiResponse({ status: 200, description: 'List of departments' })
-  findAll() {
-    return this.deptService.findAll();
+  @ApiResponse({ status: 200, description: 'Paginated list of departments' })
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.deptService.findAll(query);
   }
 
   @Post()
