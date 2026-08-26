@@ -121,7 +121,7 @@ export default function ReportsPage() {
             Assets by Category
           </h2>
           {topCategories.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">No data</p>
+            <p className="text-sm text-gray-400 text-center py-6">No data yet</p>
           ) : (
             <div className="space-y-3">
               {topCategories.map(({ name, count }) => {
