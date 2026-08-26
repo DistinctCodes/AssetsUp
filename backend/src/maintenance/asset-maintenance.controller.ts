@@ -1,10 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MaintenanceService } from './maintenance.service';
 import { CreateMaintenanceRecordDto } from './dto/create-maintenance-record.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('assets')
+@ApiBearerAuth('JWT-auth')
 @Controller('assets/:id/maintenance')
+@UseGuards(JwtAuthGuard)
 export class AssetMaintenanceController {
   constructor(private readonly maintenanceService: MaintenanceService) {}
 
