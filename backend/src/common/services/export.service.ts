@@ -75,7 +75,16 @@ export class ExportService {
     }));
 
     for await (const item of dataStream) {
-      worksheet.addRow(item).commit();
+      const safeRow: Record<string, any> = {};
+      for (const col of columns) {
+        const val = item[col.key];
+        if (typeof val === 'string' && /^[=+\-@\t\r]/.test(val)) {
+          safeRow[col.key] = `'${val}`;
+        } else {
+          safeRow[col.key] = val;
+        }
+      }
+      worksheet.addRow(safeRow).commit();
     }
 
     worksheet.commit();
@@ -84,11 +93,18 @@ export class ExportService {
 
   /**
    * Escapes values containing commas, quotes, or newlines according to CSV standards.
+   * Also neutralizes formula injection by prefixing dangerous characters.
    */
   private escapeCsvField(val: any): string {
     if (val === null || val === undefined) return '""';
 
     let str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+
+    // Neutralize formula injection: prefix values starting with =, +, -, @
+    if (/^[=+\-@\t\r]/.test(str)) {
+      str = `'${str}`;
+    }
+
     if (
       str.includes('"') ||
       str.includes(',') ||
