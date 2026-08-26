@@ -51,42 +51,39 @@ test.describe('Maintenance Flow', () => {
 
     // Open new maintenance modal
     await page.click('button:has-text("New Maintenance")');
-    await expect(page.locator('text=New Maintenance Record')).toBeVisible();
+    await expect(page.locator('text=New Maintenance')).toBeVisible();
 
-    // Fill out maintenance form
+    // Fill out maintenance form - use the correct selectors from the modal
     const maintenanceTitle = `Test maintenance for ${assetName}`;
-    await page.fill('#title', maintenanceTitle);
-    await page.fill('#description', 'Regular system update and hardware check');
-    await page.selectOption('#assetId', { index: 1 }); // Select the first available asset
+    await page.fill('#mnt-title', maintenanceTitle);
+    // Select the asset we just created
+    await page.selectOption('select', assetName, { force: true });
     await page.selectOption('#type', 'PREVENTIVE');
-    await page.fill('#scheduledDate', new Date(Date.now() + 86400000).toISOString().split('T')[0]); // Tomorrow
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    await page.fill('#mnt-date', tomorrow);
+    await page.fill('#mnt-cost', '150');
+    await page.fill('#mnt-notes', 'Regular system update and hardware check');
 
     // Submit the form
-    await page.click('button:has-text("Create Maintenance")');
-    await expect(page.locator('text=New Maintenance Record')).not.toBeVisible();
+    await page.click('button:has-text("Schedule")');
+    await expect(page.locator('text=New Maintenance')).not.toBeVisible();
 
     // Verify the maintenance record appears in Scheduled column
     await expect(page.locator(`text=${maintenanceTitle}`).first()).toBeVisible();
-    await expect(page.locator('text=Scheduled')).toBeVisible();
+    // Verify it's in the Scheduled column (first column, which has the label "Scheduled")
+    const scheduledColumn = page.locator('h3:text("Scheduled")').locator('..');
+    await expect(scheduledColumn.locator(`text=${maintenanceTitle}`)).toBeVisible();
 
-    // Drag and drop to Completed column (or find the complete button - let's check the page first, alternatively use the UI to update status)
-    // Wait for the record to be in the list, then find the action to mark as complete
-    const maintenanceRecord = page.locator(`text=${maintenanceTitle}`).first();
-    await expect(maintenanceRecord).toBeVisible();
+    // Drag the card from Scheduled to Completed column using Playwright's dragTo
+    const maintenanceCard = page.locator(`text=${maintenanceTitle}`).first();
+    const completedColumn = page.locator('h3:text("Completed")').locator('..');
+    await maintenanceCard.dragTo(completedColumn);
 
-    // Click on the record to open details or find the complete button (adjust selector based on actual UI)
-    // Alternatively, if there's a "Mark as Complete" button, click that
-    const completeButton = page.locator('button:has-text("Mark as Complete")').first();
-    if (await completeButton.isVisible()) {
-      await completeButton.click();
-    } else {
-      // If using drag and drop, simulate drag from Scheduled to Completed
-      // For simplicity in e2e, we can also verify that after status update, it appears in Completed column
-      await page.waitForTimeout(1000);
-    }
+    // Wait for the drag and drop to complete and the record to move
+    await page.waitForTimeout(1000);
 
-    // Verify the record is now in Completed column
-    await expect(page.locator('text=Completed')).toBeVisible();
-    await expect(page.locator(`text=${maintenanceTitle}`).first()).toBeVisible();
+    // Verify the record is now in the Completed column
+    await expect(completedColumn.locator(`text=${maintenanceTitle}`)).toBeVisible();
+    await expect(scheduledColumn.locator(`text=${maintenanceTitle}`)).not.toBeVisible();
   });
 });
