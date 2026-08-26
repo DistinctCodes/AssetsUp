@@ -61,6 +61,13 @@ export class User {
   @Exclude({ toPlainOnly: true })
   refreshTokenHash?: string;
 
+  @Column({ type: 'text', nullable: true })
+  @Exclude({ toPlainOnly: true })
+  passwordResetToken?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  passwordResetExpires?: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

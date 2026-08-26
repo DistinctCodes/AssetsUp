@@ -4,6 +4,7 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
 
 export enum POStatus {
@@ -12,6 +13,33 @@ export enum POStatus {
   APPROVED = 'APPROVED',
   RECEIVED = 'RECEIVED',
   CANCELLED = 'CANCELLED',
+}
+
+@Entity('purchase_order_line_items')
+export class PurchaseOrderLineItem {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  purchaseOrderId: string;
+
+  @Column()
+  description: string;
+
+  @Column({ type: 'integer', default: 1 })
+  quantity: number;
+
+  @Column({ type: 'integer', default: 0 })
+  unitCost: number;
+
+  @Column({ nullable: true })
+  category?: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }
 
 @Entity('purchase_orders')
@@ -36,6 +64,13 @@ export class PurchaseOrder {
 
   @Column({ nullable: true })
   createdByUserId?: string;
+
+  @OneToMany(
+    () => PurchaseOrderLineItem,
+    (item) => item.purchaseOrderId,
+    { cascade: true },
+  )
+  lineItems?: PurchaseOrderLineItem[];
 
   @CreateDateColumn()
   createdAt: Date;
