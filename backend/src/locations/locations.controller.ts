@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,10 +17,12 @@ import {
 import { LocationsService } from './locations.service';
 import { CreateLocationDto } from './dto/create-location.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('locations')
 @ApiBearerAuth('JWT-auth')
 @Controller('locations')
+@UseGuards(JwtAuthGuard)
 export class LocationsController {
   constructor(private readonly locationsService: LocationsService) {}
 

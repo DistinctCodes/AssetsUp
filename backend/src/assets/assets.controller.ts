@@ -18,6 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
 import { AssetHistoryService } from './asset-history.service';
+import { ReservationsService } from '../reservations/reservations.service';
 import { AssetHistoryAction } from './entities/asset-history-event.entity';
 import { BulkStatusDto } from './dto/bulk-status.dto';
 import { BulkAssignDto } from './dto/bulk-assign.dto';
@@ -37,6 +38,7 @@ export class AssetsController {
   constructor(
     private readonly assetsService: AssetsService,
     private readonly assetHistoryService: AssetHistoryService,
+    private readonly reservationsService: ReservationsService,
   ) {}
 
   @Get()
@@ -161,5 +163,18 @@ export class AssetsController {
   @ApiResponse({ status: 403, description: 'Forbidden — requires ADMIN role' })
   bulkDelete(@Body() dto: BulkDeleteDto, @GetUser() user: User) {
     return this.assetsService.bulkDelete(dto, user.id);
+  }
+
+  @Get(':id/availability')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get asset availability (free/busy windows)' })
+  @ApiResponse({ status: 200, description: 'Availability data' })
+  getAvailability(
+    @Param('id') id: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    return this.reservationsService.getAvailability(id, from, to);
   }
 }

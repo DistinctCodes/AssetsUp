@@ -5,9 +5,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { User, Lock, CheckCircle } from "lucide-react";
+import { User, Lock, CheckCircle, Sun, Moon, Monitor } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { useUpdateProfile } from "@/lib/query/hooks/useUsers";
+import { useTheme } from "@/lib/theme-provider";
 
 // ── Profile schema ──────────────────────────────────────────────
 const profileSchema = z.object({
@@ -30,6 +31,7 @@ type PasswordForm = z.infer<typeof passwordSchema>;
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
+  const { theme, setTheme } = useTheme();
   const updateProfile = useUpdateProfile();
   const [profileSaved, setProfileSaved] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);
@@ -251,6 +253,28 @@ export default function SettingsPage() {
             )}
           </div>
         </form>
+      </div>
+
+      {/* Theme section */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">Appearance</h2>
+        <div className="flex gap-3">
+          {([
+            { value: "light" as const, icon: Sun, label: "Light" },
+            { value: "dark" as const, icon: Moon, label: "Dark" },
+            { value: "system" as const, icon: Monitor, label: "System" },
+          ]).map((opt) => (
+            <button key={opt.value} onClick={() => setTheme(opt.value)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                theme === opt.value
+                  ? "border-gray-900 bg-gray-900 text-white"
+                  : "border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}>
+              <opt.icon className="w-4 h-4" />
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

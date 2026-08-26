@@ -17,6 +17,8 @@ import {
   KeyRound,
   Wrench,
   ClipboardCheck,
+  Store,
+  FileText,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -24,6 +26,8 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/assets", label: "Assets", icon: Package },
   { href: "/locations", label: "Locations", icon: MapPin },
+  { href: "/vendors", label: "Vendors", icon: Store },
+  { href: "/purchase-orders", label: "Purchase Orders", icon: FileText },
   { href: "/maintenance", label: "Maintenance", icon: Wrench },
   { href: "/audits", label: "Audits", icon: ClipboardCheck },
   { href: "/licenses", label: "Licenses", icon: KeyRound },
@@ -144,7 +148,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         aria-label="Main navigation"
         aria-hidden={!open ? "true" : undefined}
         className={clsx(
-          "fixed left-0 top-0 h-full w-60 bg-white border-r border-gray-200 flex flex-col z-30 transition-transform duration-200",
+          "fixed left-0 top-0 h-full w-60 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col z-30 transition-transform duration-200",
           // Safe-area inset for notched devices
           "pb-[env(safe-area-inset-bottom)]",
           "lg:translate-x-0",

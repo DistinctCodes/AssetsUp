@@ -46,7 +46,7 @@ export class AuthService {
   private generateAccessToken(user: AuthUser) {
     const payload = { sub: user.id, email: user.email, role: user.role };
     return this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_SECRET', 'secretKey'),
+      secret: this.configService.get<string>('JWT_SECRET'),
       expiresIn: this.configService.get<string>('JWT_EXPIRATION', '15m') as any,
     });
   }
@@ -54,10 +54,7 @@ export class AuthService {
   private generateRefreshToken(user: AuthUser) {
     const payload = { sub: user.id, email: user.email, type: 'refresh' };
     return this.jwtService.sign(payload, {
-      secret: this.configService.get<string>(
-        'JWT_REFRESH_SECRET',
-        'refreshSecretKey',
-      ),
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: '7d' as any,
     });
   }
@@ -136,10 +133,7 @@ export class AuthService {
   async refreshToken(refreshToken: string) {
     try {
       const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>(
-          'JWT_REFRESH_SECRET',
-          'refreshSecretKey',
-        ),
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
 
       const user = await this.usersService.findById(payload.sub);
@@ -178,7 +172,49 @@ export class AuthService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    // In a full implementation this would queue a reset email.
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = this.hashToken(resetToken);
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.usersService.setPasswordResetToken(
+      user.id,
+      hashedToken,
+      expires,
+    );
+
+    // TODO: send the resetToken via email instead of returning it.
+    // Never return the raw token in production — anyone who knows a user's
+    // email could otherwise call this endpoint and take over the account.
+    if (process.env.NODE_ENV !== 'production') {
+      return {
+        message: 'Password reset instructions sent',
+        resetToken,
+      };
+    }
+
     return { message: 'Password reset instructions sent' };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    if (!token || !newPassword) {
+      throw new BadRequestException('Token and new password are required');
+    }
+
+    const hashedToken = this.hashToken(token);
+    const user = await this.usersService.findByResetToken(hashedToken);
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    if (!user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.usersService.updatePassword(user.id, passwordHash);
+
+    return { message: 'Password reset successfully' };
   }
 }

@@ -149,6 +149,8 @@ export class UsersService {
         throw new BadRequestException('Current password is incorrect');
       }
       user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+      user.passwordResetToken = null;
+      user.passwordResetExpires = null;
     }
 
     const saved = await this.userRepository.save(user);
@@ -168,5 +170,30 @@ export class UsersService {
 
   async setRefreshTokenHash(userId: string, hash: string | null) {
     await this.userRepository.update(userId, { refreshTokenHash: hash });
+  }
+
+  async setPasswordResetToken(
+    userId: string,
+    tokenHash: string,
+    expires: Date,
+  ) {
+    await this.userRepository.update(userId, {
+      passwordResetToken: tokenHash,
+      passwordResetExpires: expires,
+    });
+  }
+
+  async findByResetToken(tokenHash: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { passwordResetToken: tokenHash },
+    });
+  }
+
+  async updatePassword(userId: string, passwordHash: string) {
+    await this.userRepository.update(userId, {
+      passwordHash,
+      passwordResetToken: null,
+      passwordResetExpires: null,
+    });
   }
 }

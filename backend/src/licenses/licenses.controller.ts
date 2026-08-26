@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,10 +18,12 @@ import { LicensesService } from './licenses.service';
 import { CreateLicenseDto } from './dto/create-license.dto';
 import { UpdateLicenseDto } from './dto/update-license.dto';
 import { AssignSeatDto } from './dto/assign-seat.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('licenses')
 @ApiBearerAuth('JWT-auth')
 @Controller('licenses')
+@UseGuards(JwtAuthGuard)
 export class LicensesController {
   constructor(private readonly licensesService: LicensesService) {}
 
