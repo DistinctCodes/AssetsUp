@@ -57,4 +57,14 @@ export const queryKeys = {
     list: () => [...queryKeys.audits.all, 'list'] as const,
     detail: (id: string) => [...queryKeys.audits.all, 'detail', id] as const,
   },
+  vendors: {
+    all: ['vendors'] as const,
+    lists: () => [...queryKeys.vendors.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.vendors.all, 'detail', id] as const,
+  },
+  purchaseOrders: {
+    all: ['purchase-orders'] as const,
+    lists: () => [...queryKeys.purchaseOrders.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.purchaseOrders.all, 'detail', id] as const,
+  },
 } as const;
