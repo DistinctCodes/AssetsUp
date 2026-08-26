@@ -7,6 +7,10 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Track if a refresh is in progress to de-duplicate concurrent refresh requests
+let isRefreshing = false;
+let refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null;
+
 // Attach access token to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
@@ -33,20 +37,45 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      // If a refresh is already in progress, wait for it to complete instead of starting a new one
+      if (isRefreshing && refreshPromise) {
+        try {
+          const tokens = await refreshPromise;
+          original.headers.Authorization = `Bearer ${tokens.accessToken}`;
+          return api(original);
+        } catch {
+          return Promise.reject(error);
+        }
+      }
+
+      // Start a new refresh process
+      isRefreshing = true;
+      refreshPromise = new Promise(async (resolve, reject) => {
+        try {
+          const { data } = await axios.post(
+            `${API_BASE}/auth/refresh`,
+            {},
+            { headers: { Authorization: `Bearer ${refreshToken}` } },
+          );
+          localStorage.setItem('accessToken', data.accessToken);
+          localStorage.setItem('refreshToken', data.refreshToken);
+          resolve({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+        } catch (refreshError) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/login';
+          reject(refreshError);
+        } finally {
+          isRefreshing = false;
+          refreshPromise = null;
+        }
+      });
+
       try {
-        const { data } = await axios.post(
-          `${API_BASE}/auth/refresh`,
-          {},
-          { headers: { Authorization: `Bearer ${refreshToken}` } },
-        );
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
-        original.headers.Authorization = `Bearer ${data.accessToken}`;
+        const tokens = await refreshPromise;
+        original.headers.Authorization = `Bearer ${tokens.accessToken}`;
         return api(original);
       } catch {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
         return Promise.reject(error);
       }
     }

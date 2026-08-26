@@ -67,4 +67,10 @@ export const queryKeys = {
     lists: () => [...queryKeys.purchaseOrders.all, 'list'] as const,
     detail: (id: string) => [...queryKeys.purchaseOrders.all, 'detail', id] as const,
   },
+  transfers: {
+    all: ['transfers'] as const,
+    lists: () => [...queryKeys.transfers.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.transfers.lists(), filters] as const,
+    detail: (id: string) => [...queryKeys.transfers.all, 'detail', id] as const,
+  },
 } as const;
