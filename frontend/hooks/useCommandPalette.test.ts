@@ -55,7 +55,8 @@ describe('useCommandPalette', () => {
   });
 
   it('should toggle the palette when Ctrl+K is pressed', () => {
-    renderHook(() => useCommandPalette());
+    const { result } = renderHook(() => useCommandPalette());
+    expect(result.current.isOpen).toBe(false);
     
     // Dispatch Ctrl+K keydown event
     const ctrlKEvent = new KeyboardEvent('keydown', {
@@ -67,11 +68,11 @@ describe('useCommandPalette', () => {
     
     // Check that preventDefault was called and state toggled
     expect(preventDefaultSpy).toHaveBeenCalled();
-    const { result: { current: { isOpen } } } = renderHook(() => useCommandPalette());
-    // Wait for state update
-    setTimeout(() => {
-      expect(isOpen).toBe(true);
-    }, 0);
+    // Need to act to process the state update from the event listener
+    act(() => {
+      jest.runAllTimers();
+    });
+    expect(result.current.isOpen).toBe(true);
   });
 
   it('should toggle the palette when Cmd+K (Mac) is pressed', () => {
