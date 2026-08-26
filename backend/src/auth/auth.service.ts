@@ -183,11 +183,17 @@ export class AuthService {
       expires,
     );
 
-    // In production, send the resetToken via email
-    return {
-      message: 'Password reset instructions sent',
-      resetToken,
-    };
+    // TODO: send the resetToken via email instead of returning it.
+    // Never return the raw token in production — anyone who knows a user's
+    // email could otherwise call this endpoint and take over the account.
+    if (process.env.NODE_ENV !== 'production') {
+      return {
+        message: 'Password reset instructions sent',
+        resetToken,
+      };
+    }
+
+    return { message: 'Password reset instructions sent' };
   }
 
   async resetPassword(token: string, newPassword: string) {
