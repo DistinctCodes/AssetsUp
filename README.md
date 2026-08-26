@@ -188,3 +188,64 @@ To contribute:
 
 - Include a **deployment section (Docker / CI)**
 - Write a **more enterprise-focused version** for internal tools
+
+## Quickstart with Docker
+
+The fastest way to get the backend running locally with a matching Postgres 16 and Redis 7 (same versions as CI) is via Docker Compose.
+
+### Prerequisites
+
+- Docker and Docker Compose installed
+
+### Run it
+
+```bash
+git clone <repo-url>
+cd AssetsUp
+docker compose up
+```
+
+This brings up three containers:
+
+| Service    | Description                             | Port |
+| ---------- | --------------------------------------- | ---- |
+| `postgres` | Postgres 16, data persisted in a volume | 5432 |
+| `redis`    | Redis 7, data persisted in a volume     | 6379 |
+| `backend`  | NestJS API in watch mode (`start:dev`)  | 3000 |
+
+No manual Postgres/Redis install or configuration is required — the backend
+container is pre-wired with the same env var names used in
+`.github/workflows/backend-ci.yml` (`DB_HOST`, `DB_PORT`, `DB_USERNAME`,
+`DB_PASSWORD`, `DB_NAME`, `REDIS_HOST`, `REDIS_PORT`, `JWT_SECRET`).
+
+The API will be available at `http://localhost:3000` once all three
+containers report healthy.
+
+### Overriding defaults
+
+Create a `.env` file at the repo root to override any default credentials
+before running `docker compose up`:
+
+```bash
+DB_USERNAME=postgres
+DB_PASSWORD=postgrespassword
+DB_NAME=assetsup_dev
+JWT_SECRET=dev-secret-key
+```
+
+### Stopping / resetting
+
+```bash
+docker compose down          # stop containers, keep data
+docker compose down -v       # stop containers and wipe Postgres/Redis volumes
+```
+
+### Building a production image
+
+The backend `Dockerfile` is multi-stage. `docker compose up` builds the
+`development` target (hot reload). To build the production image used for
+deployment:
+
+```bash
+docker build --target production -t assetsup-backend ./backend
+```
