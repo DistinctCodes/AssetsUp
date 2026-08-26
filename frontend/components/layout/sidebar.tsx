@@ -17,8 +17,9 @@ import {
   KeyRound,
   Wrench,
   ClipboardCheck,
-  Store,
+  Bell,
   FileText,
+  Store,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -211,8 +212,21 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           })}
         </nav>
 
-        {/* Bottom: Settings + Logout */}
+        {/* Bottom: Notifications + Settings + Logout */}
         <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
+          <Link
+            href="/notifications"
+            aria-current={pathname === "/notifications" ? "page" : undefined}
+            className={clsx(
+              "flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
+              pathname === "/notifications"
+                ? "bg-gray-100 text-gray-900"
+                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50",
+            )}
+          >
+            <Bell size={17} aria-hidden="true" />
+            Notifications
+          </Link>
           <Link
             href="/settings"
             aria-current={pathname.startsWith("/settings") ? "page" : undefined}
