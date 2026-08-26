@@ -98,7 +98,7 @@ export default function ReportsPage() {
                     <div
                       className={clsx(
                         "h-full rounded-full transition-all",
-                        STATUS_COLORS[status],
+                        STATUS_COLORS[status] ?? "bg-gray-500",
                       )}
                       style={{ width: `${pct}%` }}
                       role="progressbar"
