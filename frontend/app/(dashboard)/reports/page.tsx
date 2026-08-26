@@ -83,35 +83,39 @@ export default function ReportsPage() {
             <BarChart3 size={15} className="text-gray-400" aria-hidden="true" />
             Assets by Status
           </h2>
-          <div className="space-y-3">
-            {statusItems.map(([status, count]) => {
-              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-              return (
-                <div key={status}>
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
-                    <span className="capitalize">{status.toLowerCase()}</span>
-                    <span>
-                      {count} ({pct}%)
-                    </span>
+          {total === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No data yet</p>
+          ) : (
+            <div className="space-y-3">
+              {statusItems.map(([status, count]) => {
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                return (
+                  <div key={status}>
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span className="capitalize">{status.toLowerCase()}</span>
+                      <span>
+                        {count} ({pct}%)
+                      </span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={clsx(
+                          "h-full rounded-full transition-all",
+                          STATUS_COLORS[status] ?? "bg-gray-500",
+                        )}
+                        style={{ width: `${pct}%` }}
+                        role="progressbar"
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${status.toLowerCase()}: ${pct}%`}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={clsx(
-                        "h-full rounded-full transition-all",
-                        STATUS_COLORS[status] ?? "bg-gray-500",
-                      )}
-                      style={{ width: `${pct}%` }}
-                      role="progressbar"
-                      aria-valuenow={pct}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-label={`${status.toLowerCase()}: ${pct}%`}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* By Category */}
