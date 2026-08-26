@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import { api } from '@/lib/api';
 import axios from 'axios';
 
