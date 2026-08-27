@@ -16,6 +16,14 @@ export interface AuditLogQuery {
   limit?: number;
 }
 
+export interface AuditLogListResult {
+  items: AuditLog[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 @Injectable()
 export class AuditLogsService {
   constructor(
@@ -51,12 +59,12 @@ export class AuditLogsService {
     return saved;
   }
 
-  async findAll(query: AuditLogQuery) {
+  async findAll(query: AuditLogQuery): Promise<AuditLogListResult> {
     const page = query.page || 1;
     const limit = query.limit || 20;
     const cacheKey = `audit-logs:list:${JSON.stringify(query)}`;
 
-    const cached = await this.cacheManager.get(cacheKey);
+    const cached = await this.cacheManager.get<AuditLogListResult>(cacheKey);
     if (cached) return cached;
 
     const qb = this.auditLogRepo
@@ -79,7 +87,7 @@ export class AuditLogsService {
     if (query.to) qb.andWhere('log.createdAt <= :to', { to: query.to });
 
     const [items, total] = await qb.getManyAndCount();
-    const result = {
+    const result: AuditLogListResult = {
       items,
       total,
       page,
