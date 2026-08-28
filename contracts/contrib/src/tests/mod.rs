@@ -4,6 +4,11 @@ mod detokenization;
 mod dividends;
 mod tokenization;
 mod voting;
+
+mod escrow;
+mod kyc;
+mod oracle;
+mod staking;
 use crate::{Asset, AssetStatus, ContribContract, ContribContractClient};
 use soroban_sdk::{
     testutils::Address as _, testutils::Events as _, Address, BytesN, Env, String, Symbol,

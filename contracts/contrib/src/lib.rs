@@ -37,6 +37,11 @@ mod types;
 mod insurance;
 mod lease;
 
+mod escrow;
+mod kyc;
+mod oracle;
+mod staking;
+
 #[cfg(test)]
 mod tests;
 
@@ -440,5 +445,108 @@ impl ContribContract {
 
     pub fn get_active_leases(env: Env, asset_id: BytesN<32>) -> Vec<BytesN<32>> {
         lease::get_active_leases(env, asset_id)
+    }
+
+    // --- KYC Functions ---
+
+    pub fn submit_kyc(env: Env, address: Address) {
+        kyc::submit_kyc(env, address);
+    }
+
+    pub fn approve_kyc(env: Env, caller: Address, address: Address, tier: u32, expires_at: u64) {
+        kyc::approve_kyc(env, caller, address, tier, expires_at);
+    }
+
+    pub fn revoke_kyc(env: Env, caller: Address, address: Address) {
+        kyc::revoke_kyc(env, caller, address);
+    }
+
+    pub fn is_kyc_approved(env: Env, address: Address) -> bool {
+        kyc::is_kyc_approved(env, address)
+    }
+
+    pub fn get_kyc_record(env: Env, address: Address) -> kyc::KycRecord {
+        kyc::get_kyc_record(env, address)
+    }
+
+    // --- Oracle Functions ---
+
+    pub fn add_oracle(env: Env, caller: Address, oracle: Address) {
+        oracle::add_oracle(env, caller, oracle);
+    }
+
+    pub fn remove_oracle(env: Env, caller: Address, oracle: Address) {
+        oracle::remove_oracle(env, caller, oracle);
+    }
+
+    pub fn update_valuation(
+        env: Env,
+        source: Address,
+        asset_id: u64,
+        value: i128,
+        currency: String,
+    ) {
+        oracle::update_valuation(env, source, asset_id, value, currency);
+    }
+
+    pub fn get_latest_valuation(env: Env, asset_id: u64) -> oracle::ValuationEntry {
+        oracle::get_latest_valuation(env, asset_id)
+    }
+
+    pub fn get_valuation_history(env: Env, asset_id: u64) -> Vec<oracle::ValuationEntry> {
+        oracle::get_valuation_history(env, asset_id)
+    }
+
+    // --- Staking Functions ---
+
+    pub fn stake_tokens(env: Env, asset_id: u64, staker: Address, amount: i128, lock_period: u64) {
+        staking::stake_tokens(env, asset_id, staker, amount, lock_period);
+    }
+
+    pub fn unstake_tokens(env: Env, asset_id: u64, staker: Address) {
+        staking::unstake_tokens(env, asset_id, staker);
+    }
+
+    pub fn get_staking_power(env: Env, asset_id: u64, staker: Address) -> i128 {
+        staking::get_staking_power(env, asset_id, staker)
+    }
+
+    pub fn accrue_staking_rewards(env: Env, caller: Address, asset_id: u64) {
+        staking::accrue_staking_rewards(env, caller, asset_id);
+    }
+
+    // --- Escrow Functions ---
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_escrow(
+        env: Env,
+        asset_id: u64,
+        seller: Address,
+        buyer: Address,
+        amount: i128,
+        token_address: Address,
+        deadline: u64,
+    ) -> u64 {
+        escrow::create_escrow(
+            env,
+            asset_id,
+            seller,
+            buyer,
+            amount,
+            token_address,
+            deadline,
+        )
+    }
+
+    pub fn confirm_release(env: Env, escrow_id: u64, caller: Address) {
+        escrow::confirm_release(env, escrow_id, caller);
+    }
+
+    pub fn cancel_escrow(env: Env, escrow_id: u64, caller: Address) {
+        escrow::cancel_escrow(env, escrow_id, caller);
+    }
+
+    pub fn get_escrow(env: Env, escrow_id: u64) -> escrow::Escrow {
+        escrow::get_escrow(env, escrow_id)
     }
 }

@@ -4,11 +4,10 @@
 //! are `<Subject><PastTenseVerb>`; the SDK derives topic 0 from the name in
 //! `lower_snake_case`. The primary entity identifier is marked `#[topic]`.
 //!
-//! Only the modules `contrib/src/lib.rs` actually declares are covered here —
-//! `audit`, `pause`, `types`, `insurance`, and `lease`. The other files in
-//! `contrib/src/` are not compiled into the crate; see the crate README.
+//! Covers every module `contrib/src/lib.rs` declares: `audit`, `pause`,
+//! `types`, `insurance`, `lease`, `kyc`, `oracle`, `staking`, and `escrow`.
 
-use soroban_sdk::{contractevent, Address, BytesN, Env};
+use soroban_sdk::{contractevent, Address, BytesN, Env, String};
 
 use crate::insurance::ClaimStatus;
 
@@ -161,6 +160,133 @@ pub struct LeaseCheckedIn {
 pub struct LeaseCancelled {
     #[topic]
     pub lease_id: BytesN<32>,
+    pub caller: Address,
+    pub timestamp: u64,
+}
+
+/// An address submitted itself for KYC review.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KycSubmitted {
+    #[topic]
+    pub address: Address,
+    pub timestamp: u64,
+}
+
+/// The admin approved an address's KYC at a given tier.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KycApproved {
+    #[topic]
+    pub address: Address,
+    pub tier: u32,
+    pub expires_at: u64,
+    pub timestamp: u64,
+}
+
+/// The admin revoked a previously approved KYC record.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KycRevoked {
+    #[topic]
+    pub address: Address,
+    pub caller: Address,
+    pub timestamp: u64,
+}
+
+/// The admin authorized an address to publish valuations.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OracleAdded {
+    #[topic]
+    pub oracle: Address,
+    pub caller: Address,
+    pub timestamp: u64,
+}
+
+/// The admin revoked an address's authorization to publish valuations.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OracleRemoved {
+    #[topic]
+    pub oracle: Address,
+    pub caller: Address,
+    pub timestamp: u64,
+}
+
+/// An authorized oracle published a new valuation for an asset.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValuationUpdated {
+    #[topic]
+    pub asset_id: u64,
+    pub value: i128,
+    pub currency: String,
+    pub source: Address,
+    pub timestamp: u64,
+}
+
+/// A staker locked tokens against an asset.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Staked {
+    #[topic]
+    pub asset_id: u64,
+    pub staker: Address,
+    pub amount: i128,
+    pub timestamp: u64,
+}
+
+/// A staker withdrew their stake after the lock period elapsed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Unstaked {
+    #[topic]
+    pub asset_id: u64,
+    pub staker: Address,
+    pub amount: i128,
+    pub timestamp: u64,
+}
+
+/// The admin distributed staking rewards across an asset's stakers.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StakingRewardsAccrued {
+    #[topic]
+    pub asset_id: u64,
+    pub total_rewards: i128,
+    pub timestamp: u64,
+}
+
+/// A buyer opened an escrow for an asset sale.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EscrowOpened {
+    #[topic]
+    pub escrow_id: u64,
+    pub asset_id: u64,
+    pub seller: Address,
+    pub buyer: Address,
+    pub amount: i128,
+    pub timestamp: u64,
+}
+
+/// The buyer confirmed receipt and released the escrow to the seller.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EscrowReleased {
+    #[topic]
+    pub escrow_id: u64,
+    pub caller: Address,
+    pub timestamp: u64,
+}
+
+/// The escrow was cancelled by the buyer or seller before release.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EscrowCancelled {
+    #[topic]
+    pub escrow_id: u64,
     pub caller: Address,
     pub timestamp: u64,
 }
@@ -324,6 +450,134 @@ pub fn lease_checked_in(env: &Env, lease_id: &BytesN<32>) {
 pub fn lease_cancelled(env: &Env, lease_id: &BytesN<32>, caller: &Address) {
     LeaseCancelled {
         lease_id: lease_id.clone(),
+        caller: caller.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn kyc_submitted(env: &Env, address: &Address) {
+    KycSubmitted {
+        address: address.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn kyc_approved(env: &Env, address: &Address, tier: u32, expires_at: u64) {
+    KycApproved {
+        address: address.clone(),
+        tier,
+        expires_at,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn kyc_revoked(env: &Env, address: &Address, caller: &Address) {
+    KycRevoked {
+        address: address.clone(),
+        caller: caller.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn oracle_added(env: &Env, oracle: &Address, caller: &Address) {
+    OracleAdded {
+        oracle: oracle.clone(),
+        caller: caller.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn oracle_removed(env: &Env, oracle: &Address, caller: &Address) {
+    OracleRemoved {
+        oracle: oracle.clone(),
+        caller: caller.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn valuation_updated(
+    env: &Env,
+    asset_id: u64,
+    value: i128,
+    currency: &String,
+    source: &Address,
+) {
+    ValuationUpdated {
+        asset_id,
+        value,
+        currency: currency.clone(),
+        source: source.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn staked(env: &Env, asset_id: u64, staker: &Address, amount: i128) {
+    Staked {
+        asset_id,
+        staker: staker.clone(),
+        amount,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn unstaked(env: &Env, asset_id: u64, staker: &Address, amount: i128) {
+    Unstaked {
+        asset_id,
+        staker: staker.clone(),
+        amount,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn staking_rewards_accrued(env: &Env, asset_id: u64, total_rewards: i128) {
+    StakingRewardsAccrued {
+        asset_id,
+        total_rewards,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn escrow_opened(
+    env: &Env,
+    escrow_id: u64,
+    asset_id: u64,
+    seller: &Address,
+    buyer: &Address,
+    amount: i128,
+) {
+    EscrowOpened {
+        escrow_id,
+        asset_id,
+        seller: seller.clone(),
+        buyer: buyer.clone(),
+        amount,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn escrow_released(env: &Env, escrow_id: u64, caller: &Address) {
+    EscrowReleased {
+        escrow_id,
+        caller: caller.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn escrow_cancelled(env: &Env, escrow_id: u64, caller: &Address) {
+    EscrowCancelled {
+        escrow_id,
         caller: caller.clone(),
         timestamp: env.ledger().timestamp(),
     }
