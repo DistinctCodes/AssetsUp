@@ -9,7 +9,7 @@ of high-value transfers, escrow and KYC, and on-chain maintenance history.
 | Crate | Directory | Deployable | Responsibility |
 |---|---|---|---|
 | `assetsup` | [`assetsup/`](assetsup/) | yes | Primary asset registry: registration, ownership transfer, tokenization, dividends, voting, leasing, insurance, detokenization. |
-| `contrib` | [`contrib/`](contrib/) | yes | Secondary registry: audit log, emergency pause, insurance, leasing. Most files in this crate are **not compiled** — see below. |
+| `contrib` | [`contrib/`](contrib/) | yes | Secondary registry: audit log, emergency pause, insurance, leasing, KYC, price oracle, staking, escrow. |
 | `multisig-wallet` | [`multisig-wallet/`](multisig-wallet/) | yes | General-purpose *m-of-n* wallet: transaction submission, confirmation, execution, owner/threshold governance, emergency freeze. |
 | `multisig-transfer` | [`multisig-transfer/`](multisig-transfer/) | yes | Approval workflow for asset transfers, gated on per-category approval rules. Calls into a registry contract to move ownership. |
 | `asset-maintenance` | [`asset-maintenance/`](asset-maintenance/) | yes | On-chain maintenance history, schedules, warranties, provider registry, and alerts. |
@@ -25,8 +25,7 @@ emitted events, and error list. Start there.
 ## How `assetsup` and `contrib` relate
 
 This is the most common source of confusion in the workspace, because the two
-crates share several module names (`audit`, `detokenization`, `insurance`,
-`lease`, `tokenization`, and transfer restrictions).
+crates share several module names (`audit`, `insurance`, `lease`).
 
 They are **two independent contracts, deployed separately, with separate
 storage**. Neither reads the other's state. The overlap is duplicated code, not
@@ -35,25 +34,27 @@ a shared library:
 - **`assetsup` is the authoritative asset registry.** It is the larger crate
   (~8,900 lines), it is the one the backend is expected to treat as the source
   of truth for asset identity and ownership, and it is the only one with
-  dividends, voting, and detokenization proposals wired to a token supply.
+  tokenization, dividends, voting, detokenization, and transfer restrictions.
 - **`contrib` is a second, smaller registry** with an audit log, an emergency
-  pause, insurance, and leasing.
+  pause, insurance, leasing, KYC, a price oracle, staking, and escrow.
 
 Where a module name appears in both, the implementations have diverged and are
 not interchangeable. `assetsup::insurance` models policies and claims with a
 full claim state machine; `contrib::insurance` is a smaller policy/claim store.
 The same holds for `lease` and `audit`.
 
-> **`contrib` is mostly dead code.** `contrib/src/lib.rs` declares only
-> `audit`, `pause`, `types`, `insurance`, and `lease`. The other files in
-> `contrib/src/` — escrow, KYC, staking, oracle, tokenization, detokenization,
-> transfer restrictions, and its `error.rs` — have no `mod` declaration and are
-> **not compiled into the crate**, about 1,670 lines in total. So the deployed
-> `ContribContract` has no escrow, no KYC, no staking, no oracle, and no typed
-> errors, despite the source files being present. See
-> [`contrib/README.md`](contrib/README.md) before relying on any of them.
+`contrib` used to carry ~1,670 lines of source that had no `mod` declaration
+and were never compiled — including a `tokenization.rs` that duplicated
+`assetsup`'s and did not even parse. [SC-57] resolved that: the genuine
+duplicates (tokenization, detokenization, transfer restrictions, and the
+`error.rs` that only served them) were deleted from `contrib` in favor of
+`assetsup`'s versions, and the remaining files (KYC, oracle, staking, escrow —
+capability `assetsup` doesn't have) were rewritten to fit the crate's module
+conventions and wired into `ContribContract`. Every file in `contrib/src/` now
+compiles; see [`contrib/README.md`](contrib/README.md) for its entrypoints.
 
-Resolving this duplication — deciding which crate owns each concern — is
+Deduplicating the module names that still legitimately appear in both crates
+(`audit`, `insurance`, `lease`) — deciding which one owns each concern — is
 tracked in [SC-46]. Until that lands, treat the two as separate contracts and
 consult the per-crate README for the behaviour of the specific one you are
 calling.
