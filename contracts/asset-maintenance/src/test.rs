@@ -182,3 +182,82 @@ fn test_alerts_and_stats() {
 
     assert!(!client.is_maintenance_cost_excessive(&asset_id, &1000));
 }
+
+#[test]
+fn test_aggregate_functions_empty_history() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(AssetMaintenanceContract, ());
+    let client = AssetMaintenanceContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let registry = Address::generate(&env);
+    client.init(&admin, &registry);
+
+    let asset_id = 98u64;
+
+    // A brand-new asset with zero maintenance records must not trap and must
+    // return the sane defaults (0 cost, 0 downtime, a defined health score).
+    assert_eq!(client.calculate_total_maintenance_cost(&asset_id), 0);
+    assert_eq!(client.calculate_asset_downtime(&asset_id), 0);
+    assert_eq!(client.get_asset_health_score(&asset_id), 100);
+}
+
+#[test]
+fn test_aggregate_functions_single_record() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(AssetMaintenanceContract, ());
+    let client = AssetMaintenanceContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let registry = Address::generate(&env);
+    client.init(&admin, &registry);
+
+    let provider_addr = Address::generate(&env);
+    let provider = ProviderProfile {
+        address: provider_addr.clone(),
+        name: String::from_str(&env, "Service Corp"),
+        specialization: vec![&env, String::from_str(&env, "Engines")],
+        certification_details: String::from_str(&env, "ISO9001"),
+        total_services: 0,
+        average_rating: 0,
+        registration_timestamp: env.ledger().timestamp(),
+        is_active: true,
+        contact_hash: String::from_str(&env, "hash"),
+        service_area: String::from_str(&env, "Global"),
+    };
+    client.register_provider(&provider);
+
+    let asset_id = 99u64;
+    let record = MaintenanceRecord {
+        record_id: 1,
+        asset_id,
+        maintenance_type: MaintenanceType::Preventive,
+        provider: provider_addr.clone(),
+        technician_id: String::from_str(&env, "TECH-01"),
+        service_date: env.ledger().timestamp(),
+        duration_hours: 4,
+        description: String::from_str(&env, "Regular Checkup"),
+        parts_replaced: vec![&env, String::from_str(&env, "Filter")],
+        labor_cost: 100,
+        parts_cost: 50,
+        total_cost: 150,
+        location: String::from_str(&env, "Main Shop"),
+        condition_before: 7,
+        condition_after: 9,
+        issues_found: String::from_str(&env, "None"),
+        issues_resolved: String::from_str(&env, "N/A"),
+        next_recommendation: String::from_str(&env, "Check in 6 months"),
+        documents_ipfs: vec![&env, String::from_str(&env, "ipfs://abc")],
+        quality_rating: 10,
+        timestamp: env.ledger().timestamp(),
+    };
+    client.add_maintenance_record(&record);
+
+    assert_eq!(client.calculate_total_maintenance_cost(&asset_id), 150);
+    assert_eq!(client.calculate_asset_downtime(&asset_id), 4);
+    assert_eq!(client.get_asset_health_score(&asset_id), 75);
+}
