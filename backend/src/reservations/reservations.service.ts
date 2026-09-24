@@ -136,6 +136,7 @@ export class ReservationsService {
     id: string,
     userId: string,
     role: string,
+    reason?: string,
   ): Promise<Reservation> {
     const reservation = await this.reservationRepo.findOneBy({ id });
     if (!reservation) {
@@ -162,6 +163,7 @@ export class ReservationsService {
     }
 
     reservation.status = 'CANCELLED';
+    reservation.cancellationReason = reason || null;
     return this.reservationRepo.save(reservation);
   }
 
