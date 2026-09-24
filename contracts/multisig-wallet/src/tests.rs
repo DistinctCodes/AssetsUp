@@ -148,7 +148,8 @@ fn test_owner_profile_reflects_confirmation_activity() {
     );
 
     // confirm_transaction bumps the confirmer's profile on the write path.
-    assert!(client.confirm_transaction(&owner1, &tx_id).is_ok());
+    // (panics on failure rather than returning Result, so a bare call is the assertion)
+    client.confirm_transaction(&owner1, &tx_id);
 
     let after = client.get_owner_profile(&owner1).unwrap();
     assert_eq!(after.total_confirmations, 1);
