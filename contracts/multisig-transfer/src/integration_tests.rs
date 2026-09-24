@@ -367,3 +367,191 @@ fn two_assets_are_governed_independently() {
         "an unrelated asset must be untouched"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Flow 5: [SC-73] cancel/reject are guarded by the request state machine
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cancel_after_execution_is_rejected() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 1, 1);
+
+    let asset_id = f.register_governed_asset(31);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+
+    f.multisig
+        .approve_transfer_request(&f.approvers.get(0).unwrap(), &request_id);
+    f.multisig.execute_transfer(&f.admin, &request_id);
+
+    assert!(
+        f.multisig
+            .try_cancel_transfer_request(&f.multisig_address, &request_id)
+            .is_err(),
+        "an executed request cannot be cancelled"
+    );
+    assert_eq!(f.registry.get_asset(&asset_id).owner, recipient);
+}
+
+#[test]
+fn reject_after_execution_is_rejected() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 1, 1);
+
+    let asset_id = f.register_governed_asset(32);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+
+    f.multisig
+        .approve_transfer_request(&f.approvers.get(0).unwrap(), &request_id);
+    f.multisig.execute_transfer(&f.admin, &request_id);
+
+    assert!(
+        f.multisig
+            .try_reject_transfer_request(
+                &f.approvers.get(0).unwrap(),
+                &request_id,
+                &BytesN::from_array(&env, &[0u8; 32]),
+            )
+            .is_err(),
+        "an executed request cannot be rejected"
+    );
+    assert_eq!(f.registry.get_asset(&asset_id).owner, recipient);
+}
+
+#[test]
+fn double_cancel_is_rejected() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 1, 1);
+
+    let asset_id = f.register_governed_asset(33);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+
+    f.multisig
+        .cancel_transfer_request(&f.multisig_address, &request_id);
+    assert!(
+        f.multisig
+            .try_cancel_transfer_request(&f.multisig_address, &request_id)
+            .is_err(),
+        "a cancelled request cannot be cancelled again"
+    );
+}
+
+#[test]
+fn double_reject_is_rejected() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 1, 1);
+
+    let asset_id = f.register_governed_asset(34);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+
+    f.multisig.reject_transfer_request(
+        &f.approvers.get(0).unwrap(),
+        &request_id,
+        &BytesN::from_array(&env, &[0u8; 32]),
+    );
+    assert!(
+        f.multisig
+            .try_reject_transfer_request(
+                &f.approvers.get(0).unwrap(),
+                &request_id,
+                &BytesN::from_array(&env, &[0u8; 32]),
+            )
+            .is_err(),
+        "a rejected request cannot be rejected again"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Flow 6: [SC-72] approval-rule configuration edge cases
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_zero_approver_rule_is_rejected() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 1, 1);
+
+    let zero_rule = ApprovalRule {
+        category: category(&env),
+        required_approvals: 0,
+        approvers: f.approvers.clone(),
+        approval_timeout_secs: 86_400,
+        auto_approve: false,
+        priority: 1,
+    };
+
+    assert!(
+        f.multisig
+            .try_configure_approval_rule(&f.admin, &zero_rule)
+            .is_err(),
+        "a rule that requires zero approvers is meaningless and must be rejected"
+    );
+}
+
+#[test]
+fn a_request_for_an_unconfigured_category_is_rejected() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 1, 1);
+
+    let asset_id = f.register_governed_asset(35);
+    let recipient = Address::generate(&env);
+    let unconfigured_category = BytesN::from_array(&env, &[43u8; 32]);
+
+    let result = f.multisig.try_create_transfer_request(
+        &f.multisig_address,
+        &asset_id,
+        &unconfigured_category,
+        &recipient,
+        &BytesN::from_array(&env, &[0u8; 32]),
+        &(env.ledger().timestamp() + 100_000),
+        &None,
+    );
+
+    assert!(
+        result.is_err(),
+        "a category with no configured approval rule must be rejected (RuleNotFound)"
+    );
+}
+
+#[test]
+fn reconfiguring_a_rule_does_not_change_a_pending_request_s_requirement() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 2, 2);
+
+    let asset_id = f.register_governed_asset(36);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+
+    // The pending request snapshot requires 2 approvals.
+    assert_eq!(f.multisig.get_request(&request_id).required_approvals, 2);
+
+    // Reconfigure the live rule to require 3 approvals.
+    f.multisig.configure_approval_rule(
+        &f.admin,
+        &ApprovalRule {
+            category: category(&env),
+            required_approvals: 3,
+            approvers: f.approvers.clone(),
+            approval_timeout_secs: 86_400,
+            auto_approve: false,
+            priority: 1,
+        },
+    );
+
+    // The pending request still confirms against its 2-approval snapshot,
+    // so two approvals are enough to move ownership.
+    f.multisig
+        .approve_transfer_request(&f.approvers.get(0).unwrap(), &request_id);
+    f.multisig
+        .approve_transfer_request(&f.approvers.get(1).unwrap(), &request_id);
+    f.multisig.execute_transfer(&f.admin, &request_id);
+
+    assert_eq!(
+        f.registry.get_asset(&asset_id).owner,
+        recipient,
+        "ownership must move at the snapshot threshold, not the new rule"
+    );
+}

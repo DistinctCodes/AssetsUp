@@ -24,13 +24,7 @@ mod insurance;
 mod integration_full;
 
 // Legacy test modules (if still needed)
-mod detokenization_new;
-mod dividends_new;
-mod insurance_new;
 mod integration;
-mod tokenization_new;
-mod transfer_restrictions_new;
-mod voting_new;
 
 // Storage TTL policy tests
 mod ttl;

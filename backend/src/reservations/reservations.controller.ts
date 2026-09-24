@@ -65,11 +65,15 @@ export class ReservationsController {
   }
 
   @Patch(':id/cancel')
-  @ApiOperation({ summary: 'Cancel a reservation' })
+  @ApiOperation({ summary: 'Cancel a reservation with an optional reason' })
   @ApiResponse({ status: 200, description: 'Reservation cancelled' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  cancel(@Param('id') id: string, @GetUser() user: User) {
-    return this.reservationsService.cancel(id, user.id, user.role);
+  cancel(
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+    @GetUser() user: User,
+  ) {
+    return this.reservationsService.cancel(id, user.id, user.role, body?.reason);
   }
 
   @Patch(':id/confirm')

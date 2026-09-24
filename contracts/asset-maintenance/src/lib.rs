@@ -445,6 +445,10 @@ impl AssetMaintenanceContract {
     pub fn file_warranty_claim(env: Env, asset_id: u64, claim_amount: i128) {
         Self::require_admin(&env);
 
+        if claim_amount <= 0 {
+            panic!("claim amount must be positive");
+        }
+
         let mut warranty: WarrantyInfo = env
             .storage()
             .persistent()
@@ -493,16 +497,21 @@ impl AssetMaintenanceContract {
             .get(&DataKey::Alerts(asset_id))
             .expect("no alerts found");
 
-        if let Some(mut alert) = alerts.get(alert_index) {
-            alert.acknowledged = true;
-            alert.acknowledged_by = by.clone();
-            alerts.set(alert_index, alert);
-            env.storage()
-                .persistent()
-                .set(&DataKey::Alerts(asset_id), &alerts);
-
-            events::alert_acknowledged(&env, asset_id, alert_index, &by);
+        if alert_index >= alerts.len() {
+            panic!("alert index out of bounds");
         }
+
+        let mut alert = alerts
+            .get(alert_index)
+            .expect("alert index bound check passed");
+        alert.acknowledged = true;
+        alert.acknowledged_by = by.clone();
+        alerts.set(alert_index, alert);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Alerts(asset_id), &alerts);
+
+        events::alert_acknowledged(&env, asset_id, alert_index, &by);
     }
 
     pub fn get_alerts(env: Env, asset_id: u64) -> Vec<MaintenanceAlert> {

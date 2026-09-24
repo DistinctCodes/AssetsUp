@@ -852,14 +852,18 @@ fn acknowledging_an_alert_marks_it_and_records_who() {
 }
 
 #[test]
-fn acknowledging_an_out_of_range_alert_index_is_a_no_op() {
+fn acknowledging_an_out_of_range_alert_index_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
     ctx.client.create_maintenance_alert(&alert(&env, 7));
 
-    ctx.client
-        .acknowledge_maintenance_alert(&7, &99, &Address::generate(&env));
-
+    // [SC-69]: an out-of-bounds index must be rejected with a typed panic,
+    // not silently accepted (nor allowed to index the vector unchecked).
+    assert!(ctx
+        .client
+        .try_acknowledge_maintenance_alert(&7, &99, &Address::generate(&env))
+        .is_err());
+    // The failed call acknowledged nothing.
     assert!(!ctx.client.get_alerts(&7).get(0).unwrap().acknowledged);
 }
 

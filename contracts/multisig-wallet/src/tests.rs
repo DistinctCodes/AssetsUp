@@ -114,3 +114,44 @@ fn test_emergency_freeze() {
     );
     assert!(res.is_err());
 }
+
+#[test]
+fn test_owner_profile_reflects_confirmation_activity() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(MultisigWallet, ());
+    let client = MultisigWalletClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let owner1 = Address::generate(&env);
+    let owner2 = Address::generate(&env);
+    let owners = Vec::from_array(&env, [owner1.clone(), owner2.clone()]);
+    let threshold = 2;
+
+    client.initialize(&admin, &owners, &threshold);
+
+    // initialize() registers a zeroed profile for every owner.
+    let initial = client.get_owner_profile(&owner1).unwrap();
+    assert_eq!(initial.total_confirmations, 0);
+    assert!(initial.is_active);
+    assert_eq!(initial.owner_type, OwnerType::Primary);
+
+    let target = Address::generate(&env);
+    let tx_id = client.submit_transaction(
+        &owner1,
+        &TransactionType::Routine,
+        &target,
+        &Symbol::new(&env, "some_function"),
+        &Vec::new(&env),
+        &3600,
+        &0,
+    );
+
+    // confirm_transaction bumps the confirmer's profile on the write path.
+    // (panics on failure rather than returning Result, so a bare call is the assertion)
+    client.confirm_transaction(&owner1, &tx_id);
+
+    let after = client.get_owner_profile(&owner1).unwrap();
+    assert_eq!(after.total_confirmations, 1);
+    assert!(after.last_activity >= initial.last_activity);
+}
