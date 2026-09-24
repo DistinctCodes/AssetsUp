@@ -36,6 +36,8 @@ mod approvals;
 mod auth_tests;
 mod errors;
 mod events;
+#[cfg(test)]
+mod integration_tests;
 mod registry;
 mod rules;
 mod storage;
@@ -82,6 +84,10 @@ impl MultiSigTransferContract {
         caller.require_auth();
         utils::require_admin(&e, &caller)?;
 
+        if rule.required_approvals == 0 {
+            return Err(MultiSigError::InvalidThreshold);
+        }
+
         let mut rules_map = storage::rules_map(&e);
         rules_map.set(rule.category.clone(), rule.clone());
         storage::set_rules_map(&e, &rules_map);
@@ -107,7 +113,7 @@ impl MultiSigTransferContract {
         // The ownership check below compares the registry's owner against a
         // caller-supplied address; authenticate it first.
         caller.require_auth();
-        let (_admin, registry_addr) = utils::require_init(&e)?;
+        let (admin, registry_addr) = utils::require_init(&e)?;
 
         if caller == new_owner {
             return Err(MultiSigError::InvalidNewOwner);
@@ -129,9 +135,11 @@ impl MultiSigTransferContract {
             return Err(MultiSigError::PendingRequestExists);
         }
 
-        // initiator must be owner OR admin (registry owner check omitted here due to stub)
-        // when wired: compare registry::get_owner(...)
-        // if caller != owner && caller != admin => Unauthorized
+        // initiator must be owner OR admin
+        let owner = registry::get_owner(&e, &registry_addr, &asset_id)?;
+        if caller != owner && caller != admin {
+            return Err(MultiSigError::Unauthorized);
+        }
 
         let rule = rules::get_rule(&e, &asset_category)?;
         let now = utils::now(&e);

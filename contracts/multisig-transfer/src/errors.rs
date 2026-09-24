@@ -52,6 +52,8 @@ pub enum MultiSigError {
     CannotApproveOwnRequest = 422,
     /// This approver has already approved this request.
     AlreadyApproved = 423,
+    /// An approval rule must require at least one approver.
+    InvalidThreshold = 424,
 
     // ---------------------------------------------------------------
     // Registry interaction: 440–449
