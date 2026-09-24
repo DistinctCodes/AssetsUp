@@ -1,11 +1,29 @@
-import { Controller, Get, Post, Param, Body, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, UseGuards, BadRequestException } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
   ApiResponse,
-} from '@nestjs/swagger';
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+const ALLOWED_MIME_TYPES = new Set<string>([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'text/plain',
+  'text/csv',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
+
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 @ApiTags('assets')
 @ApiBearerAuth('JWT-auth')
@@ -64,6 +82,21 @@ export class NotesDocsController {
     },
     @Req() req: any,
   ) {
+    if (!body.title || !body.fileUrl) {
+      throw new BadRequestException('title and fileUrl are required');
+    }
+    if (body.fileType && !ALLOWED_MIME_TYPES.has(body.fileType)) {
+      throw new BadRequestException(
+        `File type "${body.fileType}" is not allowed`,
+      );
+    }
+    if (
+      body.fileSizeBytes != null &&
+      body.fileSizeBytes > MAX_FILE_SIZE_BYTES
+    ) {
+      throw new BadRequestException('File exceeds the maximum allowed size of 10 MB');
+    }
+
     const list = this.docs.get(assetId) || [];
     const doc = {
       id: `d_${Date.now()}`,

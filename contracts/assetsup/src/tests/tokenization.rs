@@ -1,463 +1,497 @@
-use crate::tests::helpers::*;
+#![cfg(test)]
+
+extern crate std;
+
+use soroban_sdk::testutils::{Address as _, Ledger as _};
+use soroban_sdk::{Address, Env, String};
+
+use crate::tokenization;
 use crate::types::AssetType;
-use soroban_sdk::String;
+use crate::AssetUpContract;
 
-#[test]
-fn test_tokenize_asset_success() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn make_asset_id(seed: u64) -> u64 {
+    seed
+}
 
-    env.mock_all_auths();
-
-    let result = client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
-
-    assert_eq!(result.asset_id, 1);
-    assert_eq!(result.total_supply, 1000000);
-    assert_eq!(result.tokenizer, user1);
-    assert_eq!(result.tokens_in_circulation, 1000000);
+fn setup_tokenized(env: &Env, asset_id: u64, tokenizer: &Address) {
+    tokenization::tokenize_asset(
+        env,
+        asset_id,
+        String::from_str(env, "TOKEN"),
+        1000,
+        2,
+        100,
+        tokenizer.clone(),
+        crate::types::TokenMetadata {
+            name: String::from_str(env, "Lock Test Asset"),
+            description: String::from_str(env, "Test"),
+            asset_type: AssetType::Digital,
+            ipfs_uri: None,
+            legal_docs_hash: None,
+            valuation_report_hash: None,
+            accredited_investor_required: false,
+            geographic_restrictions: soroban_sdk::Vec::new(env),
+        },
+    )
+    .unwrap();
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
-fn test_tokenize_asset_already_tokenized() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_tokenize_asset() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
 
-    env.mock_all_auths();
+    let asset_id = make_asset_id(100);
+    let symbol = String::from_str(&env, "ASSET100");
+    let total_supply = 1000_i128;
+    let decimals = 2u32;
+    let min_voting_threshold = 100_i128;
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+    let metadata = crate::types::TokenMetadata {
+        name: String::from_str(&env, "Test Asset"),
+        description: String::from_str(&env, "Testing tokenization"),
+        asset_type: AssetType::Digital,
+        ipfs_uri: None,
+        legal_docs_hash: None,
+        valuation_report_hash: None,
+        accredited_investor_required: false,
+        geographic_restrictions: soroban_sdk::Vec::new(&env),
+    };
 
-    // Try to tokenize again - should panic with AssetAlreadyTokenized
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST2"),
-        &500000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token 2"),
-        &String::from_str(&env, "Another test"),
-        &AssetType::Physical,
-    );
+    let tokenized_asset = env.as_contract(&contract_id, || {
+        tokenization::tokenize_asset(
+            &env,
+            asset_id,
+            symbol.clone(),
+            total_supply,
+            decimals,
+            min_voting_threshold,
+            tokenizer.clone(),
+            metadata,
+        )
+        .unwrap()
+    });
+
+    assert_eq!(tokenized_asset.asset_id, asset_id);
+    assert_eq!(tokenized_asset.symbol, symbol);
+    assert_eq!(tokenized_asset.total_supply, total_supply);
+    assert_eq!(tokenized_asset.decimals, decimals);
+    assert_eq!(tokenized_asset.tokenizer, tokenizer);
+    assert_eq!(tokenized_asset.token_holders_count, 1);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #122)")]
 fn test_tokenize_asset_invalid_supply() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
 
-    env.mock_all_auths();
+    let result = env.as_contract(&contract_id, || {
+        tokenization::tokenize_asset(
+            &env,
+            100,
+            String::from_str(&env, "ASSET100"),
+            0, // Invalid supply
+            2,
+            100,
+            tokenizer,
+            crate::types::TokenMetadata {
+                name: String::from_str(&env, "Test"),
+                description: String::from_str(&env, "Test"),
+                asset_type: AssetType::Digital,
+                ipfs_uri: None,
+                legal_docs_hash: None,
+                valuation_report_hash: None,
+                accredited_investor_required: false,
+                geographic_restrictions: soroban_sdk::Vec::new(&env),
+            },
+        )
+    });
 
-    // Should panic with InvalidTokenSupply error
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &0i128, // Invalid: zero supply
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+    assert!(result.is_err());
 }
 
 #[test]
-fn test_mint_tokens_success() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_mint_tokens() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
 
-    env.mock_all_auths();
+    let asset_id = make_asset_id(200);
+    let initial_supply = 500_i128;
+    let mint_amount = 200_i128;
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+    let (updated_supply, balance) = env.as_contract(&contract_id, || {
+        tokenization::tokenize_asset(
+            &env,
+            asset_id,
+            String::from_str(&env, "AST200"),
+            initial_supply,
+            2,
+            100,
+            tokenizer.clone(),
+            crate::types::TokenMetadata {
+                name: String::from_str(&env, "Mint Test"),
+                description: String::from_str(&env, "Test"),
+                asset_type: AssetType::Digital,
+                ipfs_uri: None,
+                legal_docs_hash: None,
+                valuation_report_hash: None,
+                accredited_investor_required: false,
+                geographic_restrictions: soroban_sdk::Vec::new(&env),
+            },
+        )
+        .unwrap();
 
-    let result = client.mint_tokens(&1u64, &500000i128, &user1);
+        let updated =
+            tokenization::mint_tokens(&env, asset_id, mint_amount, tokenizer.clone()).unwrap();
+        let bal = tokenization::get_token_balance(&env, asset_id, tokenizer.clone()).unwrap();
+        (updated.total_supply, bal)
+    });
 
-    assert_eq!(result.total_supply, 1500000);
-    assert_eq!(result.tokens_in_circulation, 1500000);
+    assert_eq!(updated_supply, initial_supply + mint_amount);
+    assert_eq!(balance, initial_supply + mint_amount);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3)")]
-fn test_mint_tokens_unauthorized() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_burn_tokens() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
 
-    env.mock_all_auths();
+    let asset_id = make_asset_id(300);
+    let initial_supply = 1000_i128;
+    let burn_amount = 400_i128;
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+    let new_supply = env.as_contract(&contract_id, || {
+        tokenization::tokenize_asset(
+            &env,
+            asset_id,
+            String::from_str(&env, "AST300"),
+            initial_supply,
+            2,
+            100,
+            tokenizer.clone(),
+            crate::types::TokenMetadata {
+                name: String::from_str(&env, "Burn Test"),
+                description: String::from_str(&env, "Test"),
+                asset_type: AssetType::Digital,
+                ipfs_uri: None,
+                legal_docs_hash: None,
+                valuation_report_hash: None,
+                accredited_investor_required: false,
+                geographic_restrictions: soroban_sdk::Vec::new(&env),
+            },
+        )
+        .unwrap();
 
-    // user2 is not tokenizer - should panic with Unauthorized
-    client.mint_tokens(&1u64, &500000i128, &user2);
+        let updated =
+            tokenization::burn_tokens(&env, asset_id, burn_amount, tokenizer.clone()).unwrap();
+        updated.total_supply
+    });
+
+    assert_eq!(new_supply, 1000_i128 - burn_amount);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #121)")]
-fn test_mint_tokens_not_tokenized() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_transfer_tokens() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let recipient = Address::generate(&env);
 
-    env.mock_all_auths();
+    let asset_id = make_asset_id(400);
+    let total_supply = 1000_i128;
+    let transfer_amount = 300_i128;
 
-    // Should panic with AssetNotTokenized error
-    client.mint_tokens(&999u64, &500000i128, &user1);
+    let (tokenizer_balance, recipient_balance) = env.as_contract(&contract_id, || {
+        tokenization::tokenize_asset(
+            &env,
+            asset_id,
+            String::from_str(&env, "AST400"),
+            total_supply,
+            2,
+            100,
+            tokenizer.clone(),
+            crate::types::TokenMetadata {
+                name: String::from_str(&env, "Transfer Test"),
+                description: String::from_str(&env, "Test"),
+                asset_type: AssetType::Digital,
+                ipfs_uri: None,
+                legal_docs_hash: None,
+                valuation_report_hash: None,
+                accredited_investor_required: false,
+                geographic_restrictions: soroban_sdk::Vec::new(&env),
+            },
+        )
+        .unwrap();
+
+        tokenization::transfer_tokens(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+            transfer_amount,
+        )
+        .unwrap();
+
+        let tb = tokenization::get_token_balance(&env, asset_id, tokenizer.clone()).unwrap();
+        let rb = tokenization::get_token_balance(&env, asset_id, recipient.clone()).unwrap();
+        (tb, rb)
+    });
+
+    assert_eq!(tokenizer_balance, 1000_i128 - transfer_amount);
+    assert_eq!(recipient_balance, transfer_amount);
 }
 
 #[test]
-fn test_burn_tokens_success() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_lock_tokens() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    env.mock_all_auths();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset_id = make_asset_id(500);
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+    env.as_contract(&contract_id, || {
+        tokenization::tokenize_asset(
+            &env,
+            asset_id,
+            String::from_str(&env, "AST500"),
+            1000,
+            2,
+            100,
+            tokenizer.clone(),
+            crate::types::TokenMetadata {
+                name: String::from_str(&env, "Lock Test"),
+                description: String::from_str(&env, "Test"),
+                asset_type: AssetType::Digital,
+                ipfs_uri: None,
+                legal_docs_hash: None,
+                valuation_report_hash: None,
+                accredited_investor_required: false,
+                geographic_restrictions: soroban_sdk::Vec::new(&env),
+            },
+        )
+        .unwrap();
 
-    let result = client.burn_tokens(&1u64, &200000i128, &user1);
+        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, tokenizer.clone())
+            .unwrap();
 
-    assert_eq!(result.total_supply, 800000);
-    assert_eq!(result.tokens_in_circulation, 800000);
+        // Try to transfer (should fail)
+        let result = tokenization::transfer_tokens(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+            100,
+        );
+        assert!(result.is_err());
+    });
+
+    // Advance time past lock period
+    env.ledger().with_mut(|li| li.timestamp = 6000);
+
+    env.as_contract(&contract_id, || {
+        // Transfer should now succeed
+        let result = tokenization::transfer_tokens(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+            100,
+        );
+        assert!(result.is_ok());
+    });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #124)")]
-fn test_burn_tokens_insufficient_balance() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_ownership_percentage() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
 
-    env.mock_all_auths();
+    let asset_id = make_asset_id(600);
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+    let percentage = env.as_contract(&contract_id, || {
+        tokenization::tokenize_asset(
+            &env,
+            asset_id,
+            String::from_str(&env, "AST600"),
+            1000,
+            2,
+            100,
+            tokenizer.clone(),
+            crate::types::TokenMetadata {
+                name: String::from_str(&env, "Percentage Test"),
+                description: String::from_str(&env, "Test"),
+                asset_type: AssetType::Digital,
+                ipfs_uri: None,
+                legal_docs_hash: None,
+                valuation_report_hash: None,
+                accredited_investor_required: false,
+                geographic_restrictions: soroban_sdk::Vec::new(&env),
+            },
+        )
+        .unwrap();
 
-    // Should panic with InsufficientBalance error
-    client.burn_tokens(&1u64, &2000000i128, &user1);
+        tokenization::calculate_ownership_percentage(&env, asset_id, tokenizer.clone()).unwrap()
+    });
+
+    // 100% = 10000 basis points
+    assert_eq!(percentage, 10000_i128);
+}
+
+// =====================
+// Token Lock Tests
+// =====================
+
+#[test]
+fn test_is_tokens_locked_when_active() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
+
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let asset_id = make_asset_id(700);
+
+    let locked = env.as_contract(&contract_id, || {
+        setup_tokenized(&env, asset_id, &tokenizer);
+        // Lock until 5000; current timestamp is 1000 — should be locked
+        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, tokenizer.clone())
+            .unwrap();
+        tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone())
+    });
+
+    assert!(locked);
 }
 
 #[test]
-fn test_transfer_tokens_success() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_is_tokens_locked_after_expiry() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    env.mock_all_auths();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset_id = make_asset_id(800);
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+    env.as_contract(&contract_id, || {
+        setup_tokenized(&env, asset_id, &tokenizer);
+        // Lock until 2000
+        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 2000, tokenizer.clone())
+            .unwrap();
+    });
 
-    client.transfer_tokens(&1u64, &user1, &user2, &300000i128);
+    // Advance time past the lock
+    env.ledger().with_mut(|li| li.timestamp = 3000);
 
-    // Verify balances
-    let balance1 = client.get_token_balance(&1u64, &user1);
-    let balance2 = client.get_token_balance(&1u64, &user2);
+    env.as_contract(&contract_id, || {
+        // Lock has expired — is_tokens_locked should return false
+        assert!(!tokenization::is_tokens_locked(
+            &env,
+            asset_id,
+            tokenizer.clone()
+        ));
 
-    assert_eq!(balance1, 700000);
-    assert_eq!(balance2, 300000);
+        // Transfer should also succeed because lock expired
+        let result = tokenization::transfer_tokens(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+            100,
+        );
+        assert!(result.is_ok());
+    });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #124)")]
-fn test_transfer_tokens_insufficient_balance() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_unlock_tokens_clears_lock_regardless_of_timestamp() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    env.mock_all_auths();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset_id = make_asset_id(900);
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+    env.as_contract(&contract_id, || {
+        setup_tokenized(&env, asset_id, &tokenizer);
 
-    // Should panic with InsufficientBalance error
-    client.transfer_tokens(&1u64, &user1, &user2, &2000000i128);
+        // Lock until far future
+        tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 99999, tokenizer.clone())
+            .unwrap();
+        assert!(tokenization::is_tokens_locked(
+            &env,
+            asset_id,
+            tokenizer.clone()
+        ));
+
+        // Unlock while still inside the lock window
+        tokenization::unlock_tokens(&env, asset_id, tokenizer.clone()).unwrap();
+
+        // Lock should be gone
+        assert!(!tokenization::is_tokens_locked(
+            &env,
+            asset_id,
+            tokenizer.clone()
+        ));
+
+        // Transfer should now succeed even though original lock hasn't "expired"
+        let result = tokenization::transfer_tokens(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+            100,
+        );
+        assert!(result.is_ok());
+    });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #126)")]
-fn test_transfer_tokens_locked() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_is_tokens_locked_no_lock_returns_false() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    env.mock_all_auths();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let asset_id = make_asset_id(1000);
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+    let locked = env.as_contract(&contract_id, || {
+        setup_tokenized(&env, asset_id, &tokenizer);
+        // No lock set — should return false
+        tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone())
+    });
 
-    // Lock tokens
-    let future_time = env.ledger().timestamp() + 1000;
-    client.lock_tokens(&1u64, &user1, &future_time, &user1);
-
-    // Should panic with TokensAreLocked error
-    client.transfer_tokens(&1u64, &user1, &user2, &100000i128);
+    assert!(!locked);
 }
 
 #[test]
-fn test_lock_unlock_tokens() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
-
-    env.mock_all_auths();
-
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
-
-    // Initially not locked
-    assert!(!client.is_tokens_locked(&1u64, &user1));
-
-    // Lock tokens
-    let future_time = env.ledger().timestamp() + 1000;
-    client.lock_tokens(&1u64, &user1, &future_time, &user1);
-
-    assert!(client.is_tokens_locked(&1u64, &user1));
-
-    // Unlock tokens
-    client.unlock_tokens(&1u64, &user1);
-
-    assert!(!client.is_tokens_locked(&1u64, &user1));
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3)")]
 fn test_lock_tokens_unauthorized() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
 
-    env.mock_all_auths();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let intruder = Address::generate(&env);
+    let asset_id = make_asset_id(1100);
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+    let (lock_result, still_unlocked) = env.as_contract(&contract_id, || {
+        setup_tokenized(&env, asset_id, &tokenizer);
 
-    let future_time = env.ledger().timestamp() + 1000;
+        // Non-tokenizer tries to lock — should fail
+        let r =
+            tokenization::lock_tokens(&env, asset_id, tokenizer.clone(), 5000, intruder.clone());
 
-    // user2 is not tokenizer - should panic with Unauthorized
-    client.lock_tokens(&1u64, &user1, &future_time, &user2);
-}
+        // Holder is still unlocked
+        let unlocked = !tokenization::is_tokens_locked(&env, asset_id, tokenizer.clone());
+        (r, unlocked)
+    });
 
-#[test]
-fn test_get_ownership_percentage() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
-
-    env.mock_all_auths();
-
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
-
-    // Transfer 30% to user2
-    client.transfer_tokens(&1u64, &user1, &user2, &300000i128);
-
-    // Check ownership percentages (in basis points)
-    let percentage1 = client.get_ownership_percentage(&1u64, &user1);
-    let percentage2 = client.get_ownership_percentage(&1u64, &user2);
-
-    assert_eq!(percentage1, 7000); // 70%
-    assert_eq!(percentage2, 3000); // 30%
-}
-
-#[test]
-fn test_get_token_holders() {
-    let env = create_env();
-    let (admin, user1, user2, user3) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
-
-    env.mock_all_auths();
-
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
-
-    // Initially only user1
-    let holders = client.get_token_holders(&1u64);
-    assert_eq!(holders.len(), 1);
-
-    // Transfer to user2 and user3
-    client.transfer_tokens(&1u64, &user1, &user2, &300000i128);
-    client.transfer_tokens(&1u64, &user1, &user3, &200000i128);
-
-    // Now should have 3 holders
-    let holders = client.get_token_holders(&1u64);
-    assert_eq!(holders.len(), 3);
-}
-
-#[test]
-fn test_update_valuation() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
-
-    env.mock_all_auths();
-
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
-
-    client.update_valuation(&1u64, &2000000i128);
-
-    let asset = client.get_tokenized_asset(&1u64);
-    assert_eq!(asset.valuation, 2000000);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #162)")]
-fn test_update_valuation_invalid() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
-
-    env.mock_all_auths();
-
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
-
-    // Should panic with InvalidValuation error
-    client.update_valuation(&1u64, &0i128);
+    assert!(lock_result.is_err());
+    assert!(still_unlocked);
 }

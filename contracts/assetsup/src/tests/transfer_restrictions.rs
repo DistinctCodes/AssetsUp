@@ -1,253 +1,269 @@
-use crate::tests::helpers::*;
-use crate::types::AssetType;
-use soroban_sdk::String;
+#![cfg(test)]
 
-#[test]
-fn test_add_to_whitelist() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+extern crate std;
 
-    env.mock_all_auths();
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{Address, Env, String};
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+use crate::tokenization;
+use crate::transfer_restrictions;
+use crate::types::{AssetType, TransferRestriction};
+use crate::AssetUpContract;
 
-    // Initially not whitelisted
-    assert!(!client.is_whitelisted(&1u64, &user2));
-
-    // Add to whitelist
-    client.add_to_whitelist(&1u64, &user2);
-
-    assert!(client.is_whitelisted(&1u64, &user2));
-}
-
-#[test]
-fn test_remove_from_whitelist() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
-
-    env.mock_all_auths();
-
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
-
-    // Add to whitelist
-    client.add_to_whitelist(&1u64, &user2);
-    assert!(client.is_whitelisted(&1u64, &user2));
-
-    // Remove from whitelist
-    client.remove_from_whitelist(&1u64, &user2);
-    assert!(!client.is_whitelisted(&1u64, &user2));
-}
-
-#[test]
-fn test_get_whitelist() {
-    let env = create_env();
-    let (admin, user1, user2, user3) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
-
-    env.mock_all_auths();
-
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
-
-    // Add multiple addresses to whitelist
-    client.add_to_whitelist(&1u64, &user2);
-    client.add_to_whitelist(&1u64, &user3);
-
-    let whitelist = client.get_whitelist(&1u64);
-    assert_eq!(whitelist.len(), 2);
-}
-
-#[test]
-fn test_add_duplicate_to_whitelist() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
-
-    env.mock_all_auths();
-
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
-
-    // Add to whitelist twice
-    client.add_to_whitelist(&1u64, &user2);
-    client.add_to_whitelist(&1u64, &user2);
-
-    // Should still only have one entry
-    let whitelist = client.get_whitelist(&1u64);
-    assert_eq!(whitelist.len(), 1);
+fn setup_tokenized_asset(env: &Env, asset_id: u64, tokenizer: &Address) {
+    tokenization::tokenize_asset(
+        env,
+        asset_id,
+        String::from_str(env, "RESTR"),
+        1000,
+        2,
+        100,
+        tokenizer.clone(),
+        crate::types::TokenMetadata {
+            name: String::from_str(env, "Restriction Test"),
+            description: String::from_str(env, "Test"),
+            asset_type: AssetType::Digital,
+            ipfs_uri: None,
+            legal_docs_hash: None,
+            valuation_report_hash: None,
+            accredited_investor_required: false,
+            geographic_restrictions: soroban_sdk::Vec::new(env),
+        },
+    )
+    .unwrap();
 }
 
 #[test]
 fn test_set_transfer_restriction() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let asset_id = 900u64;
 
-    env.mock_all_auths();
+    let (set_ok, has_restrictions) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+        let restriction = TransferRestriction {
+            require_accredited: true,
+            geographic_allowed: soroban_sdk::Vec::new(&env),
+        };
 
-    // Set transfer restriction
-    client.set_transfer_restriction(&1u64, &true);
+        let ok =
+            transfer_restrictions::set_transfer_restriction(&env, asset_id, restriction).is_ok();
+        let has = transfer_restrictions::has_transfer_restrictions(&env, asset_id).unwrap();
+        (ok, has)
+    });
 
-    // Restriction should be set (no error means success)
+    assert!(set_ok);
+    assert!(has_restrictions);
 }
 
 #[test]
-fn test_transfer_with_whitelist() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_whitelist_operations() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let whitelisted = Address::generate(&env);
+    let asset_id = 900u64;
 
-    env.mock_all_auths();
+    let (is_wl_after_add, list_len, is_wl_after_remove) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+        // Add to whitelist
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
 
-    // Add user2 to whitelist
-    client.add_to_whitelist(&1u64, &user2);
+        let is_wl_add =
+            transfer_restrictions::is_whitelisted(&env, asset_id, whitelisted.clone()).unwrap();
+        let whitelist = transfer_restrictions::get_whitelist(&env, asset_id).unwrap();
+        let len = whitelist.len();
 
-    // Transfer should succeed
-    client.transfer_tokens(&1u64, &user1, &user2, &100000i128);
+        // Remove from whitelist
+        transfer_restrictions::remove_from_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
 
-    let balance = client.get_token_balance(&1u64, &user2);
-    assert_eq!(balance, 100000);
+        let is_wl_rem =
+            transfer_restrictions::is_whitelisted(&env, asset_id, whitelisted.clone()).unwrap();
+        (is_wl_add, len, is_wl_rem)
+    });
+
+    assert!(is_wl_after_add);
+    assert_eq!(list_len, 1);
+    assert!(!is_wl_after_remove);
 }
 
 #[test]
-fn test_empty_whitelist() {
-    let env = create_env();
-    let (admin, user1, _, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_whitelist_duplicate_prevention() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let whitelisted = Address::generate(&env);
+    let asset_id = 900u64;
 
-    env.mock_all_auths();
+    let list_len = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    client.tokenize_asset(
-        &1u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+        // Add to whitelist twice
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
 
-    let whitelist = client.get_whitelist(&1u64);
-    assert_eq!(whitelist.len(), 0);
+        // Should still have only 1 entry
+        transfer_restrictions::get_whitelist(&env, asset_id)
+            .unwrap()
+            .len()
+    });
+
+    assert_eq!(list_len, 1);
 }
 
 #[test]
-#[should_panic]
-fn test_transfer_to_non_whitelisted_fails() {
-    use soroban_sdk::testutils::Address as _;
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let user3 = soroban_sdk::Address::generate(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_validate_transfer_no_restrictions() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset_id = 900u64;
 
-    env.mock_all_auths();
+    let valid = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    client.tokenize_asset(
-        &2u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+        // Validate transfer when no restrictions exist
+        transfer_restrictions::validate_transfer(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+        )
+        .unwrap()
+    });
 
-    // Only user2 is whitelisted
-    client.add_to_whitelist(&2u64, &user2);
-
-    // Transfer to user3 (not whitelisted) should panic with TransferRestricted
-    client.transfer_tokens(&2u64, &user1, &user3, &100000i128);
+    assert!(valid);
 }
 
 #[test]
-fn test_empty_whitelist_allows_transfer() {
-    let env = create_env();
-    let (admin, user1, user2, _) = create_mock_addresses(&env);
-    let client = initialize_contract(&env, &admin);
+fn test_get_transfer_restriction() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let asset_id = 900u64;
 
-    env.mock_all_auths();
+    let (before_err, after_require_accredited) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
 
-    client.tokenize_asset(
-        &3u64,
-        &String::from_str(&env, "TST"),
-        &1000000i128,
-        &6u32,
-        &100i128,
-        &user1,
-        &String::from_str(&env, "Test Token"),
-        &String::from_str(&env, "A test tokenized asset"),
-        &AssetType::Physical,
-    );
+        // Should fail initially (no restriction)
+        let before = transfer_restrictions::get_transfer_restriction(&env, asset_id).is_err();
 
-    // No whitelist — transfer should succeed
-    client.transfer_tokens(&3u64, &user1, &user2, &100000i128);
-    assert_eq!(client.get_token_balance(&3u64, &user2), 100000);
+        // Set restriction
+        let new_restriction = TransferRestriction {
+            require_accredited: true,
+            geographic_allowed: soroban_sdk::Vec::new(&env),
+        };
+        transfer_restrictions::set_transfer_restriction(&env, asset_id, new_restriction).unwrap();
+
+        // Should now exist
+        let after = transfer_restrictions::get_transfer_restriction(&env, asset_id).unwrap();
+        (before, after.require_accredited)
+    });
+
+    assert!(before_err);
+    assert!(after_require_accredited);
+}
+
+#[test]
+fn test_validate_transfer_blocked_when_not_whitelisted() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let whitelisted = Address::generate(&env);
+    let not_whitelisted = Address::generate(&env);
+    let asset_id = 901u64;
+
+    let (allowed_result, blocked_result) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+
+        // Add only `whitelisted` to the whitelist
+        transfer_restrictions::add_to_whitelist(&env, asset_id, whitelisted.clone()).unwrap();
+
+        // Transfer to whitelisted address should be allowed
+        let allowed = transfer_restrictions::validate_transfer(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            whitelisted.clone(),
+        );
+
+        // Transfer to non-whitelisted address should be blocked
+        let blocked = transfer_restrictions::validate_transfer(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            not_whitelisted.clone(),
+        );
+
+        (allowed, blocked)
+    });
+
+    assert!(allowed_result.is_ok());
+    assert!(blocked_result.is_err());
+}
+
+#[test]
+fn test_validate_transfer_empty_whitelist_allows_all() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset_id = 902u64;
+
+    let result = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+
+        // No whitelist entries — transfer should be allowed
+        transfer_restrictions::validate_transfer(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+        )
+    });
+
+    assert!(result.is_ok());
+    assert!(result.unwrap());
+}
+
+#[test]
+fn test_validate_transfer_accredited_required_uses_whitelist() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let accredited = Address::generate(&env);
+    let non_accredited = Address::generate(&env);
+    let asset_id = 903u64;
+
+    let (ok_result, err_result) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+
+        // Set accredited requirement; whitelist acts as the accredited registry
+        let restriction = TransferRestriction {
+            require_accredited: true,
+            geographic_allowed: soroban_sdk::Vec::new(&env),
+        };
+        transfer_restrictions::set_transfer_restriction(&env, asset_id, restriction).unwrap();
+        transfer_restrictions::add_to_whitelist(&env, asset_id, accredited.clone()).unwrap();
+
+        let ok = transfer_restrictions::validate_transfer(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            accredited.clone(),
+        );
+        let err = transfer_restrictions::validate_transfer(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            non_accredited.clone(),
+        );
+        (ok, err)
+    });
+
+    assert!(ok_result.is_ok());
+    assert!(err_result.is_err());
 }

@@ -27,7 +27,9 @@ debug = 0              # no debug info in a deployed artifact
 panic = "abort"        # unwinding tables are unusable in Soroban anyway
 # Kept deliberately. Overflow checks cost a little size and gas, but these
 # contracts move asset value and share counts; a silent wrap is worse than a
-# trapped transaction. Converting the traps into typed errors is [SC-43].
+# trapped transaction. [SC-43] converted those arithmetic-overflow traps into
+# typed errors. The broader non-arithmetic `.unwrap()`/`.expect()` trap cleanup
+# (storage lookups, not overflow) is tracked separately in [SC-58]/[SC-59]/[SC-60].
 overflow-checks = true
 
 # Same size profile, but with debug assertions left on so a testnet deployment
