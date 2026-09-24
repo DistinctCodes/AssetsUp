@@ -36,6 +36,8 @@ mod approvals;
 mod auth_tests;
 mod errors;
 mod events;
+#[cfg(test)]
+mod pagination_tests;
 mod registry;
 mod rules;
 mod storage;
@@ -386,24 +388,42 @@ impl MultiSigTransferContract {
             .ok_or(MultiSigError::RequestNotFound)
     }
 
-    pub fn get_asset_history(e: Env, asset_id: BytesN<32>) -> Vec<u64> {
+    pub fn get_asset_history(e: Env, asset_id: BytesN<32>, offset: u32, limit: u32) -> Vec<u64> {
         let hist = storage::asset_history_map(&e);
-        hist.get(asset_id).unwrap_or(Vec::new(&e))
+        let list = hist.get(asset_id).unwrap_or(Vec::new(&e));
+        paginate(&e, &list, offset, limit)
     }
 
-    pub fn get_pending_transfers_approver(e: Env, approver: Address) -> Vec<u64> {
+    pub fn get_pending_transfers_approver(
+        e: Env,
+        approver: Address,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<u64> {
         // gas-friendly simple scan approach. If scale grows, add reverse-index.
         let requests = storage::requests_map(&e);
         let mut result = Vec::new(&e);
+        let mut skipped = 0u32;
 
         for (id, r) in requests.iter() {
-            if r.status == RequestStatus::Pending {
-                let rule = storage::rules_map(&e).get(r.asset_category.clone());
-                if let Some(rule) = rule {
-                    if approvals::is_authorized_approver(&rule.approvers, &approver) {
-                        result.push_back(id);
-                    }
+            if r.status != RequestStatus::Pending {
+                continue;
+            }
+            let rule = storage::rules_map(&e).get(r.asset_category.clone());
+            if let Some(rule) = rule {
+                if !approvals::is_authorized_approver(&rule.approvers, &approver) {
+                    continue;
                 }
+            } else {
+                continue;
+            }
+
+            if skipped < offset {
+                skipped += 1;
+            } else if limit == 0 || result.len() < limit {
+                result.push_back(id);
+            } else {
+                break;
             }
         }
 
@@ -413,8 +433,35 @@ impl MultiSigTransferContract {
     pub fn get_required_approvers_category(
         e: Env,
         category: BytesN<32>,
+        offset: u32,
+        limit: u32,
     ) -> Result<Vec<Address>, MultiSigError> {
         let rule = rules::get_rule(&e, &category)?;
-        Ok(rule.approvers)
+        Ok(paginate(&e, &rule.approvers, offset, limit))
     }
+}
+
+/// Slices `list` to the `[offset, offset + limit)` page.
+///
+/// `offset` past the end yields an empty page and `limit == 0` means "no
+/// limit" (everything from `offset` onward). Keeps the list-returning views
+/// bounded as history and approver queues grow in storage.
+fn paginate<T>(e: &Env, list: &Vec<T>, offset: u32, limit: u32) -> Vec<T>
+where
+    T: soroban_sdk::IntoVal<Env, soroban_sdk::Val>
+        + soroban_sdk::TryFromVal<Env, soroban_sdk::Val>
+        + Clone,
+{
+    let skip = offset.min(list.len()) as usize;
+    let take = if limit == 0 {
+        usize::MAX
+    } else {
+        limit as usize
+    };
+
+    let mut out = Vec::new(e);
+    for item in list.try_iter().skip(skip).take(take) {
+        out.push_back(item.expect("iterating an in-memory vector must not fail"));
+    }
+    out
 }
