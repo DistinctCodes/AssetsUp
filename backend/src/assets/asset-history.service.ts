@@ -52,7 +52,14 @@ export class AssetHistoryService {
   async findByAsset(
     assetId: string,
     filters?: AssetHistoryFilters,
-  ): Promise<AssetHistoryEvent[]> {
+    page = 1,
+    limit = 20,
+  ): Promise<{
+    data: AssetHistoryEvent[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const where: Record<string, unknown> = { assetId };
 
     if (filters?.action) where.action = filters.action;
@@ -69,9 +76,21 @@ export class AssetHistoryService {
       order: { createdAt: 'DESC' },
     });
 
-    if (!filters?.search) return events;
+    const filtered = filters?.search
+      ? events.filter((e) =>
+          e.description?.toLowerCase().includes(filters.search!.toLowerCase()),
+        )
+      : events;
 
-    const needle = filters.search.toLowerCase();
-    return events.filter((e) => e.description?.toLowerCase().includes(needle));
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+    const startIndex = (safePage - 1) * safeLimit;
+
+    return {
+      data: filtered.slice(startIndex, startIndex + safeLimit),
+      total: filtered.length,
+      page: safePage,
+      limit: safeLimit,
+    };
   }
 }

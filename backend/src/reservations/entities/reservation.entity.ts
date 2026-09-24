@@ -37,6 +37,9 @@ export class Reservation {
   @Column({ nullable: true })
   purpose?: string;
 
+  @Column({ nullable: true })
+  cancellationReason?: string;
+
   @Column({ default: 'PENDING' })
   status: string; // PENDING | CONFIRMED | CANCELLED | COMPLETED
 
