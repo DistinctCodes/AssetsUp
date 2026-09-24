@@ -83,7 +83,7 @@ fn configure_approval_rule_succeeds_once_the_admin_authenticates() {
     // The rule is stored, observable through its approver list.
     assert_eq!(
         client
-            .get_required_approvers_category(&category(&env))
+            .get_required_approvers_category(&category(&env), &0, &0)
             .len(),
         1
     );
@@ -152,10 +152,10 @@ fn read_entrypoints_do_not_require_authorization() {
     let (client, _admin) = setup(&env);
 
     // No auths are mocked; these must still answer.
-    assert_eq!(client.get_asset_history(&category(&env)).len(), 0);
+    assert_eq!(client.get_asset_history(&category(&env), &0, &0).len(), 0);
     assert_eq!(
         client
-            .get_pending_transfers_approver(&Address::generate(&env))
+            .get_pending_transfers_approver(&Address::generate(&env), &0, &0)
             .len(),
         0
     );

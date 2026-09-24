@@ -13,6 +13,17 @@ use crate::errors::Error;
 use crate::types::{ProposalStatus, ProposalType, TransactionStatus, TransactionType};
 use crate::{MultisigWallet, MultisigWalletClient};
 
+/// A side-effect-free callee for value-bearing transactions. The wallet cannot
+/// invoke itself (contract re-entry is forbidden), so successful executions
+/// target this no-op entrypoint instead.
+#[soroban_sdk::contract]
+struct NoopTarget;
+
+#[soroban_sdk::contractimpl]
+impl NoopTarget {
+    pub fn noop(_env: Env) {}
+}
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -22,6 +33,9 @@ struct Wallet<'a> {
     client: MultisigWalletClient<'a>,
     admin: Address,
     owners: Vec<Address>,
+    /// A registered no-op entrypoint used as the callee for value-bearing
+    /// transactions (self-invocation is forbidden in Soroban).
+    noop_target: Address,
 }
 
 impl<'a> Wallet<'a> {
@@ -44,11 +58,14 @@ fn wallet_with(env: &Env, owner_count: u32, threshold: u32) -> Wallet<'_> {
     env.mock_all_auths();
     client.initialize(&admin, &owners, &threshold);
 
+    let noop_target = env.register(NoopTarget, ());
+
     Wallet {
         env: env.clone(),
         client,
         admin,
         owners,
+        noop_target,
     }
 }
 
@@ -962,4 +979,160 @@ fn transaction_parameters_round_trip() {
     assert_eq!(tx.function_name, Symbol::new(&env, "pay"));
     assert_eq!(tx.parameters.len(), 1);
     assert_eq!(tx.value, 100);
+}
+
+// ---------------------------------------------------------------------------
+// [SC-64] freeze/unfreeze and daily-limit interaction with in-flight work
+// ---------------------------------------------------------------------------
+
+/// Submits a value-bearing transaction targeting a registered no-op callee, so
+/// successful executions have a real, side-effect-free invocation to make.
+///
+/// Note: `confirm_transaction` auto-executes as soon as the confirmation count
+/// reaches the threshold, so these tests cover the full submit -> confirm ->
+/// (auto)execute path rather than a separately triggered execute.
+fn submit_value(w: &Wallet, initiator: &Address, value: u128) -> u64 {
+    w.client.submit_transaction(
+        initiator,
+        &TransactionType::Routine,
+        &w.noop_target,
+        &Symbol::new(&w.env, "noop"),
+        &Vec::new(&w.env),
+        &3600,
+        &value,
+    )
+}
+
+/// Confirms with the two owners other than `skip`; the second confirmation
+/// auto-executes the transaction. Only for transfers that must succeed.
+fn confirm_and_execute(w: &Wallet, tx_id: u64, skip: u32) {
+    for i in 0..3 {
+        if i == skip {
+            continue;
+        }
+        w.client.confirm_transaction(&w.owner(i), &tx_id);
+    }
+}
+
+#[test]
+fn freezing_mid_flight_blocks_confirmation_and_execution_until_unfreeze() {
+    let env = Env::default();
+    let w = wallet(&env);
+
+    // One confirmation in, still below threshold and fully in flight.
+    let tx_id = submit_value(&w, &w.owner(0), 0);
+    w.client.confirm_transaction(&w.owner(1), &tx_id);
+    let in_flight = w.client.get_transaction(&tx_id).unwrap();
+    assert_eq!(in_flight.confirmations_count, 1);
+    assert_eq!(in_flight.status, TransactionStatus::Pending);
+
+    // Freeze mid-flight.
+    w.client.emergency_freeze(&w.owner(0));
+    assert!(w.client.is_frozen());
+
+    let res = w
+        .client
+        .try_confirm_transaction(&w.owner(2), &tx_id)
+        .expect_err("a frozen wallet must reject confirmations");
+    assert_eq!(res, Ok(Error::WalletFrozen));
+
+    let res = w
+        .client
+        .try_execute_transaction(&tx_id)
+        .expect_err("a frozen wallet must reject execution");
+    assert_eq!(res, Ok(Error::WalletFrozen));
+
+    // No side effects on the in-flight transaction while frozen.
+    let preserved = w.client.get_transaction(&tx_id).unwrap();
+    assert_eq!(preserved.status, TransactionStatus::Pending);
+    assert_eq!(preserved.confirmations_count, 1);
+
+    // Unfreezing restores exactly the pre-freeze behaviour, and the pending
+    // transaction picks up where it left off.
+    w.client.emergency_unfreeze(&w.owner(0));
+    assert!(!w.client.is_frozen());
+    w.client.confirm_transaction(&w.owner(2), &tx_id);
+    let done = w.client.get_transaction(&tx_id).unwrap();
+    assert_eq!(done.status, TransactionStatus::Executed);
+    assert_eq!(done.confirmations_count, 2);
+}
+
+#[test]
+fn daily_limit_blocks_a_transaction_beyond_the_remaining_allowance() {
+    let env = Env::default();
+    let w = wallet(&env);
+    w.client.set_daily_limit(&w.owner(0), &5_000u128);
+
+    // 3k executes and leaves 2k of allowance for the day.
+    let first = submit_value(&w, &w.owner(0), 3_000);
+    confirm_and_execute(&w, first, 0);
+    assert_eq!(
+        w.client.get_transaction(&first).unwrap().status,
+        TransactionStatus::Executed
+    );
+
+    // Another 3k same-day would push spent to 6k > 5k. The final confirmation
+    // reaches the threshold and its auto-execute is rejected; the whole call
+    // rolls back, so the transaction stays pending with only the first
+    // confirmation recorded.
+    let second = submit_value(&w, &w.owner(1), 3_000);
+    w.client.confirm_transaction(&w.owner(0), &second);
+    let res = w
+        .client
+        .try_confirm_transaction(&w.owner(2), &second)
+        .expect_err("3k on top of 3k exceeds the 5k daily limit");
+    assert_eq!(res, Ok(Error::DailyLimitExceeded));
+    let pending = w.client.get_transaction(&second).unwrap();
+    assert_eq!(
+        pending.status,
+        TransactionStatus::Pending,
+        "the blocked transfer is not executed"
+    );
+    assert_eq!(
+        pending.confirmations_count, 1,
+        "the failed threshold confirmation rolled back"
+    );
+
+    // A 2k transfer within the remaining allowance still goes through.
+    let third = submit_value(&w, &w.owner(2), 2_000);
+    confirm_and_execute(&w, third, 2);
+    assert_eq!(
+        w.client.get_transaction(&third).unwrap().status,
+        TransactionStatus::Executed
+    );
+}
+
+#[test]
+fn daily_limit_spent_resets_when_the_ledger_crosses_into_a_new_day() {
+    let env = Env::default();
+    let w = wallet(&env);
+    w.client.set_daily_limit(&w.owner(0), &5_000u128);
+
+    let first = submit_value(&w, &w.owner(0), 3_000);
+    confirm_and_execute(&w, first, 0);
+    assert_eq!(
+        w.client.get_transaction(&first).unwrap().status,
+        TransactionStatus::Executed
+    );
+
+    // Same ledger day: another 3k would blow the budget.
+    let second = submit_value(&w, &w.owner(1), 3_000);
+    w.client.confirm_transaction(&w.owner(0), &second);
+    let res = w
+        .client
+        .try_confirm_transaction(&w.owner(2), &second)
+        .expect_err("same-day 3k exceeds the remaining allowance");
+    assert_eq!(res, Ok(Error::DailyLimitExceeded));
+
+    // Cross into the next ledger day; the spend counter must reset.
+    let now = env.ledger().timestamp();
+    env.ledger().set_timestamp((now / 86400) * 86400 + 86400);
+
+    let third = submit_value(&w, &w.owner(0), 3_000);
+    confirm_and_execute(&w, third, 0);
+    assert_eq!(
+        w.client.get_transaction(&third).unwrap().status,
+        TransactionStatus::Executed,
+        "the new day starts with a fresh daily allowance"
+    );
 }

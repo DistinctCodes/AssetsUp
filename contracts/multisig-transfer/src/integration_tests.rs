@@ -341,7 +341,7 @@ fn a_completed_transfer_is_visible_in_both_contracts() {
     assert_eq!(f.registry.get_assets_by_owner(&recipient).len(), 1);
 
     // Multisig side: the request records this asset in its history.
-    let history = f.multisig.get_asset_history(&asset_id);
+    let history = f.multisig.get_asset_history(&asset_id, &0, &0);
     assert_eq!(history.len(), 1);
     assert_eq!(history.get(0).unwrap(), request_id);
 }
