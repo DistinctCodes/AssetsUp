@@ -32,7 +32,7 @@ fn require_admin(env: &Env, caller: &Address) {
         .storage()
         .persistent()
         .get(&GlobalDataKey::Admin)
-        .expect("Not initialized");
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
     if *caller != admin {
         panic!("Unauthorized");
     }
@@ -102,9 +102,9 @@ pub fn get_latest_valuation(env: Env, asset_id: u64) -> ValuationEntry {
         .get(&DataKey::History(asset_id))
         .unwrap_or_else(|| Vec::new(&env));
     if history.is_empty() {
-        panic!("No valuation exists");
+        crate::handle_error(&env, crate::Error::NotFound);
     }
-    history.last().unwrap()
+    history.last().unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotFound))
 }
 
 pub fn get_valuation_history(env: Env, asset_id: u64) -> Vec<ValuationEntry> {

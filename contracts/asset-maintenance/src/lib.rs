@@ -17,18 +17,20 @@
 //!
 //! ## Error handling
 //!
-//! Unlike the other crates in this workspace, failures here are raised with
-//! `panic!` on a `&str` rather than a typed `contracterror`, so callers cannot
-//! distinguish failure modes by code.
+//! Failures trap with a typed [`Error`] (`contracterror`) so callers can match
+//! on specific codes (shared 1–99 and asset-maintenance 500–599).
 //!
 //! See [`README.md`](https://github.com/DistinctCodes/AssetsUp/blob/main/contracts/asset-maintenance/README.md)
 //! for the full entrypoint, storage, and event tables.
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec};
 
+pub mod error;
 pub mod events;
 mod test;
 mod tests_coverage;
+
+pub use crate::error::{handle_error, Error};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -201,7 +203,7 @@ impl AssetMaintenanceContract {
             .storage()
             .persistent()
             .get(&DataKey::Admin)
-            .expect("not initialized");
+            .unwrap_or_else(|| handle_error(&env, Error::NotInitialized));
         admin.require_auth();
     }
 
@@ -222,7 +224,7 @@ impl AssetMaintenanceContract {
     }
 
     pub fn register_provider(env: Env, provider: ProviderProfile) {
-        let admin: Address = env.storage().persistent().get(&DataKey::Admin).unwrap();
+        let admin: Address = env.storage().persistent().get(&DataKey::Admin).unwrap_or_else(|| handle_error(&env, Error::NotInitialized));
         admin.require_auth();
 
         env.storage()
@@ -233,7 +235,7 @@ impl AssetMaintenanceContract {
     }
 
     pub fn deactivate_provider(env: Env, provider_address: Address) {
-        let admin: Address = env.storage().persistent().get(&DataKey::Admin).unwrap();
+        let admin: Address = env.storage().persistent().get(&DataKey::Admin).unwrap_or_else(|| handle_error(&env, Error::NotInitialized));
         admin.require_auth();
 
         if let Some(mut provider) = env
@@ -259,7 +261,7 @@ impl AssetMaintenanceContract {
             .storage()
             .persistent()
             .get(&DataKey::Provider(record.provider.clone()))
-            .expect("provider not registered");
+            .unwrap_or_else(|| handle_error(&env, Error::ProviderNotRegistered));
         if !provider_data.is_active {
             panic!("provider is inactive");
         }
@@ -453,7 +455,7 @@ impl AssetMaintenanceContract {
             .storage()
             .persistent()
             .get(&DataKey::Warranty(asset_id))
-            .expect("no warranty found");
+            .unwrap_or_else(|| handle_error(&env, Error::WarrantyNotFound));
 
         if warranty.status != WarrantyStatus::Active {
             panic!("warranty is not active");
@@ -495,7 +497,7 @@ impl AssetMaintenanceContract {
             .storage()
             .persistent()
             .get(&DataKey::Alerts(asset_id))
-            .expect("no alerts found");
+            .unwrap_or_else(|| handle_error(&env, Error::NotFound));
 
         if alert_index >= alerts.len() {
             panic!("alert index out of bounds");
@@ -503,7 +505,7 @@ impl AssetMaintenanceContract {
 
         let mut alert = alerts
             .get(alert_index)
-            .expect("alert index bound check passed");
+            .unwrap_or_else(|| handle_error(&env, Error::AlertIndexOutOfBounds));
         alert.acknowledged = true;
         alert.acknowledged_by = by.clone();
         alerts.set(alert_index, alert);

@@ -1,11 +1,15 @@
 mod asset_registry_tests;
 
-mod detokenization;
-mod dividends;
-mod tokenization;
-mod voting;
+// The following modules tested assetsup APIs and were never compiled into
+// contrib (see SC-57 / SC-61). Removed so `cargo test -p contrib` only
+// exercises live ContribContract entrypoints.
+// mod detokenization;
+// mod dividends;
+// mod tokenization;
+// mod voting;
 
 mod escrow;
+mod escrow_staking_integration;
 mod kyc;
 mod oracle;
 mod staking;

@@ -85,7 +85,7 @@ pub fn confirm_release(env: Env, escrow_id: u64, caller: Address) {
 
     let store = env.storage().persistent();
     let key = DataKey::Escrow(escrow_id);
-    let mut escrow: Escrow = store.get(&key).expect("Escrow not found");
+    let mut escrow: Escrow = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::EscrowNotFound));
 
     if caller != escrow.buyer {
         panic!("Unauthorized: only the buyer can release the escrow");
@@ -109,7 +109,7 @@ pub fn cancel_escrow(env: Env, escrow_id: u64, caller: Address) {
 
     let store = env.storage().persistent();
     let key = DataKey::Escrow(escrow_id);
-    let mut escrow: Escrow = store.get(&key).expect("Escrow not found");
+    let mut escrow: Escrow = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::EscrowNotFound));
 
     if caller != escrow.buyer && caller != escrow.seller {
         panic!("Unauthorized: only the buyer or seller can cancel the escrow");
@@ -128,5 +128,5 @@ pub fn get_escrow(env: Env, escrow_id: u64) -> Escrow {
     env.storage()
         .persistent()
         .get(&DataKey::Escrow(escrow_id))
-        .expect("Escrow not found")
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::EscrowNotFound))
 }

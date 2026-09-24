@@ -35,7 +35,7 @@ codes, and every contract uses those rather than declaring its own.
 | 200–299 | `contrib` |
 | 300–399 | `multisig-wallet` |
 | 400–499 | `multisig-transfer` |
-| 500–599 | `asset-maintenance` (reserved; see below) |
+| 500–599 | `asset-maintenance` |
 | 600+ | Unallocated. Claim the next free block here before using it. |
 
 A code, once published, is permanent. Retiring a variant means leaving its
@@ -77,10 +77,18 @@ code 1 across different contracts.
 
 ## `contrib` (200–299)
 
-`contrib` has **no typed errors in compiled code**. Its `src/error.rs` defines
-an enum, but the file has no `mod` declaration, so nothing references it and
-every failure surfaces as a `panic!` on a string. The range is reserved for
-when that module is wired in or removed as part of [SC-46].
+Typed `Error` enum lives in `contrib/src/error.rs` and is wired into the crate.
+Failures use `handle_error` / `panic_with_error!` with codes in this range
+(plus shared 1–99).
+
+| Block | Concern |
+|---:|---|
+| 200–219 | Registry / assets |
+| 220–239 | Insurance |
+| 240–249 | Lease |
+| 250–259 | Escrow |
+| 260–269 | KYC |
+| 270–279 | Staking |
 
 ## `multisig-wallet` (300–399)
 
@@ -100,11 +108,12 @@ when that module is wired in or removed as part of [SC-46].
 
 ## `asset-maintenance` (500–599)
 
-Reserved but unused. This crate has **no error enum at all** — it raises
-failures with `panic!` on a `&str`, so callers cannot distinguish a missing
-warranty from an inactive provider by code. Converting it to a `contracterror`
-in the 500 range is follow-up work; the range is claimed here so it does not
-get taken in the meantime.
+Typed `Error` enum lives in `asset-maintenance/src/error.rs`. Failures use
+`handle_error` / `panic_with_error!` with codes in this range (plus shared 1–99).
+
+| Block | Concern |
+|---:|---|
+| 500–509 | Providers, schedules, warranties, alerts |
 
 ## For backend implementers
 

@@ -47,7 +47,7 @@ pub fn create_lease(
     let store = env.storage().persistent();
     let asset: Asset = store
         .get(&GlobalDataKey::Asset(asset_id.clone()))
-        .expect("Asset not found");
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound));
 
     if asset.owner != lessor {
         panic!("Unauthorized: Only asset owner can create lease");
@@ -91,7 +91,7 @@ pub fn check_in_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
     caller.require_auth();
     let store = env.storage().persistent();
     let key = DataKey::Lease(lease_id.clone());
-    let mut lease: Lease = store.get(&key).expect("Lease not found");
+    let mut lease: Lease = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::LeaseNotFound));
 
     if caller != lease.lessor {
         panic!("Unauthorized: Only lessor can check in lease");
@@ -107,9 +107,9 @@ pub fn cancel_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
     caller.require_auth();
     let store = env.storage().persistent();
     let key = DataKey::Lease(lease_id.clone());
-    let mut lease: Lease = store.get(&key).expect("Lease not found");
+    let mut lease: Lease = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::LeaseNotFound));
 
-    let admin: Address = store.get(&GlobalDataKey::Admin).expect("Not initialized");
+    let admin: Address = store.get(&GlobalDataKey::Admin).unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
 
     if caller != lease.lessor && caller != admin {
         panic!("Unauthorized: Only lessor or admin can cancel lease");
@@ -128,7 +128,9 @@ pub fn get_active_leases(env: Env, asset_id: BytesN<32>) -> Vec<BytesN<32>> {
 
     let mut active_leases = Vec::new(&env);
     for lid in leases.iter() {
-        let l: Lease = store.get(&DataKey::Lease(lid.clone())).unwrap();
+        let l: Lease = store
+            .get(&DataKey::Lease(lid.clone()))
+            .unwrap_or_else(|| crate::handle_error(&env, crate::Error::LeaseNotFound));
         if l.status == LeaseStatus::Active {
             active_leases.push_back(lid);
         }
