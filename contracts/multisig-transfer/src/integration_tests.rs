@@ -526,10 +526,7 @@ fn reconfiguring_a_rule_does_not_change_a_pending_request_s_requirement() {
     let request_id = f.request_transfer(&asset_id, &recipient);
 
     // The pending request snapshot requires 2 approvals.
-    assert_eq!(
-        f.multisig.get_request(&request_id).required_approvals,
-        2
-    );
+    assert_eq!(f.multisig.get_request(&request_id).required_approvals, 2);
 
     // Reconfigure the live rule to require 3 approvals.
     f.multisig.configure_approval_rule(
