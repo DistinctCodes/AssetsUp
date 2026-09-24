@@ -230,3 +230,5 @@ fn test_audit_log_records_register_transfer_retire() {
     assert_eq!(last_entry.log_id, 3);
     assert_eq!(last_entry.action, String::from_str(&env, "retire"));
 }
+
+mod escrow_staking_integration;

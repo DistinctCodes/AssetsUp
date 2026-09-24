@@ -52,6 +52,7 @@ pub fn create_escrow(
     deadline: u64,
 ) -> u64 {
     buyer.require_auth();
+    crate::pause::require_subsystem_not_paused(&env, crate::pause::Subsystem::Escrow);
 
     let store = env.storage().persistent();
 
@@ -80,6 +81,7 @@ pub fn create_escrow(
 
 pub fn confirm_release(env: Env, escrow_id: u64, caller: Address) {
     caller.require_auth();
+    crate::pause::require_subsystem_not_paused(&env, crate::pause::Subsystem::Escrow);
 
     let store = env.storage().persistent();
     let key = DataKey::Escrow(escrow_id);
@@ -95,11 +97,15 @@ pub fn confirm_release(env: Env, escrow_id: u64, caller: Address) {
     escrow.status = EscrowStatus::Completed;
     store.set(&key, &escrow);
 
+    // Issue #1533 – escrow release adjusts staking rewards for the seller when staked.
+    crate::staking::on_escrow_released(&env, escrow.asset_id, &escrow.seller, escrow.amount);
+
     crate::events::escrow_released(&env, escrow_id, &caller);
 }
 
 pub fn cancel_escrow(env: Env, escrow_id: u64, caller: Address) {
     caller.require_auth();
+    crate::pause::require_subsystem_not_paused(&env, crate::pause::Subsystem::Escrow);
 
     let store = env.storage().persistent();
     let key = DataKey::Escrow(escrow_id);

@@ -69,6 +69,30 @@ The reasoning:
    entrypoint at all ([SC-49]). Splitting does not deliver that benefit until
    upgradeability exists.
 
+
+## Source of truth (issue #1532)
+
+This section freezes the ownership decision so contributors stop guessing.
+
+| Concern | Authoritative crate | Notes |
+|---|---|---|
+| Asset registry, tokenization, dividends, voting, detokenization, transfer restrictions | **`assetsup`** | Full production implementation. |
+| Audit log | **`assetsup`** | `contrib/src/audit.rs` is a legacy duplicate; do not extend it. Prefer `assetsup` APIs from the backend. |
+| Insurance (policy + claim state machine) | **`assetsup`** | `contrib`'s insurance is a strict subset kept only for experimental flows; new features land in `assetsup`. |
+| Leasing | **`assetsup`** | Same as insurance — `assetsup` is richer and authoritative. |
+| Emergency / granular pause | **`contrib`** for subsystem pause (escrow/staking/kyc); **`assetsup`** for its own global pause | Pause is local to each deployed contract. |
+| Escrow, KYC, staking, oracle | **`contrib`** | These modules are unique to `contrib` and are the source of truth for asset-finance flows. |
+
+### Rules going forward
+
+1. **Do not add features to `contrib`'s audit / insurance / lease modules.** Treat them as soft-deprecated mirrors. Bug fixes that also exist in `assetsup` must be applied to `assetsup` first.
+2. **New escrow, staking, KYC, or oracle work belongs in `contrib`.**
+3. Shared types that both crates need should move into a future `assetsup-types` lib crate (see migration sequence below), not be copy-pasted again.
+4. Backend and integrators must call **`assetsup`** for registry / insurance / lease / audit, and **`contrib`** for escrow / staking / KYC / oracle.
+
+The earlier assessment that most of `contrib` was uncompiled is **obsolete**: `lib.rs` now declares `escrow`, `kyc`, `oracle`, and `staking`, and those modules ship. The duplication that remains is specifically audit / insurance / lease.
+
+
 ## What to do first: resolve the duplication
 
 `assetsup` and `contrib` are independent contracts with separate storage that
