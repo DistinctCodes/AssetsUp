@@ -29,11 +29,20 @@ fn test_escrow_release_adjusts_seller_staking_rewards() {
     assert_eq!(before, 0);
 
     let escrow_amount = 10_000i128;
-    let escrow_id =
-        client.create_escrow(&asset_id, &seller, &buyer, &escrow_amount, &token, &1_000_000u64);
+    let escrow_id = client.create_escrow(
+        &asset_id,
+        &seller,
+        &buyer,
+        &escrow_amount,
+        &token,
+        &1_000_000u64,
+    );
 
     client.confirm_release(&escrow_id, &buyer);
-    assert_eq!(client.get_escrow(&escrow_id).status, EscrowStatus::Completed);
+    assert_eq!(
+        client.get_escrow(&escrow_id).status,
+        EscrowStatus::Completed
+    );
 
     let after = client.get_stake(&asset_id, &seller).rewards_earned;
     // on_escrow_released credits 1% of escrow amount.
@@ -51,9 +60,18 @@ fn test_escrow_release_noop_when_seller_not_staked() {
     let token = Address::generate(&env);
     let asset_id = 11u64;
 
-    let escrow_id =
-        client.create_escrow(&asset_id, &seller, &buyer, &1_000i128, &token, &1_000_000u64);
+    let escrow_id = client.create_escrow(
+        &asset_id,
+        &seller,
+        &buyer,
+        &1_000i128,
+        &token,
+        &1_000_000u64,
+    );
     // Should not panic even though seller has no stake.
     client.confirm_release(&escrow_id, &buyer);
-    assert_eq!(client.get_escrow(&escrow_id).status, EscrowStatus::Completed);
+    assert_eq!(
+        client.get_escrow(&escrow_id).status,
+        EscrowStatus::Completed
+    );
 }

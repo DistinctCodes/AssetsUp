@@ -584,7 +584,6 @@ pub fn escrow_cancelled(env: &Env, escrow_id: u64, caller: &Address) {
     .publish(env);
 }
 
-
 // --- Granular subsystem pause (issue #1531) ---
 
 #[contractevent]
