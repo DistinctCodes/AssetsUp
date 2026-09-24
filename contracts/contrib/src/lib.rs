@@ -82,6 +82,8 @@ pub enum DataKey {
     TotalCount,
     Admin,
     Paused,
+    /// Per-subsystem pause flags (issue #1531). Global `Paused` still freezes everything.
+    SubsystemPaused(crate::pause::Subsystem),
     AuthorizedRegistrar(Address),
     AuditLogCount,
     AuditLogs(BytesN<32>),
@@ -341,6 +343,19 @@ impl ContribContract {
             .unwrap_or(false)
     }
 
+    /// Pause a single subsystem without freezing the whole contract (issue #1531).
+    pub fn pause_subsystem(env: Env, caller: Address, subsystem: pause::Subsystem) {
+        pause::pause_subsystem(&env, caller, subsystem);
+    }
+
+    pub fn unpause_subsystem(env: Env, caller: Address, subsystem: pause::Subsystem) {
+        pause::unpause_subsystem(&env, caller, subsystem);
+    }
+
+    pub fn is_subsystem_paused(env: Env, subsystem: pause::Subsystem) -> bool {
+        pause::is_subsystem_paused(&env, subsystem)
+    }
+
     fn add_to_owner_registry(env: &Env, owner: &Address, asset_id: &BytesN<32>) {
         let store = env.storage().persistent();
         let owner_key = DataKey::OwnerAssets(owner.clone());
@@ -513,6 +528,14 @@ impl ContribContract {
 
     pub fn accrue_staking_rewards(env: Env, caller: Address, asset_id: u64) {
         staking::accrue_staking_rewards(env, caller, asset_id);
+    }
+
+    pub fn get_stake(env: Env, asset_id: u64, staker: Address) -> staking::Stake {
+        staking::get_stake(env, asset_id, staker)
+    }
+
+    pub fn set_reward_period_length(env: Env, caller: Address, asset_id: u64, length_secs: u64) {
+        staking::set_reward_period_length(env, caller, asset_id, length_secs);
     }
 
     // --- Escrow Functions ---

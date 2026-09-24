@@ -583,3 +583,48 @@ pub fn escrow_cancelled(env: &Env, escrow_id: u64, caller: &Address) {
     }
     .publish(env);
 }
+
+
+// --- Granular subsystem pause (issue #1531) ---
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubsystemPaused {
+    #[topic]
+    pub caller: Address,
+    pub subsystem: u32,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubsystemUnpaused {
+    #[topic]
+    pub caller: Address,
+    pub subsystem: u32,
+}
+
+pub fn subsystem_paused(env: &Env, caller: &Address, subsystem: &crate::pause::Subsystem) {
+    let code: u32 = match subsystem {
+        crate::pause::Subsystem::Escrow => 1,
+        crate::pause::Subsystem::Staking => 2,
+        crate::pause::Subsystem::Kyc => 3,
+    };
+    SubsystemPaused {
+        caller: caller.clone(),
+        subsystem: code,
+    }
+    .publish(env);
+}
+
+pub fn subsystem_unpaused(env: &Env, caller: &Address, subsystem: &crate::pause::Subsystem) {
+    let code: u32 = match subsystem {
+        crate::pause::Subsystem::Escrow => 1,
+        crate::pause::Subsystem::Staking => 2,
+        crate::pause::Subsystem::Kyc => 3,
+    };
+    SubsystemUnpaused {
+        caller: caller.clone(),
+        subsystem: code,
+    }
+    .publish(env);
+}

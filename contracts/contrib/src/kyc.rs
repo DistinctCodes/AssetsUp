@@ -34,6 +34,7 @@ pub enum DataKey {
 
 fn require_admin(env: &Env, caller: &Address) {
     caller.require_auth();
+    crate::pause::require_subsystem_not_paused(env, crate::pause::Subsystem::Kyc);
     let admin: Address = env
         .storage()
         .persistent()
@@ -46,6 +47,7 @@ fn require_admin(env: &Env, caller: &Address) {
 
 pub fn submit_kyc(env: Env, address: Address) {
     address.require_auth();
+    crate::pause::require_subsystem_not_paused(&env, crate::pause::Subsystem::Kyc);
 
     let record = KycRecord {
         address: address.clone(),
