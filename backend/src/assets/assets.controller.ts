@@ -102,13 +102,20 @@ export class AssetsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.assetHistoryService.findByAsset(id, {
-      action,
-      startDate,
-      endDate,
-      search,
-    });
+    return this.assetHistoryService.findByAsset(
+      id,
+      {
+        action,
+        startDate,
+        endDate,
+        search,
+      },
+      page,
+      limit,
+    );
   }
 
   @Patch(':id/status')
