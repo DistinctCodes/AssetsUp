@@ -1,21 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Package, AlertTriangle, ArrowRightLeft, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
-
-interface MyAsset {
-  id: string;
-  name: string;
-  assetId: string;
-  condition: string;
-  status: string;
-  imageUrl?: string;
-  checkedOutAt?: string;
-  dueDate?: string;
-}
+import { useAssets } from "@/lib/query/hooks/useAssets";
+import { useAuthStore } from "@/store/auth.store";
 
 interface MyRequest {
   id: string;
@@ -25,11 +16,22 @@ interface MyRequest {
   createdAt: string;
 }
 
-const MOCK_ASSETS: MyAsset[] = [];
 const MOCK_REQUESTS: MyRequest[] = [];
 
 export default function MyAssetsPage() {
   const [tab, setTab] = useState<"assets" | "requests">("assets");
+  const user = useAuthStore((s) => s.user);
+
+  // The asset list endpoint has no assignedToId filter yet, so this
+  // fetches a reasonably large page of assets (same shared data source
+  // and Asset shape as the main /assets table) and filters to the
+  // current user client-side, rather than maintaining a second,
+  // hand-rolled "my assets" data source.
+  const { data, isLoading } = useAssets({ limit: 100 });
+  const assets = useMemo(
+    () => (data?.data ?? []).filter((asset) => asset.assignedTo?.id === user?.id),
+    [data, user?.id],
+  );
 
   return (
     <div>
@@ -43,7 +45,7 @@ export default function MyAssetsPage() {
         <button onClick={() => setTab("assets")} className={`px-4 py-2 rounded-md text-sm font-medium ${
           tab === "assets" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
         }`}>
-          My Assets ({MOCK_ASSETS.length})
+          My Assets ({assets.length})
         </button>
         <button onClick={() => setTab("requests")} className={`px-4 py-2 rounded-md text-sm font-medium ${
           tab === "requests" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
@@ -54,16 +56,20 @@ export default function MyAssetsPage() {
 
       {tab === "assets" && (
         <div className="space-y-3">
-          {MOCK_ASSETS.length === 0 ? (
+          {isLoading ? (
+            <div className="bg-white border rounded-xl p-12 text-center text-gray-400">
+              Loading your assets...
+            </div>
+          ) : assets.length === 0 ? (
             <div className="bg-white border rounded-xl p-12 text-center">
               <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">No assets assigned to you yet</p>
             </div>
           ) : (
-            MOCK_ASSETS.map((asset) => (
+            assets.map((asset) => (
               <div key={asset.id} className="bg-white border rounded-xl p-4 flex items-center gap-4">
-                {asset.imageUrl ? (
-                  <img src={asset.imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                {asset.imageUrls?.[0] ? (
+                  <img src={asset.imageUrls[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />
                 ) : (
                   <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
                     <Package className="w-6 h-6 text-gray-400" />
