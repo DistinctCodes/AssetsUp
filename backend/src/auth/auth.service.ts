@@ -26,12 +26,38 @@ export interface AuthUser {
 
 @Injectable()
 export class AuthService {
+  // Explicit revocation list for refresh-token jtis, keyed by jti with the
+  // token's own expiry so entries can be pruned once they'd have expired
+  // naturally anyway. This is on top of (not instead of) the existing
+  // hash-rotation check below: rotation alone only catches *reuse of the
+  // previous* token, whereas this lets a specific token be revoked
+  // outright (e.g. on logout) even if it's still the *current* one.
+  //
+  // Caveat: this is in-process memory, so it resets on restart and isn't
+  // shared across multiple server instances. A production deployment
+  // running more than one instance needs this backed by a shared store
+  // (e.g. Redis) instead — noted here rather than silently assumed away.
+  private readonly revokedRefreshTokenJtis = new Map<string, number>(); // jti -> exp (unix seconds)
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @Optional() private readonly auditLogsService?: AuditLogsService,
   ) {}
+
+  private pruneExpiredRevocations() {
+    const now = Math.floor(Date.now() / 1000);
+    for (const [jti, exp] of this.revokedRefreshTokenJtis) {
+      if (exp <= now) this.revokedRefreshTokenJtis.delete(jti);
+    }
+  }
+
+  private revokeRefreshToken(jti: string | undefined, exp: number | undefined) {
+    if (!jti || !exp) return;
+    this.revokedRefreshTokenJtis.set(jti, exp);
+    this.pruneExpiredRevocations();
+  }
 
   private sanitizeUser(user: User): AuthUser {
     return {
@@ -52,7 +78,12 @@ export class AuthService {
   }
 
   private generateRefreshToken(user: AuthUser) {
-    const payload = { sub: user.id, email: user.email, type: 'refresh' };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      type: 'refresh',
+      jti: crypto.randomUUID(),
+    };
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: '7d' as any,
@@ -136,6 +167,10 @@ export class AuthService {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
 
+      if (payload?.jti && this.revokedRefreshTokenJtis.has(payload.jti)) {
+        throw new UnauthorizedException('Refresh token has been revoked');
+      }
+
       const user = await this.usersService.findById(payload.sub);
       if (!user.refreshTokenHash) {
         throw new UnauthorizedException('Refresh token has been revoked');
@@ -145,10 +180,18 @@ export class AuthService {
       if (submittedHash !== user.refreshTokenHash) {
         // Token reuse detected — revoke session
         await this.usersService.setRefreshTokenHash(user.id, null);
+        this.revokeRefreshToken(payload?.jti, payload?.exp);
         throw new UnauthorizedException(
           'Refresh token reuse detected — session revoked',
         );
       }
+
+      // Rotation: this token has now been exchanged for a new pair, so it
+      // must not be accepted again even though its hash is about to be
+      // overwritten anyway — the explicit revocation closes the window
+      // where a copy of this exact token (e.g. logged, cached) is replayed
+      // before an attacker-triggered reuse would otherwise be detected.
+      this.revokeRefreshToken(payload?.jti, payload?.exp);
 
       const authUser = this.sanitizeUser(user);
       const tokens = await this.generateTokenPair(authUser);
@@ -159,8 +202,22 @@ export class AuthService {
     }
   }
 
-  async logout(userId: string) {
+  async logout(userId: string, refreshToken?: string) {
     await this.usersService.setRefreshTokenHash(userId, null);
+
+    if (refreshToken) {
+      try {
+        const payload = this.jwtService.decode(refreshToken) as {
+          jti?: string;
+          exp?: number;
+        } | null;
+        this.revokeRefreshToken(payload?.jti, payload?.exp);
+      } catch {
+        // Malformed token on logout isn't actionable — the user is being
+        // logged out either way via the hash reset above.
+      }
+    }
+
     return { message: 'Logged out successfully' };
   }
 
