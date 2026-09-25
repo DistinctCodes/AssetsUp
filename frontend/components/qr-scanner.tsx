@@ -14,11 +14,11 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
   const [mode, setMode] = useState<"camera" | "manual">("camera");
   const [manualId, setManualId] = useState("");
   const [error, setError] = useState("");
-  const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
     if (mode !== "camera") return;
     let stream: MediaStream | null = null;
+    let cancelled = false;
 
     const startCamera = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -37,12 +37,11 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
-          setScanning(true);
           // Try BarcodeDetector API
           if ("BarcodeDetector" in window) {
             const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
             const detect = async () => {
-              if (!videoRef.current || !scanning) return;
+              if (!videoRef.current || cancelled) return;
               try {
                 const barcodes = await detector.detect(videoRef.current);
                 if (barcodes.length > 0) {
@@ -72,7 +71,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
 
     startCamera();
     return () => {
-      setScanning(false);
+      cancelled = true;
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, [mode, onScan]);
@@ -104,17 +103,27 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
                 {error}
               </div>
             )}
-            <input
-              type="text"
-              placeholder="Enter Asset ID"
-              value={manualId}
-              onChange={(e) => setManualId(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg text-lg text-center"
-              autoFocus
-            />
-            <Button className="w-full" onClick={() => manualId && onScan(manualId)}>
-              Look Up Asset
-            </Button>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                const assetId = manualId.trim();
+                if (assetId) onScan(assetId);
+              }}
+              className="space-y-4"
+            >
+              <input
+                type="text"
+                placeholder="Enter Asset ID"
+                aria-label="Asset ID"
+                value={manualId}
+                onChange={(e) => setManualId(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg text-lg text-center"
+                autoFocus
+              />
+              <Button className="w-full" type="submit" disabled={!manualId.trim()}>
+                Look Up Asset
+              </Button>
+            </form>
           </div>
         </div>
       )}
