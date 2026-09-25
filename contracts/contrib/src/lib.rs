@@ -30,6 +30,7 @@
 //! for the full entrypoint, storage, event, and error tables.
 
 mod audit;
+pub mod error;
 pub mod events;
 mod pause;
 mod types;
@@ -45,6 +46,7 @@ mod staking;
 #[cfg(test)]
 mod tests;
 
+pub use crate::error::{handle_error, Error};
 use crate::types::AssetStatus;
 use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, String, Vec};
 
@@ -117,7 +119,7 @@ impl ContribContract {
         env.storage()
             .persistent()
             .get(&DataKey::Admin)
-            .expect("Not initialized")
+            .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized))
     }
 
     pub fn add_authorized_registrar(env: Env, caller: Address, registrar: Address) {
@@ -126,7 +128,7 @@ impl ContribContract {
             .storage()
             .persistent()
             .get(&DataKey::Admin)
-            .expect("Not initialized");
+            .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
         if caller != admin {
             panic!("Unauthorized");
         }
@@ -143,7 +145,7 @@ impl ContribContract {
             .storage()
             .persistent()
             .get(&DataKey::Admin)
-            .expect("Not initialized");
+            .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
         if caller != admin {
             panic!("Unauthorized");
         }
@@ -226,7 +228,7 @@ impl ContribContract {
         let store = env.storage().persistent();
         let key = DataKey::Asset(asset_id.clone());
 
-        let mut asset: Asset = store.get(&key).expect("Asset not found");
+        let mut asset: Asset = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound));
 
         if asset.owner != caller {
             panic!("Unauthorized");
@@ -264,7 +266,7 @@ impl ContribContract {
         let store = env.storage().persistent();
         let key = DataKey::Asset(asset_id.clone());
 
-        let mut asset: Asset = store.get(&key).expect("Asset not found");
+        let mut asset: Asset = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound));
 
         if asset.owner != caller {
             panic!("Unauthorized");
@@ -296,7 +298,7 @@ impl ContribContract {
         env.storage()
             .persistent()
             .get(&DataKey::Asset(asset_id))
-            .expect("Asset not found")
+            .unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound))
     }
 
     pub fn get_assets_by_owner(env: Env, owner: Address) -> Vec<BytesN<32>> {
@@ -316,7 +318,7 @@ impl ContribContract {
             .storage()
             .persistent()
             .get(&DataKey::Admin)
-            .expect("Not initialized");
+            .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
         if caller != admin {
             panic!("Unauthorized");
         }
@@ -329,7 +331,7 @@ impl ContribContract {
             .storage()
             .persistent()
             .get(&DataKey::Admin)
-            .expect("Not initialized");
+            .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
         if caller != admin {
             panic!("Unauthorized");
         }

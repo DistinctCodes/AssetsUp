@@ -57,7 +57,7 @@ pub fn create_policy(env: Env, asset_id: BytesN<32>, policy_data: InsurancePolic
     let store = env.storage().persistent();
 
     // Authorization: admin or insurer
-    let admin: Address = store.get(&GlobalDataKey::Admin).expect("Not initialized");
+    let admin: Address = store.get(&GlobalDataKey::Admin).unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
     if policy_data.insurer != admin {
         policy_data.insurer.require_auth();
     } else {
@@ -84,14 +84,14 @@ pub fn get_policy(env: Env, policy_id: BytesN<32>) -> InsurancePolicy {
     env.storage()
         .persistent()
         .get(&DataKey::Policy(policy_id))
-        .expect("Policy not found")
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::PolicyNotFound))
 }
 
 pub fn cancel_policy(env: Env, policy_id: BytesN<32>, caller: Address) {
     caller.require_auth();
     let store = env.storage().persistent();
     let key = DataKey::Policy(policy_id.clone());
-    let mut policy: InsurancePolicy = store.get(&key).expect("Policy not found");
+    let mut policy: InsurancePolicy = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::PolicyNotFound));
 
     if caller != policy.holder && caller != policy.insurer {
         panic!("Unauthorized");
@@ -107,7 +107,7 @@ pub fn is_policy_active(env: Env, policy_id: BytesN<32>) -> bool {
     let store = env.storage().persistent();
     let policy: InsurancePolicy = store
         .get(&DataKey::Policy(policy_id))
-        .expect("Policy not found");
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::PolicyNotFound));
 
     let current_time = env.ledger().timestamp();
     policy.status == PolicyStatus::Active
@@ -171,7 +171,7 @@ pub fn update_claim_status(
     insurer.require_auth();
     let store = env.storage().persistent();
     let claim_key = DataKey::Claim(claim_id.clone());
-    let mut claim: InsuranceClaim = store.get(&claim_key).expect("Claim not found");
+    let mut claim: InsuranceClaim = store.get(&claim_key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::ClaimNotFound));
 
     let policy = get_policy(env.clone(), claim.policy_id.clone());
     if insurer != policy.insurer {
@@ -188,7 +188,7 @@ pub fn get_claim(env: Env, claim_id: BytesN<32>) -> InsuranceClaim {
     env.storage()
         .persistent()
         .get(&DataKey::Claim(claim_id))
-        .expect("Claim not found")
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::ClaimNotFound))
 }
 
 pub fn get_claims_for_policy(env: Env, policy_id: BytesN<32>) -> Vec<BytesN<32>> {

@@ -99,7 +99,7 @@ pub fn unstake_tokens(env: Env, asset_id: u64, staker: Address) {
 
     let store = env.storage().persistent();
     let key = DataKey::Stake(asset_id, staker.clone());
-    let mut stake: Stake = store.get(&key).expect("No stake found");
+    let mut stake: Stake = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::StakeNotFound));
 
     let now = env.ledger().timestamp();
     if now < stake.staked_at + stake.lock_period {
@@ -126,7 +126,7 @@ pub fn get_stake(env: Env, asset_id: u64, staker: Address) -> Stake {
     env.storage()
         .persistent()
         .get(&DataKey::Stake(asset_id, staker))
-        .expect("No stake found")
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::StakeNotFound))
 }
 
 /// Admin can set / reset the reward period length for an asset.
@@ -136,7 +136,7 @@ pub fn set_reward_period_length(env: Env, caller: Address, asset_id: u64, length
         .storage()
         .persistent()
         .get(&GlobalDataKey::Admin)
-        .expect("Not initialized");
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
     if caller != admin {
         panic!("Unauthorized");
     }
@@ -178,7 +178,7 @@ pub fn accrue_staking_rewards(env: Env, caller: Address, asset_id: u64) {
         .storage()
         .persistent()
         .get(&GlobalDataKey::Admin)
-        .expect("Not initialized");
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
     if caller != admin {
         panic!("Unauthorized");
     }
@@ -188,7 +188,9 @@ pub fn accrue_staking_rewards(env: Env, caller: Address, asset_id: u64) {
     ensure_reward_period(&env, asset_id, now);
 
     let period_key = DataKey::RewardPeriod(asset_id);
-    let period: RewardPeriod = store.get(&period_key).unwrap();
+    let period: RewardPeriod = store
+        .get(&period_key)
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::RewardPeriodNotFound));
     let period_start = period.started_at;
     let period_length = if period.length_secs == 0 {
         DEFAULT_PERIOD_SECS
@@ -264,7 +266,9 @@ pub fn accrue_staking_rewards(env: Env, caller: Address, asset_id: u64) {
     for item in weights.iter() {
         let (staker, weight) = item;
         let key = DataKey::Stake(asset_id, staker.clone());
-        let mut stake: Stake = store.get(&key).unwrap();
+        let mut stake: Stake = store
+            .get(&key)
+            .unwrap_or_else(|| crate::handle_error(env, crate::Error::StakeNotFound));
         let share = (weight.saturating_mul(REWARD_POOL)) / total_weight;
         stake.rewards_earned = stake.rewards_earned.saturating_add(share);
         store.set(&key, &stake);

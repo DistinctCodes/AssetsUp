@@ -39,7 +39,7 @@ fn require_admin(env: &Env, caller: &Address) {
         .storage()
         .persistent()
         .get(&GlobalDataKey::Admin)
-        .expect("Not initialized");
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
     if *caller != admin {
         panic!("Unauthorized");
     }
@@ -96,7 +96,7 @@ pub fn revoke_kyc(env: Env, caller: Address, address: Address) {
         .storage()
         .persistent()
         .get(&key)
-        .expect("KYC record not found");
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::KycRecordNotFound));
     record.status = KycStatus::Revoked;
     env.storage().persistent().set(&key, &record);
 
@@ -117,5 +117,5 @@ pub fn get_kyc_record(env: Env, address: Address) -> KycRecord {
     env.storage()
         .persistent()
         .get(&DataKey::Record(address))
-        .expect("KYC record not found")
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::KycRecordNotFound))
 }
