@@ -21,10 +21,19 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
     let stream: MediaStream | null = null;
 
     const startCamera = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("Camera access isn't supported in this browser. Use manual entry instead.");
+        setMode("manual");
+        return;
+      }
+
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment" },
         });
+        // A previous attempt's error no longer applies once camera access
+        // succeeds.
+        setError("");
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
@@ -48,8 +57,15 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
             detect();
           }
         }
-      } catch {
-        setError("Camera access denied. Use manual entry instead.");
+      } catch (err) {
+        const name = err instanceof DOMException ? err.name : undefined;
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+          setError("Camera access was denied. Use manual entry instead, or allow camera access and try again.");
+        } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+          setError("No camera was found on this device. Use manual entry instead.");
+        } else {
+          setError("Couldn't access the camera. Use manual entry instead.");
+        }
         setMode("manual");
       }
     };
@@ -83,6 +99,11 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
       ) : (
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="w-full max-w-sm space-y-4">
+            {error && (
+              <div className="bg-red-600/80 text-white p-3 rounded-lg text-sm text-center">
+                {error}
+              </div>
+            )}
             <input
               type="text"
               placeholder="Enter Asset ID"
@@ -99,7 +120,10 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
       )}
 
       <div className="p-4 flex justify-center">
-        <button onClick={() => setMode(mode === "camera" ? "manual" : "camera")}
+        <button onClick={() => {
+            setError("");
+            setMode(mode === "camera" ? "manual" : "camera");
+          }}
           className="text-white/70 text-sm flex items-center gap-1">
           {mode === "camera" ? <><Keyboard className="w-4 h-4" /> Enter ID manually</> : <><Camera className="w-4 h-4" /> Use camera</>}
         </button>
