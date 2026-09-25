@@ -9,8 +9,71 @@ import { Server, Socket } from 'socket.io';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnEvent } from '@nestjs/event-emitter';
-import { Logger } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+  UseGuards,
+} from '@nestjs/common';
 import { Notification } from '../notifications/entities/notification.entity';
+
+/**
+ * Verifies the JWT on a WebSocket connection's handshake and stamps the
+ * decoded user id onto `client.data.userId`. Shared by `handleConnection`
+ * (rejects unauthenticated sockets outright) and available via
+ * `@UseGuards(WsJwtGuard)` for any `@SubscribeMessage` handler this or
+ * another gateway adds later — previously, auth was only ever inline in
+ * `handleConnection`, so a new message handler added without remembering
+ * to re-check `client.data.userId` would have been reachable by any
+ * connected socket, authenticated or not.
+ */
+@Injectable()
+export class WsJwtGuard implements CanActivate {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
+  ) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const client = context.switchToWs().getClient<Socket>();
+
+    if (client.data?.userId) {
+      // Already verified during handleConnection.
+      return true;
+    }
+
+    const token = extractWsToken(client);
+    if (!token) {
+      throw new WsException('Missing authentication token');
+    }
+
+    try {
+      const payload = this.jwtService.verify(token, {
+        secret: this.configService.get<string>('JWT_SECRET', 'secretKey'),
+      });
+      if (!payload?.sub) {
+        throw new WsException('Invalid token payload');
+      }
+      client.data.userId = payload.sub;
+      return true;
+    } catch {
+      throw new WsException('Unauthorized');
+    }
+  }
+}
+
+function extractWsToken(client: Socket): string | undefined {
+  const authHeader = client.handshake.headers.authorization;
+  if (authHeader) {
+    const [scheme, token] = authHeader.split(' ');
+    if (scheme?.toLowerCase() === 'bearer' && token) return token;
+  }
+  const queryToken = client.handshake.query.token;
+  if (typeof queryToken === 'string') return queryToken;
+  if (Array.isArray(queryToken) && queryToken.length > 0) return queryToken[0];
+  return undefined;
+}
 
 /**
  * Real-time event gateway.
@@ -35,6 +98,7 @@ import { Notification } from '../notifications/entities/notification.entity';
     callback(null, { origin, credentials: true });
   },
 })
+@UseGuards(WsJwtGuard)
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private static configService: ConfigService;
   private readonly logger = new Logger(EventsGateway.name);
@@ -51,7 +115,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(client: Socket) {
     try {
-      const token = this.extractToken(client);
+      const token = extractWsToken(client);
       if (!token) {
         throw new WsException('Missing authentication token');
       }
@@ -73,19 +137,6 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket) {
     this.logger.debug(`Client ${client.id} disconnected`);
-  }
-
-  private extractToken(client: Socket): string | undefined {
-    const authHeader = client.handshake.headers.authorization;
-    if (authHeader) {
-      const [scheme, token] = authHeader.split(' ');
-      if (scheme?.toLowerCase() === 'bearer' && token) return token;
-    }
-    const queryToken = client.handshake.query.token;
-    if (typeof queryToken === 'string') return queryToken;
-    if (Array.isArray(queryToken) && queryToken.length > 0)
-      return queryToken[0];
-    return undefined;
   }
 
   @OnEvent('notification.new')
