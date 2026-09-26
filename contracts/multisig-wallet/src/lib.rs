@@ -117,12 +117,20 @@ impl MultisigWallet {
         Self::check_owner(&env, &initiator)?;
         Self::check_not_frozen(&env)?;
 
-        let tx_id: u64 = env.storage().instance().get(&DataKey::NextTxId).ok_or(Error::NotInitialized)?;
+        let tx_id: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::NextTxId)
+            .ok_or(Error::NotInitialized)?;
         env.storage()
             .instance()
             .set(&DataKey::NextTxId, &(tx_id + 1));
 
-        let threshold: u32 = env.storage().instance().get(&DataKey::Threshold).ok_or(Error::NotInitialized)?;
+        let threshold: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Threshold)
+            .ok_or(Error::NotInitialized)?;
 
         let tx = Transaction {
             id: tx_id,
@@ -334,7 +342,11 @@ impl MultisigWallet {
         proposer.require_auth();
         Self::check_owner(&env, &proposer)?;
 
-        let owners: Vec<Address> = env.storage().instance().get(&DataKey::Owners).ok_or(Error::NotInitialized)?;
+        let owners: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .ok_or(Error::NotInitialized)?;
         if owners.contains(&new_owner) {
             return Err(Error::OwnerAlreadyExists);
         }
@@ -357,12 +369,20 @@ impl MultisigWallet {
         proposer.require_auth();
         Self::check_owner(&env, &proposer)?;
 
-        let owners: Vec<Address> = env.storage().instance().get(&DataKey::Owners).ok_or(Error::NotInitialized)?;
+        let owners: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .ok_or(Error::NotInitialized)?;
         if !owners.contains(&owner_to_remove) {
             return Err(Error::OwnerNotFound);
         }
 
-        let threshold: u32 = env.storage().instance().get(&DataKey::Threshold).ok_or(Error::NotInitialized)?;
+        let threshold: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Threshold)
+            .ok_or(Error::NotInitialized)?;
         if owners.len() <= 2 || owners.len() <= threshold {
             return Err(Error::InsufficientOwners);
         }
@@ -385,7 +405,11 @@ impl MultisigWallet {
         proposer.require_auth();
         Self::check_owner(&env, &proposer)?;
 
-        let owners: Vec<Address> = env.storage().instance().get(&DataKey::Owners).ok_or(Error::NotInitialized)?;
+        let owners: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .ok_or(Error::NotInitialized)?;
         if new_threshold == 0 || new_threshold > owners.len() {
             return Err(Error::InvalidThreshold);
         }
@@ -432,7 +456,11 @@ impl MultisigWallet {
             proposal.confirmations_received,
         );
 
-        let threshold: u32 = env.storage().instance().get(&DataKey::Threshold).ok_or(Error::NotInitialized)?;
+        let threshold: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Threshold)
+            .ok_or(Error::NotInitialized)?;
         if proposal.confirmations_received >= threshold {
             Self::execute_proposal(env, proposal_id)?;
         }
@@ -451,16 +479,26 @@ impl MultisigWallet {
             return Err(Error::InvalidProposal);
         }
 
-        let threshold: u32 = env.storage().instance().get(&DataKey::Threshold).ok_or(Error::NotInitialized)?;
+        let threshold: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Threshold)
+            .ok_or(Error::NotInitialized)?;
         if proposal.confirmations_received < threshold {
             return Err(Error::Unauthorized);
         }
 
         match proposal.proposal_type {
             ProposalType::AddOwner => {
-                let new_owner = proposal.target_address.clone().ok_or(Error::InvalidProposal)?;
-                let mut owners: Vec<Address> =
-                    env.storage().instance().get(&DataKey::Owners).ok_or(Error::NotInitialized)?;
+                let new_owner = proposal
+                    .target_address
+                    .clone()
+                    .ok_or(Error::InvalidProposal)?;
+                let mut owners: Vec<Address> = env
+                    .storage()
+                    .instance()
+                    .get(&DataKey::Owners)
+                    .ok_or(Error::NotInitialized)?;
                 owners.push_back(new_owner.clone());
                 env.storage().instance().set(&DataKey::Owners, &owners);
 
@@ -481,9 +519,15 @@ impl MultisigWallet {
                 events::owner_added(&env, &new_owner, &proposal.proposer);
             }
             ProposalType::RemoveOwner => {
-                let owner_to_remove = proposal.target_address.clone().ok_or(Error::InvalidProposal)?;
-                let mut owners: Vec<Address> =
-                    env.storage().instance().get(&DataKey::Owners).ok_or(Error::NotInitialized)?;
+                let owner_to_remove = proposal
+                    .target_address
+                    .clone()
+                    .ok_or(Error::InvalidProposal)?;
+                let mut owners: Vec<Address> = env
+                    .storage()
+                    .instance()
+                    .get(&DataKey::Owners)
+                    .ok_or(Error::NotInitialized)?;
                 if let Some(i) = owners.iter().position(|x| x == owner_to_remove) {
                     owners.remove(i as u32);
                 }
@@ -496,7 +540,11 @@ impl MultisigWallet {
             }
             ProposalType::ChangeThreshold => {
                 let new_threshold = proposal.new_threshold.ok_or(Error::InvalidProposal)?;
-                let old_threshold: u32 = env.storage().instance().get(&DataKey::Threshold).ok_or(Error::NotInitialized)?;
+                let old_threshold: u32 = env
+                    .storage()
+                    .instance()
+                    .get(&DataKey::Threshold)
+                    .ok_or(Error::NotInitialized)?;
                 env.storage()
                     .instance()
                     .set(&DataKey::Threshold, &new_threshold);

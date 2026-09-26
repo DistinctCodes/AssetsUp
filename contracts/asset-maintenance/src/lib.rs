@@ -224,7 +224,11 @@ impl AssetMaintenanceContract {
     }
 
     pub fn register_provider(env: Env, provider: ProviderProfile) {
-        let admin: Address = env.storage().persistent().get(&DataKey::Admin).unwrap_or_else(|| handle_error(&env, Error::NotInitialized));
+        let admin: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Admin)
+            .unwrap_or_else(|| handle_error(&env, Error::NotInitialized));
         admin.require_auth();
 
         env.storage()
@@ -235,7 +239,11 @@ impl AssetMaintenanceContract {
     }
 
     pub fn deactivate_provider(env: Env, provider_address: Address) {
-        let admin: Address = env.storage().persistent().get(&DataKey::Admin).unwrap_or_else(|| handle_error(&env, Error::NotInitialized));
+        let admin: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Admin)
+            .unwrap_or_else(|| handle_error(&env, Error::NotInitialized));
         admin.require_auth();
 
         if let Some(mut provider) = env
@@ -272,6 +280,13 @@ impl AssetMaintenanceContract {
         }
         if record.labor_cost < 0 || record.parts_cost < 0 || record.total_cost < 0 {
             panic!("cost values must be non-negative");
+        }
+        let max_cost: i128 = 999_999_999_999; // Upper bound on individual cost
+        if record.labor_cost > max_cost
+            || record.parts_cost > max_cost
+            || record.total_cost > max_cost
+        {
+            panic!("cost value exceeds maximum allowed");
         }
         if record.labor_cost + record.parts_cost != record.total_cost {
             panic!("labor + parts cost must equal total cost");

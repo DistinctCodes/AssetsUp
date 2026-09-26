@@ -104,7 +104,9 @@ pub fn get_latest_valuation(env: Env, asset_id: u64) -> ValuationEntry {
     if history.is_empty() {
         crate::handle_error(&env, crate::Error::NotFound);
     }
-    history.last().unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotFound))
+    history
+        .last()
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotFound))
 }
 
 pub fn get_valuation_history(env: Env, asset_id: u64) -> Vec<ValuationEntry> {

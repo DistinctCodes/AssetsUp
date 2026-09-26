@@ -1,3 +1,15 @@
+/**
+ * Audit Log Page
+ * 
+ * PURPOSE: Records all user actions and system changes (create, update, delete operations)
+ * across assets, users, departments, and authentication events.
+ * 
+ * This is distinct from the "Audits / Stocktake" page which performs physical verification
+ * of asset locations and inventory counts.
+ * 
+ * USE CASE: Compliance and accountability—who did what and when.
+ */
+
 'use client';
 
 import { useState } from 'react';
@@ -24,6 +36,7 @@ export default function AuditLogPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Audit Log</h1>
         <p className="text-sm text-gray-500 mt-1">Track changes across assets and users</p>
+        <p className="text-xs text-gray-400 mt-1">See all system actions (create, update, delete) for compliance and accountability</p>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">

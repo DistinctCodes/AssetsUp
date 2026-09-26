@@ -99,7 +99,9 @@ pub fn unstake_tokens(env: Env, asset_id: u64, staker: Address) {
 
     let store = env.storage().persistent();
     let key = DataKey::Stake(asset_id, staker.clone());
-    let mut stake: Stake = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::StakeNotFound));
+    let mut stake: Stake = store
+        .get(&key)
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::StakeNotFound));
 
     let now = env.ledger().timestamp();
     if now < stake.staked_at + stake.lock_period {

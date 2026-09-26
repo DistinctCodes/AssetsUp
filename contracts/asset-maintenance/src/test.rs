@@ -201,6 +201,63 @@ fn make_alert(env: &Env, asset_id: u64, message: &str) -> MaintenanceAlert {
 // ---------------------------------------------------------------------------
 
 #[test]
+fn test_unauthorized_maintenance_logging() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(AssetMaintenanceContract, ());
+    let client = AssetMaintenanceContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let registry = Address::generate(&env);
+    client.init(&admin, &registry);
+
+    let provider_addr = Address::generate(&env);
+    let unauthorized_addr = Address::generate(&env);
+    let provider = ProviderProfile {
+        address: provider_addr.clone(),
+        name: String::from_str(&env, "Service Corp"),
+        specialization: vec![&env, String::from_str(&env, "Engines")],
+        certification_details: String::from_str(&env, "ISO9001"),
+        total_services: 0,
+        average_rating: 0,
+        registration_timestamp: env.ledger().timestamp(),
+        is_active: true,
+        contact_hash: String::from_str(&env, "hash"),
+        service_area: String::from_str(&env, "Global"),
+    };
+    client.register_provider(&provider);
+
+    let asset_id = 999u64;
+    let record = MaintenanceRecord {
+        record_id: 1,
+        asset_id,
+        maintenance_type: MaintenanceType::Preventive,
+        provider: unauthorized_addr.clone(), // Unauthorized provider
+        technician_id: String::from_str(&env, "TECH-01"),
+        service_date: env.ledger().timestamp(),
+        duration_hours: 4,
+        description: String::from_str(&env, "Unauthorized attempt"),
+        parts_replaced: vec![&env],
+        labor_cost: 100,
+        parts_cost: 50,
+        total_cost: 150,
+        location: String::from_str(&env, "Main Shop"),
+        condition_before: 7,
+        condition_after: 9,
+        issues_found: String::from_str(&env, "None"),
+        issues_resolved: String::from_str(&env, "N/A"),
+        next_recommendation: String::from_str(&env, "Check in 6 months"),
+        documents_ipfs: vec![&env],
+        quality_rating: 10,
+        timestamp: env.ledger().timestamp(),
+    };
+
+    // Attempt to add record with unauthorized provider should fail
+    assert!(client.try_add_maintenance_record(&record).is_err());
+}
+
+#[test]
 fn test_out_of_bounds_alert_index_is_rejected() {
     let env = Env::default();
     env.mock_all_auths();
