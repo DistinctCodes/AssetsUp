@@ -228,7 +228,9 @@ impl ContribContract {
         let store = env.storage().persistent();
         let key = DataKey::Asset(asset_id.clone());
 
-        let mut asset: Asset = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound));
+        let mut asset: Asset = store
+            .get(&key)
+            .unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound));
 
         if asset.owner != caller {
             panic!("Unauthorized");
@@ -266,7 +268,9 @@ impl ContribContract {
         let store = env.storage().persistent();
         let key = DataKey::Asset(asset_id.clone());
 
-        let mut asset: Asset = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound));
+        let mut asset: Asset = store
+            .get(&key)
+            .unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound));
 
         if asset.owner != caller {
             panic!("Unauthorized");

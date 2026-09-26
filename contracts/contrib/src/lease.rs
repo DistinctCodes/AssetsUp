@@ -91,7 +91,9 @@ pub fn check_in_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
     caller.require_auth();
     let store = env.storage().persistent();
     let key = DataKey::Lease(lease_id.clone());
-    let mut lease: Lease = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::LeaseNotFound));
+    let mut lease: Lease = store
+        .get(&key)
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::LeaseNotFound));
 
     if caller != lease.lessor {
         panic!("Unauthorized: Only lessor can check in lease");
@@ -107,9 +109,13 @@ pub fn cancel_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
     caller.require_auth();
     let store = env.storage().persistent();
     let key = DataKey::Lease(lease_id.clone());
-    let mut lease: Lease = store.get(&key).unwrap_or_else(|| crate::handle_error(&env, crate::Error::LeaseNotFound));
+    let mut lease: Lease = store
+        .get(&key)
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::LeaseNotFound));
 
-    let admin: Address = store.get(&GlobalDataKey::Admin).unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
+    let admin: Address = store
+        .get(&GlobalDataKey::Admin)
+        .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
 
     if caller != lease.lessor && caller != admin {
         panic!("Unauthorized: Only lessor or admin can cancel lease");

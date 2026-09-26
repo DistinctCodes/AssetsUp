@@ -1,3 +1,15 @@
+/**
+ * Audits / Stocktake Page
+ * 
+ * PURPOSE: Physical asset verification and inventory stocktake sessions.
+ * Users create audit sessions to verify that physical assets match system records
+ * (location, condition, existence).
+ * 
+ * This is distinct from the "Audit Log" page which tracks all system actions and changes.
+ * 
+ * USE CASE: Physical inventory control and asset location verification.
+ */
+
 "use client";
 
 import { useState } from "react";
@@ -34,6 +46,9 @@ export default function AuditsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Audits / Stocktake</h1>
           <p className="text-sm text-gray-500 mt-1">
             Verify physical assets exist where the system says they do
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            See &ldquo;Audit Log&rdquo; to track system action history instead
           </p>
         </div>
         <Button size="sm" onClick={() => setShowWizard(true)}>
