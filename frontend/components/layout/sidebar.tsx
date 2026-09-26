@@ -37,6 +37,10 @@ const navItems = [
   { href: "/reports", label: "Reports", icon: BarChart3 },
 ];
 
+export function isActiveRoute(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 interface SidebarProps {
   open?: boolean;
   onClose?: () => void;
@@ -45,7 +49,7 @@ interface SidebarProps {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuthStore();
+  const logout = useAuthStore((state) => state.logout);
   const asideRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -191,7 +195,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto" aria-label="Site pages">
           {navItems.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
+            const active = isActiveRoute(pathname, href);
             return (
               <Link
                 key={href}

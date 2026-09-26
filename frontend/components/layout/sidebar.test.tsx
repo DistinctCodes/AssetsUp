@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Sidebar } from './sidebar';
 
 const mockPush = jest.fn();
@@ -46,7 +46,7 @@ describe('Sidebar', () => {
     const logoutButton = screen.getByText('Logout');
     fireEvent.click(logoutButton);
     expect(mockLogout).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith('/login');
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/login'));
   });
 
   it('renders Settings and Notifications links', () => {
