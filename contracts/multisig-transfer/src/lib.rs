@@ -42,6 +42,8 @@ mod integration_tests;
 mod pagination_tests;
 mod registry;
 mod rules;
+#[cfg(test)]
+mod signer_count_tests;
 mod storage;
 mod types;
 mod utils;
@@ -86,9 +88,10 @@ impl MultiSigTransferContract {
         caller.require_auth();
         utils::require_admin(&e, &caller)?;
 
-        if rule.required_approvals == 0 {
-            return Err(MultiSigError::InvalidThreshold);
-        }
+        // Rejects rules that could never be satisfied: no threshold at all
+        // (`InvalidThreshold`), a threshold above the rule's own signer set
+        // (`ThresholdExceedsSignerCount`), or a signer set below `MIN_SIGNERS`.
+        rules::validate(&rule)?;
 
         let mut rules_map = storage::rules_map(&e);
         rules_map.set(rule.category.clone(), rule.clone());

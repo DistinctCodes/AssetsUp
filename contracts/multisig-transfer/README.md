@@ -29,6 +29,11 @@ other:
 - An asset has at most one pending transfer request at a time
   (`AssetPendingRequest`); a second request fails with `PendingRequestExists`.
 - An approver cannot approve the same request twice (`AlreadyApproved`).
+- An approval rule must be satisfiable by its own signer set:
+  `1 <= required_approvals <= approvers.len()`, with `approvers.len() >= MIN_SIGNERS`.
+  A threshold above the signer count (`ThresholdExceedsSignerCount`) or an empty
+  signer set (`InsufficientSigners`) is rejected at write time rather than
+  accepted and silently wedging every transfer raised under it (see [SC-77]).
 - A requester cannot approve their own request (`CannotApproveOwnRequest`).
 - Execution requires `approvals >= rule.required_approvals` for the asset's
   category (`NotEnoughApprovals`).
@@ -60,7 +65,7 @@ follow.
 | Entrypoint | Args | Returns | Auth | Errors |
 |---|---|---|---|---|
 | `initialize` | `admin, asset_registry` | `()` | — (none) | — |
-| `configure_approval_rule` | `caller, rule` | `Result<()>` | admin check via `require_admin` | `NotInitialized`, `Unauthorized` |
+| `configure_approval_rule` | `caller, rule` | `Result<()>` | admin check via `require_admin` | `NotInitialized`, `Unauthorized`, `InvalidThreshold`, `ThresholdExceedsSignerCount`, `InsufficientSigners` |
 | `create_transfer_request` | `caller, asset_id, asset_category, to_owner, ...` | `Result<u64>` | caller ownership check | `AssetNotFound`, `AssetRetired`, `InvalidOwner`, `InvalidNewOwner`, `PendingRequestExists`, `RuleNotFound` |
 | `approve_transfer_request` | `caller, request_id, ...` | `Result<()>` | approver membership check | `RequestNotFound`, `RequestNotPending`, `ApproverNotAuthorized`, `CannotApproveOwnRequest`, `AlreadyApproved`, `ApprovalDeadlinePassed` |
 | `reject_transfer_request` | `caller, request_id, reason_hash` | `Result<()>` | approver membership check | `RequestNotFound`, `RequestNotPending`, `ApproverNotAuthorized` |
