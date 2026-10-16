@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PublicAssetDto, toPublicAsset } from './dto/public-asset.dto';
 import { Asset, ASSET_DETAIL_RELATIONS } from './entities/asset.entity';
 import { AssetLifecycleService, AssetStatus } from './asset-lifecycle.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -110,6 +111,23 @@ export class AssetsService {
     });
     if (!asset) throw new NotFoundException(`Asset ${id} not found`);
     return asset;
+  }
+
+  /**
+   * Public scan lookup by asset id (UUID) or printed asset tag. Returns only
+   * non-sensitive fields; unknown/soft-deleted assets are a 404.
+   */
+  async findPublicByScan(assetId: string): Promise<PublicAssetDto> {
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        assetId,
+      );
+    const asset = await this.assetRepo.findOne({
+      where: isUuid ? { id: assetId } : { assetTag: assetId },
+      relations: ['category', 'location'],
+    });
+    if (!asset) throw new NotFoundException('Asset not found');
+    return toPublicAsset(asset);
   }
 
   async updateStatus(id: string, dto: UpdateAssetStatusDto, actorId?: string) {

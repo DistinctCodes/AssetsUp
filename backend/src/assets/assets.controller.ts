@@ -16,7 +16,9 @@ import {
   ApiBadRequestResponse,
   ApiResponse,
 } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AssetsService } from './assets.service';
+import { PublicAssetDto } from './dto/public-asset.dto';
 import { AssetHistoryService } from './asset-history.service';
 import { ReservationsService } from '../reservations/reservations.service';
 import { AssetHistoryAction } from './entities/asset-history-event.entity';
@@ -69,6 +71,21 @@ export class AssetsController {
   @ApiResponse({ status: 201, description: 'Asset created' })
   create(@Body() dto: any) {
     return this.assetsService.create(dto);
+  }
+
+  /**
+   * Public (no JWT) landing data for a scanned QR label. Declared before the
+   * `:id` routes so `scan` is never captured as an asset id.
+   */
+  @Get('scan/:assetId')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Public asset info for a scanned QR code' })
+  @ApiResponse({ status: 200, type: PublicAssetDto })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  scan(@Param('assetId') assetId: string) {
+    return this.assetsService.findPublicByScan(assetId);
   }
 
   @Get(':id')
