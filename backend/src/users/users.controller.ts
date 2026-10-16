@@ -7,6 +7,7 @@ import {
   Query,
   Req,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,6 +18,7 @@ import {
 import { UsersService } from './users.service';
 import { UserRole } from './entities/user.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { GetUser } from '../auth/decorators/get-user.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @ApiTags('users')
@@ -41,16 +43,9 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'Current user profile' })
-  async getProfile(@Req() req: any) {
-    const userId = req.user?.id || req.user?.sub;
+  async getProfile(@GetUser('id') userId?: string) {
     if (!userId) {
-      return {
-        id: 'demo-user-id',
-        email: 'user@example.com',
-        role: UserRole.ADMIN,
-        firstName: 'Demo',
-        lastName: 'User',
-      };
+      throw new UnauthorizedException('Authentication required');
     }
     const user = await this.usersService.findById(userId);
     return this.usersService.sanitize(user);

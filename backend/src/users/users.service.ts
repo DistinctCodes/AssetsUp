@@ -12,6 +12,7 @@ import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './entities/user.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { normalizeEmail } from './utils/normalize-email';
 
 @Injectable()
 export class UsersService {
@@ -61,7 +62,9 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { email } });
+    return this.userRepository.findOne({
+      where: { email: normalizeEmail(email) },
+    });
   }
 
   async create(dto: {
@@ -76,7 +79,7 @@ export class UsersService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = this.userRepository.create({
-      email: dto.email,
+      email: normalizeEmail(dto.email),
       passwordHash,
       firstName: dto.firstName,
       lastName: dto.lastName,
