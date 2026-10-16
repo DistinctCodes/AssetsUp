@@ -79,6 +79,26 @@ export class AssetsController {
     return this.assetsService.findDetail(id);
   }
 
+  // Literal `bulk` routes must be declared before the `:id` routes below,
+  // otherwise Express matches `bulk` as an id and these handlers never run.
+  @Patch('bulk/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Bulk update asset status' })
+  @ApiResponse({ status: 200, description: 'Bulk status update result' })
+  bulkStatus(@Body() dto: BulkStatusDto, @GetUser() user: User) {
+    return this.assetsService.bulkStatus(dto, user.id);
+  }
+
+  @Delete('bulk')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Bulk soft delete assets (ADMIN only)' })
+  @ApiResponse({ status: 200, description: 'Bulk delete result' })
+  @ApiResponse({ status: 403, description: 'Forbidden — requires ADMIN role' })
+  bulkDelete(@Body() dto: BulkDeleteDto, @GetUser() user: User) {
+    return this.assetsService.bulkDelete(dto, user.id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update an asset' })
   @ApiResponse({ status: 200, description: 'Asset updated' })
@@ -146,30 +166,12 @@ export class AssetsController {
     return this.assetsService.transfer(id, dto, user?.id);
   }
 
-  @Patch('bulk/status')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Bulk update asset status' })
-  @ApiResponse({ status: 200, description: 'Bulk status update result' })
-  bulkStatus(@Body() dto: BulkStatusDto, @GetUser() user: User) {
-    return this.assetsService.bulkStatus(dto, user.id);
-  }
-
   @Patch('bulk/assign')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Bulk assign assets to user or department' })
   @ApiResponse({ status: 200, description: 'Bulk assignment result' })
   bulkAssign(@Body() dto: BulkAssignDto, @GetUser() user: User) {
     return this.assetsService.bulkAssign(dto, user.id);
-  }
-
-  @Delete('bulk')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'Bulk soft delete assets (ADMIN only)' })
-  @ApiResponse({ status: 200, description: 'Bulk delete result' })
-  @ApiResponse({ status: 403, description: 'Forbidden — requires ADMIN role' })
-  bulkDelete(@Body() dto: BulkDeleteDto, @GetUser() user: User) {
-    return this.assetsService.bulkDelete(dto, user.id);
   }
 
   @Get(':id/availability')
