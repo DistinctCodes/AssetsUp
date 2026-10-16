@@ -17,6 +17,7 @@ import {
 import { UsersService } from './users.service';
 import { UserRole } from './entities/user.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ListUsersQueryDto } from './dto/list-users-query.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @ApiTags('users')
@@ -28,13 +29,8 @@ export class UsersController {
   @Get()
   @ApiOperation({ summary: 'List users (paginated, searchable)' })
   @ApiResponse({ status: 200, description: 'List of users' })
-  findAll(
-    @Query('search') search?: string,
-    @Query('role') role?: UserRole,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.usersService.findAll({ search, role, page, limit });
+  findAll(@Query() query: ListUsersQueryDto) {
+    return this.usersService.findAll(query);
   }
 
   @Get('me')

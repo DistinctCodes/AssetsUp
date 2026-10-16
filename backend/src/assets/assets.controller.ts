@@ -17,6 +17,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
+import { ListAssetsQueryDto } from './dto/list-assets-query.dto';
 import { AssetHistoryService } from './asset-history.service';
 import { ReservationsService } from '../reservations/reservations.service';
 import { AssetHistoryAction } from './entities/asset-history-event.entity';
@@ -44,24 +45,8 @@ export class AssetsController {
   @Get()
   @ApiOperation({ summary: 'List all assets (paginated, filterable)' })
   @ApiResponse({ status: 200, description: 'Paginated list of assets' })
-  findAll(
-    @Query('search') search?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('departmentId') departmentId?: string,
-    @Query('locationId') locationId?: string,
-    @Query('status') status?: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.assetsService.findAll({
-      search,
-      categoryId,
-      departmentId,
-      locationId,
-      status,
-      page,
-      limit,
-    });
+  findAll(@Query() query: ListAssetsQueryDto) {
+    return this.assetsService.findAll(query);
   }
 
   @Post()
