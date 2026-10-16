@@ -42,6 +42,8 @@ mod integration_tests;
 mod pagination_tests;
 mod registry;
 mod rules;
+#[cfg(test)]
+mod signer_events_tests;
 mod storage;
 mod types;
 mod utils;
@@ -91,10 +93,29 @@ impl MultiSigTransferContract {
         }
 
         let mut rules_map = storage::rules_map(&e);
+
+        // Read the outgoing rule before overwriting it. Signers are not stored
+        // in a standalone registry -- the set *is* `rule.approvers`, replaced
+        // wholesale here -- so the only way to report a signer leaving is to
+        // have captured the previous set first.
+        let previous = rules_map.get(rule.category.clone());
+
         rules_map.set(rule.category.clone(), rule.clone());
         storage::set_rules_map(&e, &rules_map);
 
-        events::approval_rule_updated(&e, &rule.category, rule.required_approvals, utils::now(&e));
+        let now = utils::now(&e);
+        events::approval_rule_updated(&e, &rule.category, rule.required_approvals, now);
+
+        // `ApprovalRuleUpdated` reports the new threshold but not who changed.
+        // Emitting a per-approver delta is what lets off-chain monitoring alert
+        // on a signer being added or revoked without re-reading contract state.
+        for approver in rules::added_approvers(&e, &previous, &rule).iter() {
+            events::approver_added(&e, &approver, &caller, now);
+        }
+        for approver in rules::removed_approvers(&e, &previous, &rule).iter() {
+            events::approver_removed(&e, &approver, &caller, now);
+        }
+
         Ok(())
     }
 

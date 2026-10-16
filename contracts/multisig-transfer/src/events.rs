@@ -80,6 +80,8 @@ pub struct ApprovalRuleUpdated {
 }
 
 /// An address was granted approver rights.
+///
+/// Emitted once per address that is newly present in a rule's approver set.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ApproverAdded {
@@ -90,6 +92,10 @@ pub struct ApproverAdded {
 }
 
 /// An address had its approver rights revoked.
+///
+/// Emitted once per address that is no longer present in a rule's approver set.
+/// Note this revokes *future* approvals only: a request already approved under
+/// the previous set stays `Approved` and executable.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ApproverRemoved {
@@ -203,7 +209,6 @@ pub fn approval_rule_updated(e: &Env, category: &BytesN<32>, required: u32, time
     .publish(e);
 }
 
-#[allow(dead_code)]
 pub fn approver_added(e: &Env, approver: &Address, added_by: &Address, timestamp: u64) {
     ApproverAdded {
         approver: approver.clone(),
@@ -213,7 +218,6 @@ pub fn approver_added(e: &Env, approver: &Address, added_by: &Address, timestamp
     .publish(e);
 }
 
-#[allow(dead_code)]
 pub fn approver_removed(e: &Env, approver: &Address, removed_by: &Address, timestamp: u64) {
     ApproverRemoved {
         approver: approver.clone(),
