@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcryptjs';
+import { PasswordService } from '../common/security/password.service';
 import { UsersService } from '../users/users.service';
 import { User, UserRole } from '../users/entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
@@ -44,7 +44,12 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @Optional() private readonly auditLogsService?: AuditLogsService,
-  ) {}
+    @Optional() passwords?: PasswordService,
+  ) {
+    this.passwords = passwords ?? new PasswordService(configService);
+  }
+
+  private readonly passwords: PasswordService;
 
   private pruneExpiredRevocations() {
     const now = Math.floor(Date.now() / 1000);
@@ -137,7 +142,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isMatch = await bcrypt.compare(dto.password, user.passwordHash);
+    const isMatch = await this.passwords.compare(dto.password, user.passwordHash);
     if (!isMatch) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -269,7 +274,7 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
-    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const passwordHash = await this.passwords.hash(newPassword);
     await this.usersService.updatePassword(user.id, passwordHash);
 
     return { message: 'Password reset successfully' };
