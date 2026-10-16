@@ -55,6 +55,32 @@ Storage is centralized in [`src/storage.rs`](src/storage.rs) rather than
 scattered across modules — this is the pattern the rest of the workspace should
 follow.
 
+### TTL policy
+
+All entries are **persistent**, and every one carries an explicit TTL policy in
+[`src/ttl.rs`](src/ttl.rs), mirroring `assetsup`: an entry is bumped when it has
+fewer than 30 days of ledgers left, back out to 90.
+
+TTL is extended in two places, and both are needed:
+
+- **On write**, inside the `set_*` accessors in `storage.rs`. An entrypoint that
+  only bumped at its start would extend what was already there, leaving anything
+  it writes afterwards at the network's `min_persistent_entry_ttl`.
+- **On read and on entry**, via `ttl::extend_all` at the top of every
+  entrypoint, including the read-only queries. A completed transfer is never
+  written again, so a write-only policy would let its record lapse while an
+  indexer is still querying it.
+
+The `(request_id, approver)` approval flags in `approvals.rs` are individually
+keyed, so `extend_all` cannot reach them; they are extended on read and write
+directly.
+
+Note that `Requests`, `AssetHistory` and the other maps are stored as a single
+entry each, so TTL is per-map rather than per-request. TTL is a floor on data
+lifetime, not a cleanup mechanism — abandoned approvals are handled by expiry
+(see [SC-73]), which also releases the asset lock. Letting TTL lapse would
+archive the record *without* releasing the lock, which is strictly worse.
+
 ## Entrypoints
 
 | Entrypoint | Args | Returns | Auth | Errors |
@@ -116,6 +142,7 @@ Resolving this is tracked in [SC-45].
 | `events.rs` | All event emission. |
 | `errors.rs` | `MultiSigError`. |
 | `utils.rs` | `require_admin`, `now`. |
+| `ttl.rs` | Storage TTL policy and `extend_all`. |
 
 ## Tests
 

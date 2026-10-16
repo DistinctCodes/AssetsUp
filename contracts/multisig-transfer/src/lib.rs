@@ -43,6 +43,8 @@ mod pagination_tests;
 mod registry;
 mod rules;
 mod storage;
+#[cfg(test)]
+mod ttl_tests;
 mod types;
 mod utils;
 
@@ -59,6 +61,8 @@ impl MultiSigTransferContract {
     // Init
     // ----------------------------
     pub fn initialize(e: Env, admin: Address, asset_registry: Address) {
+        ttl::extend_all(&e);
+
         // Without this, whoever calls initialize first becomes admin of a
         // freshly deployed contract, regardless of who deployed it.
         admin.require_auth();
@@ -80,6 +84,8 @@ impl MultiSigTransferContract {
         caller: Address,
         rule: ApprovalRule,
     ) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
         // require_admin only compares `caller` against the stored admin.
         // Without authenticating `caller` first, anyone could pass the admin's
         // address and pass that check.
@@ -112,6 +118,8 @@ impl MultiSigTransferContract {
         expires_at: u64,
         execute_after: Option<u64>,
     ) -> Result<u64, MultiSigError> {
+        ttl::extend_all(&e);
+
         // The ownership check below compares the registry's owner against a
         // caller-supplied address; authenticate it first.
         caller.require_auth();
@@ -209,6 +217,8 @@ impl MultiSigTransferContract {
         caller: Address,
         request_id: u64,
     ) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
         // The approver-membership check below compares against a
         // caller-supplied address; authenticate it first or approvals can be
         // forged by naming an authorized approver.
@@ -269,6 +279,8 @@ impl MultiSigTransferContract {
         request_id: u64,
         reason_hash: BytesN<32>,
     ) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
         caller.require_auth();
         let (_admin, _registry) = utils::require_init(&e)?;
 
@@ -303,6 +315,8 @@ impl MultiSigTransferContract {
     // Execute transfer (anyone can trigger once approved)
     // ----------------------------
     pub fn execute_transfer(e: Env, caller: Address, request_id: u64) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
         let (_admin, registry_addr) = utils::require_init(&e)?;
         // Deliberately permissionless, like multisig-wallet's execute_*: the
         // authorization decision was already made by the approvers, and
@@ -355,6 +369,8 @@ impl MultiSigTransferContract {
         caller: Address,
         request_id: u64,
     ) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
         // Cancellation is restricted to the requester or the admin, both
         // compared against a caller-supplied address.
         caller.require_auth();
@@ -390,6 +406,8 @@ impl MultiSigTransferContract {
     // Queries
     // ----------------------------
     pub fn get_request(e: Env, request_id: u64) -> Result<TransferRequest, MultiSigError> {
+        ttl::extend_all(&e);
+
         let requests = storage::requests_map(&e);
         requests
             .get(request_id)
@@ -397,6 +415,8 @@ impl MultiSigTransferContract {
     }
 
     pub fn get_asset_history(e: Env, asset_id: BytesN<32>, offset: u32, limit: u32) -> Vec<u64> {
+        ttl::extend_all(&e);
+
         let hist = storage::asset_history_map(&e);
         let list = hist.get(asset_id).unwrap_or(Vec::new(&e));
         paginate(&e, &list, offset, limit)
@@ -408,6 +428,8 @@ impl MultiSigTransferContract {
         offset: u32,
         limit: u32,
     ) -> Vec<u64> {
+        ttl::extend_all(&e);
+
         // gas-friendly simple scan approach. If scale grows, add reverse-index.
         let requests = storage::requests_map(&e);
         let mut result = Vec::new(&e);
@@ -444,6 +466,8 @@ impl MultiSigTransferContract {
         offset: u32,
         limit: u32,
     ) -> Result<Vec<Address>, MultiSigError> {
+        ttl::extend_all(&e);
+
         let rule = rules::get_rule(&e, &category)?;
         Ok(paginate(&e, &rule.approvers, offset, limit))
     }
