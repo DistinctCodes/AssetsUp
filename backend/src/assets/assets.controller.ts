@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,6 +18,8 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
+import { AssetLabelService } from './asset-label.service';
+import { AssetQrQueryDto, AssetLabelQueryDto } from './dto/asset-qr-query.dto';
 import { AssetHistoryService } from './asset-history.service';
 import { ReservationsService } from '../reservations/reservations.service';
 import { AssetHistoryAction } from './entities/asset-history-event.entity';
@@ -39,6 +42,7 @@ export class AssetsController {
     private readonly assetsService: AssetsService,
     private readonly assetHistoryService: AssetHistoryService,
     private readonly reservationsService: ReservationsService,
+    private readonly labelService: AssetLabelService,
   ) {}
 
   @Get()
@@ -77,6 +81,30 @@ export class AssetsController {
   @ApiResponse({ status: 404, description: 'Asset not found' })
   findOne(@Param('id') id: string) {
     return this.assetsService.findDetail(id);
+  }
+
+  @Get(':id/qr')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'QR code image (PNG or SVG) encoding the asset scan URL',
+  })
+  @ApiResponse({ status: 200, description: 'QR image' })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  async qr(@Param('id') id: string, @Query() query: AssetQrQueryDto) {
+    const img = await this.labelService.qr(id, query.format, query.size);
+    return new StreamableFile(Buffer.from(img.body), { type: img.contentType });
+  }
+
+  @Get(':id/label')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Printable Code 128 barcode label (PNG) of the asset tag',
+  })
+  @ApiResponse({ status: 200, description: 'Barcode label image' })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  async label(@Param('id') id: string, @Query() query: AssetLabelQueryDto) {
+    const img = await this.labelService.label(id, query.scale);
+    return new StreamableFile(Buffer.from(img.body), { type: img.contentType });
   }
 
   @Patch(':id')
