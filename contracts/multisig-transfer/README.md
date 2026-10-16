@@ -33,6 +33,10 @@ other:
 - Execution requires `approvals >= rule.required_approvals` for the asset's
   category (`NotEnoughApprovals`).
 - Retired assets cannot be transferred (`AssetRetired`).
+- A rule must grant a non-zero approval window (`MissingApprovalWindow`); a
+  request whose window closes short of its threshold is auto-cancelled by
+  `expire_transfer_request`, releasing the asset lock. A request that *did*
+  reach its threshold stays `Approved` and executable.
 
 ## Storage layout
 
@@ -60,12 +64,13 @@ follow.
 | Entrypoint | Args | Returns | Auth | Errors |
 |---|---|---|---|---|
 | `initialize` | `admin, asset_registry` | `()` | — (none) | — |
-| `configure_approval_rule` | `caller, rule` | `Result<()>` | admin check via `require_admin` | `NotInitialized`, `Unauthorized` |
+| `configure_approval_rule` | `caller, rule` | `Result<()>` | admin check via `require_admin` | `NotInitialized`, `Unauthorized`, `InvalidThreshold`, `MissingApprovalWindow` |
 | `create_transfer_request` | `caller, asset_id, asset_category, to_owner, ...` | `Result<u64>` | caller ownership check | `AssetNotFound`, `AssetRetired`, `InvalidOwner`, `InvalidNewOwner`, `PendingRequestExists`, `RuleNotFound` |
 | `approve_transfer_request` | `caller, request_id, ...` | `Result<()>` | approver membership check | `RequestNotFound`, `RequestNotPending`, `ApproverNotAuthorized`, `CannotApproveOwnRequest`, `AlreadyApproved`, `ApprovalDeadlinePassed` |
 | `reject_transfer_request` | `caller, request_id, reason_hash` | `Result<()>` | approver membership check | `RequestNotFound`, `RequestNotPending`, `ApproverNotAuthorized` |
 | `execute_transfer` | `caller, request_id` | `Result<()>` | `caller` | `RequestNotFound`, `RequestNotPending`, `NotEnoughApprovals`, `ExecuteTooEarly`, `RequestExpired`, `RegistryCallFailed` |
 | `cancel_transfer_request` | `caller, request_id` | `Result<()>` | requester or admin | `RequestNotFound`, `RequestNotPending`, `Unauthorized` |
+| `expire_transfer_request` | `caller, request_id` | `Result<()>` | — (none, permissionless) | `NotInitialized`, `RequestNotFound`, `RequestNotPending`, `ApprovalWindowStillOpen` |
 
 `initialize` performs **no** authorization and can be front-run on a freshly
 deployed contract — see [SC-42].
@@ -87,6 +92,7 @@ crate in the workspace that does this.
 | `("TransferRejected",)` | `(request_id, rejector, reason_hash, timestamp)` |
 | `("TransferExecuted",)` | `(request_id, asset_id, new_owner, timestamp)` |
 | `("TransferCancelled",)` | `(request_id, cancelled_by, timestamp)` |
+| `("TransferRequestExpired",)` | `(request_id, asset_id, approvals_received, approvals_required, approval_deadline, timestamp)` |
 | `("ApprovalRuleUpdated",)` | `(category, required_approvals, timestamp)` |
 | `("ApproverAdded",)` | `(approver, added_by, timestamp)` |
 | `("ApproverRemoved",)` | `(approver, removed_by, timestamp)` |
@@ -97,7 +103,19 @@ uses `symbol_short!` in `snake_case`. `ApproverAdded` and `ApproverRemoved` are
 
 ## Errors
 
-`MultiSigError`, defined in [`src/errors.rs`](src/errors.rs), codes 1–18.
+`MultiSigError`, defined in [`src/errors.rs`](src/errors.rs).
+
+Code allocation follows [`contracts/ERRORS.md`](../ERRORS.md): **1–99** are shared
+across the workspace with the same meaning everywhere, and **400–499** belong
+to this contract alone.
+
+| Code | Variant | Meaning |
+|---|---|---|
+| 2 | `NotInitialized` | Called before `initialize`. Shared. |
+| 3 | `Unauthorized` | Authenticated but not permitted. Shared. |
+| 400–406 | `RequestNotFound` … `PendingRequestExists` | Request lifecycle. |
+| 420–426 | `RuleNotFound` … `ApprovalWindowStillOpen` | Approval rules and approvers. |
+| 440–444 | `AssetNotFound` … `RegistryCallFailed` | Registry interaction. |
 
 Note the collision risk with sibling contracts: code `1` is `NotInitialized`
 here but `AlreadyInitialized` in `assetsup`, `contrib`, and `multisig-wallet`.
@@ -112,7 +130,7 @@ Resolving this is tracked in [SC-45].
 | `types.rs` | `TransferRequest`, `ApprovalRule`, `RequestStatus`. |
 | `approvals.rs` | Approval bookkeeping and double-approval guards. |
 | `registry.rs` | Cross-contract calls into the asset registry. |
-| `rules.rs` | Per-category approval rule lookup. |
+| `rules.rs` | Per-category approval rule lookup and approval-window arithmetic. |
 | `events.rs` | All event emission. |
 | `errors.rs` | `MultiSigError`. |
 | `utils.rs` | `require_admin`, `now`. |

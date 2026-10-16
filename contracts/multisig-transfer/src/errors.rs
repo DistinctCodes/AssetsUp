@@ -54,6 +54,15 @@ pub enum MultiSigError {
     AlreadyApproved = 423,
     /// An approval rule must require at least one approver.
     InvalidThreshold = 424,
+    /// An approval rule must grant a non-zero approval window.
+    ///
+    /// Without this a rule could be written whose window closes the instant the
+    /// request is created, leaving the request permanently un-approvable and its
+    /// asset permanently locked.
+    MissingApprovalWindow = 425,
+    /// The request's approval window has not closed yet, so there is nothing to
+    /// auto-cancel.
+    ApprovalWindowStillOpen = 426,
 
     // ---------------------------------------------------------------
     // Registry interaction: 440–449
@@ -96,6 +105,8 @@ mod tests {
             MultiSigError::ApproverNotAuthorized as u32,
             MultiSigError::CannotApproveOwnRequest as u32,
             MultiSigError::AlreadyApproved as u32,
+            MultiSigError::MissingApprovalWindow as u32,
+            MultiSigError::ApprovalWindowStillOpen as u32,
             MultiSigError::AssetNotFound as u32,
             MultiSigError::AssetRetired as u32,
             MultiSigError::InvalidOwner as u32,
