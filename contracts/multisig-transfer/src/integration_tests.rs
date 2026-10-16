@@ -26,6 +26,7 @@ use assetsup::{AssetUpContract, AssetUpContractClient};
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{Address, BytesN, Env, String, Vec};
 
+use crate::errors::MultiSigError;
 use crate::types::ApprovalRule;
 use crate::{MultiSigTransferContract, MultiSigTransferContractClient};
 
@@ -553,5 +554,119 @@ fn reconfiguring_a_rule_does_not_change_a_pending_request_s_requirement() {
         f.registry.get_asset(&asset_id).owner,
         recipient,
         "ownership must move at the snapshot threshold, not the new rule"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Flow 7: [#1511] a duplicate approval has its own error
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_duplicate_approval_from_the_same_signer_returns_already_approved() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 2, 3);
+
+    let asset_id = f.register_governed_asset(50);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let signer = f.approvers.get(0).unwrap();
+
+    f.multisig.approve_transfer_request(&signer, &request_id);
+
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&signer, &request_id),
+        Err(Ok(MultiSigError::AlreadyApproved)),
+        "the same signer approving twice must report AlreadyApproved"
+    );
+
+    // The rejected duplicate must not have been counted a second time.
+    assert_eq!(
+        f.multisig.get_request(&request_id).received_approvals,
+        1,
+        "a duplicate approval must not increment the approval count"
+    );
+}
+
+#[test]
+fn already_approved_is_distinct_from_the_other_approval_refusals() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 2, 3);
+
+    let asset_id = f.register_governed_asset(51);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let signer = f.approvers.get(0).unwrap();
+    f.multisig.approve_transfer_request(&signer, &request_id);
+
+    // Not an approver at all.
+    let stranger = Address::generate(&env);
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&stranger, &request_id),
+        Err(Ok(MultiSigError::ApproverNotAuthorized))
+    );
+
+    // The requester approving their own request. The fixture raises requests
+    // as the multisig contract's own address, so that address is the
+    // initiator.
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&f.multisig_address, &request_id),
+        Err(Ok(MultiSigError::CannotApproveOwnRequest))
+    );
+
+    // A genuine repeat approval.
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&signer, &request_id),
+        Err(Ok(MultiSigError::AlreadyApproved))
+    );
+}
+
+#[test]
+fn a_rejected_duplicate_does_not_block_the_remaining_approvers() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 2, 3);
+
+    let asset_id = f.register_governed_asset(52);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let first = f.approvers.get(0).unwrap();
+    let second = f.approvers.get(1).unwrap();
+
+    f.multisig.approve_transfer_request(&first, &request_id);
+    assert!(f
+        .multisig
+        .try_approve_transfer_request(&first, &request_id)
+        .is_err());
+
+    // A different signer can still complete the threshold, and the transfer
+    // then executes: the duplicate left the request in a usable state.
+    f.multisig.approve_transfer_request(&second, &request_id);
+    f.multisig.execute_transfer(&f.admin, &request_id);
+
+    assert_eq!(f.registry.get_asset(&asset_id).owner, recipient);
+}
+
+#[test]
+fn a_repeat_approval_after_the_threshold_is_met_reports_the_request_state() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 1, 2);
+
+    let asset_id = f.register_governed_asset(53);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let signer = f.approvers.get(0).unwrap();
+
+    // One approval meets the threshold, so the request leaves Pending.
+    f.multisig.approve_transfer_request(&signer, &request_id);
+
+    // The status check runs before the duplicate check, so this is
+    // RequestNotPending rather than AlreadyApproved.
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&signer, &request_id),
+        Err(Ok(MultiSigError::RequestNotPending))
     );
 }
