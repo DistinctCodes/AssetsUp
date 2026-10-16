@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { AppDataSource } from '../data-source';
 
 /**
  * Minimal database seed script.
@@ -15,8 +16,6 @@ export async function seed(dataSource: DataSource): Promise<void> {
 }
 
 if (require.main === module) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { AppDataSource } = require('../data-source') as { AppDataSource: DataSource };
   AppDataSource.initialize()
     .then(async (ds: DataSource) => {
       await seed(ds);

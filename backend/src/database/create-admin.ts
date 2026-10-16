@@ -1,5 +1,6 @@
 import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
+import { AppDataSource } from '../data-source';
 import { User, UserRole } from '../users/entities/user.entity';
 
 /**
@@ -28,8 +29,6 @@ export async function createInitialAdmin(ds: DataSource): Promise<boolean> {
 }
 
 if (require.main === module) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { AppDataSource } = require('../data-source') as { AppDataSource: DataSource };
   AppDataSource.initialize()
     .then((ds) => createInitialAdmin(ds))
     .then((created) => console.log(created ? 'Admin created' : 'No admin created'))
