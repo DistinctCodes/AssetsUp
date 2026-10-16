@@ -29,6 +29,16 @@ other:
 - An asset has at most one pending transfer request at a time
   (`AssetPendingRequest`); a second request fails with `PendingRequestExists`.
 - An approver cannot approve the same request twice (`AlreadyApproved`).
+- Removing an approver from a rule revokes their ability to approve **any
+  still-pending request immediately**, including requests raised before the
+  change: `approve_transfer_request` re-reads the live rule, so the
+  `PendingApprovals` snapshot is a convenience index and never an authorization
+  source. Revocation is prospective only — an approval already counted towards a
+  threshold is not undone (see [SC-76]).
+- A request snapshots `required_approvals` when it is raised, so editing a rule
+  afterwards does not move a live request's bar. Narrowing an approver set can
+  therefore strand a request below its threshold; the remedy is to cancel and
+  re-raise it.
 - A requester cannot approve their own request (`CannotApproveOwnRequest`).
 - Execution requires `approvals >= rule.required_approvals` for the asset's
   category (`NotEnoughApprovals`).
