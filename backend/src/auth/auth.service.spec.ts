@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { createMock } from '@golevelup/ts-jest';
-import * as bcrypt from 'bcryptjs';
+import { PasswordService } from '../common/security/password.service';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { UserRole } from '../users/entities/user.entity';
@@ -12,6 +12,7 @@ describe('AuthService', () => {
   let authService: AuthService;
   let usersService: UsersService;
   let jwtService: JwtService;
+  let passwordService: PasswordService;
 
   const mockUser = {
     id: 'usr-123',
@@ -32,6 +33,10 @@ describe('AuthService', () => {
           useValue: createMock<UsersService>(),
         },
         {
+          provide: PasswordService,
+          useValue: createMock<PasswordService>(),
+        },
+        {
           provide: JwtService,
           useValue: createMock<JwtService>(),
         },
@@ -50,6 +55,7 @@ describe('AuthService', () => {
     authService = module.get<AuthService>(AuthService);
     usersService = module.get<UsersService>(UsersService);
     jwtService = module.get<JwtService>(JwtService);
+    passwordService = module.get<PasswordService>(PasswordService);
   });
 
   describe('register', () => {
@@ -91,8 +97,8 @@ describe('AuthService', () => {
         .spyOn(usersService, 'findByEmail')
         .mockResolvedValue(mockUser as any);
       jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(() => Promise.resolve(false));
+        .spyOn(passwordService, 'compare')
+        .mockResolvedValue(false);
 
       await expect(
         authService.login({

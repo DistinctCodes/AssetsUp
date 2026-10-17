@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsMaxBytes } from '../../common/validators/is-max-bytes.validator';
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
@@ -20,5 +21,6 @@ export class RegisterDto {
   @ApiProperty({ example: 'Password123!', minimum: 8 })
   @IsString()
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  @IsMaxBytes(72)
   password: string;
 }
