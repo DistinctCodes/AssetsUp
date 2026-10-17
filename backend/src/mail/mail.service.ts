@@ -1,44 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { MailTemplate, renderTemplate } from './mail-templates';
 
-export type MailTemplate =
-  | 'welcome'
-  | 'transfer-decision'
-  | 'warranty-expiring';
-
-/** Renders a template + context into a subject and HTML body. */
-function renderTemplate(
-  template: MailTemplate,
-  context: Record<string, unknown>,
-): { subject: string; html: string } {
-  const layout = (title: string, body: string) =>
-    `<div style="font-family:sans-serif"><h2>${title}</h2>${body}<hr/><small>AssetsUp</small></div>`;
-
-  switch (template) {
-    case 'welcome':
-      return {
-        subject: 'Welcome to AssetsUp',
-        html: layout('Welcome', `<p>Hi ${context.name ?? 'there'}, your account is ready.</p>`),
-      };
-    case 'transfer-decision':
-      return {
-        subject: `Asset transfer ${context.decision ?? 'update'}`,
-        html: layout(
-          'Transfer decision',
-          `<p>Your transfer request for <b>${context.assetName ?? 'an asset'}</b> was <b>${context.decision ?? 'updated'}</b>.</p>`,
-        ),
-      };
-    case 'warranty-expiring':
-      return {
-        subject: 'Warranty expiring soon',
-        html: layout(
-          'Warranty expiring',
-          `<p>The warranty for <b>${context.assetName ?? 'an asset'}</b> expires on ${context.expiresOn ?? 'soon'}.</p>`,
-        ),
-      };
-  }
-}
+export type { MailTemplate };
 
 /**
  * Sends transactional email via SMTP (config from env). When SMTP is not
@@ -71,7 +36,7 @@ export class MailService {
     template: MailTemplate,
     context: Record<string, unknown> = {},
   ): Promise<void> {
-    const { subject, html } = renderTemplate(template, context);
+    const { subject, html, text } = renderTemplate(template, context);
 
     if (!this.transporter) {
       this.logger.log(`[mail:dev] to=${to} template=${template} subject="${subject}"`);
@@ -83,6 +48,7 @@ export class MailService {
       to,
       subject,
       html,
+      text,
     });
   }
 }

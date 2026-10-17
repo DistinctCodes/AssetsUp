@@ -2,7 +2,7 @@
 
 extern crate std;
 
-use soroban_sdk::testutils::Address as _;
+use soroban_sdk::testutils::{Address as _, Ledger as _, LedgerInfo};
 use soroban_sdk::{Address, Env, String};
 
 use crate::detokenization;
@@ -32,6 +32,12 @@ fn setup_tokenized_asset(env: &Env, asset_id: u64, tokenizer: &Address) {
         },
     )
     .unwrap();
+
+    // Move past the tokenize→detokenize cooldown (#1487) so the proposal under
+    // test is not rejected by that guard.
+    env.ledger().with_mut(|li: &mut LedgerInfo| {
+        li.timestamp = detokenization::DETOKENIZE_COOLDOWN_SECONDS + 1;
+    });
 }
 
 #[test]
@@ -72,6 +78,26 @@ fn test_duplicate_proposal_prevention() {
     });
 
     assert!(second_err);
+}
+
+#[test]
+fn test_propose_blocked_during_cooldown() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let proposer = Address::generate(&env);
+    let asset_id = 1000u64;
+
+    let cooldown_err = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+        // Rewind to inside the cooldown window that follows tokenization.
+        env.ledger().with_mut(|li: &mut LedgerInfo| {
+            li.timestamp = detokenization::DETOKENIZE_COOLDOWN_SECONDS - 1;
+        });
+        detokenization::propose_detokenization(&env, asset_id, proposer.clone()).is_err()
+    });
+
+    assert!(cooldown_err);
 }
 
 #[test]

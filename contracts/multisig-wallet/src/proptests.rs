@@ -234,3 +234,22 @@ proptest! {
         }
     }
 }
+
+/// A transaction snapshots the threshold when it is submitted, so changing the
+/// wallet threshold while it is pending must not change what it requires.
+#[test]
+fn pending_transaction_keeps_its_threshold_when_the_wallet_threshold_changes() {
+    let env = Env::default();
+    let (client, owners) = wallet(&env, 3, 3);
+    let proposer = owners.get(0).unwrap();
+    let tx_id = submit(&env, &client, &proposer);
+
+    let proposal_id = client.propose_change_threshold(&proposer, &1);
+    for i in 0..3u32 {
+        client.confirm_proposal(&owners.get(i).unwrap(), &proposal_id);
+    }
+
+    assert_eq!(client.get_threshold(), 1);
+    let tx = client.get_transaction(&tx_id).unwrap();
+    assert_eq!(tx.required_confirmations, 3);
+}
