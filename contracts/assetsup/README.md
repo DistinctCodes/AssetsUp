@@ -123,6 +123,10 @@ Reads: `get_asset`, `get_asset_info`, `batch_get_asset_info`,
 Reads: `get_token_balance`, `get_token_holders`, `is_tokens_locked`,
 `get_ownership_percentage`, `get_tokenized_asset`.
 
+A token symbol may be claimed by at most one tokenized asset. Reusing a symbol
+is rejected with `DuplicateTokenSymbol` (`132`), which stops the same underlying
+asset being tokenized twice under different ids.
+
 ### Dividends, voting, detokenization
 
 | Entrypoint | Auth |
@@ -136,6 +140,10 @@ Reads: `get_token_balance`, `get_token_holders`, `is_tokens_locked`,
 
 Reads: `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`,
 `proposal_passed`, `get_detokenization_proposal`, `is_detokenization_active`.
+
+`propose_detokenization` is rejected with `DetokenizationCooldownActive` (`163`)
+until `DETOKENIZE_COOLDOWN_SECONDS` (7 days) have elapsed since the asset was
+tokenized, preventing immediate tokenize→detokenize round-trips.
 
 ### Transfer restrictions
 

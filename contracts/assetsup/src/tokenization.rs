@@ -38,6 +38,18 @@ pub fn tokenize_asset(
         return Err(Error::AssetAlreadyTokenized);
     }
 
+    // Prevent double-tokenizing the same underlying asset under a *different*
+    // token id. The registry keys assets by `BytesN<32>` while tokenization
+    // keys them by `u64`, and the contract does not link the two spaces, so a
+    // caller could otherwise mint a second token record for an asset that is
+    // already tokenized. The symbol is the caller-supplied identity of the
+    // asset, so a symbol already claimed by another tokenized asset is
+    // rejected.
+    let symbol_key = TokenDataKey::SymbolRegistry(symbol.clone());
+    if store.has(&symbol_key) {
+        return Err(Error::DuplicateTokenSymbol);
+    }
+
     // Create tokenized asset
     let timestamp = env.ledger().timestamp();
     let tokenized_asset = TokenizedAsset {
@@ -58,6 +70,10 @@ pub fn tokenize_asset(
 
     // Store tokenized asset
     store.set(&key, &tokenized_asset);
+
+    // Claim the symbol so a later call cannot tokenize the same asset again
+    // under a different id.
+    store.set(&symbol_key, &asset_id);
 
     // Store metadata
     let metadata_key = TokenDataKey::TokenMetadata(asset_id);
