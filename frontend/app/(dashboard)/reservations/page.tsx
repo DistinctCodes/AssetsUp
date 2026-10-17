@@ -1,27 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Calendar, Plus, Check, X, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Calendar, Plus, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-
-interface Reservation {
-  id: string;
-  assetName: string;
-  assetId: string;
-  purpose: string;
-  startsAt: string;
-  endsAt: string;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
-  requester: string;
-}
-
-const MOCK: Reservation[] = [
-  { id: "r1", assetName: "Projector A", assetId: "a-1", purpose: "Client demo", startsAt: "2026-08-26T09:00:00Z", endsAt: "2026-08-26T17:00:00Z", status: "PENDING", requester: "Alex" },
-  { id: "r2", assetName: "Test Vehicle", assetId: "a-2", purpose: "Field audit", startsAt: "2026-08-27T08:00:00Z", endsAt: "2026-08-27T18:00:00Z", status: "CONFIRMED", requester: "Sam" },
-];
+import { reservationsApiClient, type Reservation } from "@/lib/api/reservations";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-yellow-100 text-yellow-700",
@@ -34,19 +17,37 @@ type Tab = "my" | "pending";
 
 export default function ReservationsPage() {
   const [tab, setTab] = useState<Tab>("my");
-  const [reservations, setReservations] = useState<Reservation[]>(MOCK);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showBooking, setShowBooking] = useState(false);
 
-  const myReservations = reservations;
-  const pendingConfirmations = reservations.filter((r) => r.status === "PENDING");
-  const currentList = tab === "my" ? myReservations : pendingConfirmations;
+  useEffect(() => {
+    const fetchFn = tab === "my" ? reservationsApiClient.listMine : reservationsApiClient.listAll;
+    fetchFn()
+      .then(setReservations)
+      .catch(() => setReservations([]))
+      .finally(() => setLoading(false));
+  }, [tab]);
 
-  const handleConfirm = (id: string) => {
-    setReservations((prev) => prev.map((r) => r.id === id ? { ...r, status: "CONFIRMED" as const } : r));
+  const pendingConfirmations = reservations.filter((r) => r.status === "PENDING");
+  const currentList = tab === "my" ? reservations : pendingConfirmations;
+
+  const handleConfirm = async (id: string) => {
+    try {
+      await reservationsApiClient.confirm(id);
+      setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status: "CONFIRMED" as const } : r)));
+    } catch {
+      // ignore on error
+    }
   };
 
-  const handleCancel = (id: string) => {
-    setReservations((prev) => prev.map((r) => r.id === id ? { ...r, status: "CANCELLED" as const } : r));
+  const handleCancel = async (id: string) => {
+    try {
+      await reservationsApiClient.cancel(id);
+      setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status: "CANCELLED" as const } : r)));
+    } catch {
+      // ignore on error
+    }
   };
 
   return (
@@ -76,7 +77,11 @@ export default function ReservationsPage() {
       </div>
 
       <div className="space-y-3">
-        {currentList.length === 0 ? (
+        {loading ? (
+          <div className="bg-white border rounded-xl p-12 text-center">
+            <p className="text-gray-400">Loading reservations...</p>
+          </div>
+        ) : currentList.length === 0 ? (
           <div className="bg-white border rounded-xl p-12 text-center">
             <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">No reservations</p>
