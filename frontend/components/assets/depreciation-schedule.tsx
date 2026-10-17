@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { TrendingDown, DollarSign, BarChart3 } from "lucide-react";
+import { api } from "@/lib/api";
 
 interface DepreciationEntry {
   period: number;
@@ -19,29 +20,48 @@ interface DepreciationData {
   schedule: DepreciationEntry[];
 }
 
-const MOCK_DATA: DepreciationData = {
-  method: "STRAIGHT_LINE",
-  usefulLifeMonths: 60,
-  salvageValue: 500,
-  purchaseCost: 5000,
-  currentValue: 3200,
-  schedule: Array.from({ length: 12 }, (_, i) => ({
-    period: i + 1,
-    openingValue: 5000 - i * 375,
-    depreciation: 375,
-    closingValue: 5000 - (i + 1) * 375,
-  })),
-};
-
-export function DepreciationSchedule({ data = MOCK_DATA }: { data?: DepreciationData }) {
+export function DepreciationSchedule({ assetId }: { assetId: string }) {
+  const [data, setData] = useState<DepreciationData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+
+  useState(() => {
+    api
+      .get<DepreciationData>(`/assets/${assetId}/depreciation`)
+      .then((r) => setData(r.data))
+      .catch(() => setError("Failed to load depreciation data"))
+      .finally(() => setLoading(false));
+  });
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse">
+        <div className="h-4 bg-gray-200 rounded w-1/3 mb-4" />
+        <div className="grid grid-cols-3 gap-4">
+          <div className="h-16 bg-gray-100 rounded-lg" />
+          <div className="h-16 bg-gray-100 rounded-lg" />
+          <div className="h-16 bg-gray-100 rounded-lg" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h3 className="text-sm font-semibold text-gray-900 mb-2">Depreciation Schedule</h3>
+        <p className="text-sm text-gray-400">{error || "No depreciation configured for this asset."}</p>
+      </div>
+    );
+  }
+
   const visibleSchedule = expanded ? data.schedule : data.schedule.slice(0, 6);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
       <h3 className="text-sm font-semibold text-gray-900 mb-4">Depreciation Schedule</h3>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div className="bg-gray-50 rounded-lg p-3">
           <p className="text-xs text-gray-500">Purchase Cost</p>
@@ -57,7 +77,6 @@ export function DepreciationSchedule({ data = MOCK_DATA }: { data?: Depreciation
         </div>
       </div>
 
-      {/* Simple bar chart */}
       <div className="mb-4">
         <p className="text-xs text-gray-500 mb-2">Book Value Over Time</p>
         <div className="flex items-end gap-1 h-32">
@@ -77,7 +96,6 @@ export function DepreciationSchedule({ data = MOCK_DATA }: { data?: Depreciation
         </div>
       </div>
 
-      {/* Table */}
       <div className={`${expanded ? "" : "max-h-48 overflow-hidden"}`}>
         <table className="w-full text-sm">
           <thead>
@@ -136,7 +154,6 @@ export function DepreciationFinancialsTab() {
         </div>
       </div>
 
-      {/* Category breakdown placeholder */}
       <div className="bg-white border rounded-xl p-5">
         <h3 className="text-sm font-semibold mb-4">Book Value by Category</h3>
         <div className="space-y-3">
@@ -158,8 +175,6 @@ export function DepreciationFinancialsTab() {
           ))}
         </div>
       </div>
-
-      <DepreciationSchedule />
     </div>
   );
 }

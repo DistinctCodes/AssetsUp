@@ -1,21 +1,17 @@
 import { create } from 'zustand';
-import { AUTH_COOKIE } from '@/lib/auth-routes';
 import { authApi, AuthUser, LoginPayload, RegisterPayload } from '@/lib/auth-api';
 
-// Cookie helpers for middleware access (middleware runs on Edge, can't read localStorage)
-function setAuthCookie(token: string) {
-  document.cookie = `${AUTH_COOKIE}=${token}; path=/; max-age=${15 * 60}; SameSite=Lax`;
-}
-
-function clearAuthCookie() {
-  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
-}
+/**
+ * Token handling has moved from localStorage to httpOnly cookies.
+ * The backend sets `HttpOnly; Secure; SameSite=Lax` cookies for both
+ * access and refresh tokens. The client sends `withCredentials` on
+ * all requests so the browser attaches them automatically.
+ */
 
 interface AuthState {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
@@ -27,63 +23,35 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: false,
   isAuthenticated: false,
-
   setUser: (user) => set({ user, isAuthenticated: !!user }),
 
   login: async (payload) => {
     set({ isLoading: true });
     try {
       const data = await authApi.login(payload);
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
-      setAuthCookie(data.accessToken);
       set({ user: data.user, isAuthenticated: true });
-    } finally {
-      set({ isLoading: false });
-    }
+    } finally { set({ isLoading: false }); }
   },
 
   register: async (payload) => {
     set({ isLoading: true });
     try {
       const data = await authApi.register(payload);
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
-      setAuthCookie(data.accessToken);
       set({ user: data.user, isAuthenticated: true });
-    } finally {
-      set({ isLoading: false });
-    }
+    } finally { set({ isLoading: false }); }
   },
 
   logout: async () => {
-    try {
-      await authApi.logout();
-    } finally {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      clearAuthCookie();
-      set({ user: null, isAuthenticated: false });
-    }
+    try { await authApi.logout(); }
+    finally { set({ user: null, isAuthenticated: false }); }
   },
 
   loadUser: async () => {
     set({ isLoading: true });
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      set({ isLoading: false });
-      return;
-    }
     try {
       const user = await authApi.me();
       set({ user, isAuthenticated: true });
-    } catch {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      clearAuthCookie();
-      set({ user: null, isAuthenticated: false });
-    } finally {
-      set({ isLoading: false });
-    }
+    } catch { set({ user: null, isAuthenticated: false }); }
+    finally { set({ isLoading: false }); }
   },
 }));
