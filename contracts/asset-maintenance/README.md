@@ -18,10 +18,38 @@ exists.
 - `AssetStats(asset_id)` is a derived rollup (total cost, downtime, service
   count, health score) maintained alongside the history.
 - A health score is expressed on a 1–100 scale.
+- Persistent entries carry a 30-day / 90-day TTL policy (see
+  [`src/ttl.rs`](src/ttl.rs)): every read and write bumps the entry back out so
+  a long-lived asset's history is not archived for being untouched.
+
+## Authorization model
+
+The contract has a single privileged principal and one delegated role.
+
+- **Admin.** Stored at `init`; the stored address must authenticate for every
+  registry-level mutation: `register_provider`, `deactivate_provider`,
+  `add_warranty_information`, `update_warranty_information`,
+  `file_warranty_claim`, and `create_maintenance_alert` all call the internal
+  `require_admin` helper, which loads `DataKey::Admin` and calls
+  `require_auth()` on it. `init` itself requires the *incoming* admin's
+  authorization.
+- **Service providers.** The only role that may *log maintenance*. A record is
+  accepted only when (a) the `provider` named in the record authenticated the
+  call, and (b) that address is a registered `ProviderProfile` with
+  `is_active == true`. A field technician therefore does not need a separate
+  on-chain role: the provider they work for is the accountable principal, and
+  `technician_id` is carried inside the record as audit data.
+- **Callers (`owner`) of the schedule entrypoints.** `schedule_maintenance`,
+  `update_maintenance_schedule`, and `cancel_scheduled_maintenance` take an
+  explicit `owner` argument and call `require_auth()` on it. Ownership is **not**
+  cross-checked against an asset registry; this contract does not call the
+  `AssetRegistry` address it stores.
+
+`get_*` entrypoints and the analytics functions are read-only and unguarded.
 
 ## Storage layout
 
-All entries use **instance** storage.
+All entries use **persistent** storage with the TTL policy described above.
 
 | Key | Type | Meaning |
 |---|---|---|
@@ -36,9 +64,10 @@ All entries use **instance** storage.
 
 ## Entrypoints
 
-`Auth` names the address whose `require_auth()` is called. **"— (none)" marks an
-entrypoint that performs no authorization at all**; these are unguarded and are
-tracked in [SC-42].
+`Auth` names the address whose `require_auth()` is called — see
+[Authorization model](#authorization-model). Read-only `get_*` entrypoints and
+the analytics functions perform no authorization. No mutating entrypoint is
+unguarded.
 
 ### Setup and providers
 
@@ -57,6 +86,7 @@ tracked in [SC-42].
 | `get_maintenance_history` | `asset_id` | `Vec<MaintenanceRecord>` | read-only |
 | `schedule_maintenance` | `owner, schedule` | `()` | `owner` |
 | `update_maintenance_schedule` | `owner, schedule` | `()` | `owner` (via `schedule_maintenance`) |
+| `cancel_scheduled_maintenance` | `owner, asset_id` | `()` | `owner` |
 | `complete_scheduled_maintenance` | `asset_id, record` | `()` | `record.provider` (via `add_maintenance_record`) |
 | `get_upcoming_maintenance` | `asset_id` | `Option<ScheduledMaintenance>` | read-only |
 | `get_overdue_maintenance` | `asset_id` | `bool` | read-only |
@@ -71,16 +101,16 @@ delegation away.
 
 | Entrypoint | Args | Returns | Auth |
 |---|---|---|---|
-| `add_warranty_information` | `warranty: WarrantyInfo` | `()` | — (none) |
-| `update_warranty_information` | `warranty: WarrantyInfo` | `()` | — (none) |
+| `add_warranty_information` | `warranty: WarrantyInfo` | `()` | stored `admin` |
+| `update_warranty_information` | `warranty: WarrantyInfo` | `()` | stored `admin` |
 | `get_warranty` | `asset_id` | `Option<WarrantyInfo>` | read-only |
-| `file_warranty_claim` | `asset_id, claim_amount` | `()` | — (none) |
+| `file_warranty_claim` | `asset_id, claim_amount` | `()` | stored `admin` |
 
 ### Alerts
 
 | Entrypoint | Args | Returns | Auth |
 |---|---|---|---|
-| `create_maintenance_alert` | `alert: MaintenanceAlert` | `()` | — (none) |
+| `create_maintenance_alert` | `alert: MaintenanceAlert` | `()` | stored `admin` |
 | `acknowledge_maintenance_alert` | `asset_id, alert_index, by` | `()` | `by` |
 | `get_alerts` | `asset_id` | `Vec<MaintenanceAlert>` | read-only |
 
@@ -91,26 +121,43 @@ delegation away.
 
 ## Events
 
-| Topics | Emitted by |
-|---|---|
-| `("MaintRec", asset_id)` | `add_maintenance_record` |
-| `("MaintSch", asset_id)` | `schedule_maintenance` |
-| `("MaintCmp", asset_id)` | `complete_scheduled_maintenance` |
-| `("WarrAdd", asset_id)` | `add_warranty_information` |
-| `("WarrClm", asset_id)` | `file_warranty_claim` |
-| `("AlertCr", asset_id)` | `create_maintenance_alert` |
+Typed `#[contractevent]` structs emitted via [`src/events.rs`](src/events.rs);
+topic 0 is the struct name in `lower_snake_case`, and `asset_id` (or the
+subject address) is topic 1. See `contracts/EVENTS.md` for the workspace
+convention.
 
-These topics use `CamelCase`, unlike the `snake_case` used elsewhere in the
-workspace — see [SC-36]. `init`, `register_provider`, `deactivate_provider`,
-`update_maintenance_schedule`, `update_warranty_information`, and
-`acknowledge_maintenance_alert` emit no event.
+| Event (topic 0) | Emitted by |
+|---|---|
+| `contract_initialized` | `init` |
+| `provider_registered` | `register_provider` |
+| `provider_deactivated` | `deactivate_provider` |
+| `maintenance_recorded` | `add_maintenance_record` |
+| `maintenance_scheduled` | `schedule_maintenance` |
+| `maintenance_schedule_updated` | `update_maintenance_schedule` |
+| `maintenance_schedule_cancelled` | `cancel_scheduled_maintenance` |
+| `maintenance_completed` | `complete_scheduled_maintenance` |
+| `warranty_added` | `add_warranty_information` |
+| `warranty_updated` | `update_warranty_information` |
+| `warranty_claim_filed` | `file_warranty_claim` |
+| `alert_created` | `create_maintenance_alert` |
+| `alert_acknowledged` | `acknowledge_maintenance_alert` |
+
+Every state-changing entrypoint emits exactly one event. Cancelling a schedule
+sits alongside completing one: both remove the schedule, but only a completion
+appends to the append-only history.
 
 ## Errors
 
-This crate has **no error enum**. Failures are raised with `panic!` on a
-`&str` message rather than a typed `contracterror`, so callers cannot
-distinguish failure modes by code. Unifying this with the rest of the workspace
-is tracked in [SC-45].
+Typed `#[contracterror]` in [`src/error.rs`](src/error.rs). Codes follow the
+workspace allocation in `contracts/ERRORS.md`: **1–99** are shared across every
+contract, **500–599** belong to `asset-maintenance` (`ProviderNotRegistered`,
+`ProviderInactive`, `ScheduleNotFound`, `WarrantyNotFound`, `WarrantyNotActive`,
+`WarrantyExpired`, `MaxClaimsReached`, `AlertIndexOutOfBounds`, `AssetNotFound`,
+`InvalidArguments`).
+
+Validation failures raised by the historical `panic!("...")` calls still trap
+with a `&str` message; converting the remainder to typed codes is tracked in
+SC-45.
 
 ## Types
 
@@ -159,5 +206,7 @@ assert_eq!(history.len(), 1);
 cargo test -p asset-maintenance
 ```
 
-Coverage is currently thin (4 tests for ~730 lines); expanding it is tracked in
-[SC-41].
+`test.rs` and `tests_coverage.rs` cover the entrypoints with example-based
+tests; `proptests.rs` adds property-based tests over maintenance cost and
+date-range inputs (balancing costs accepted, unbalanced or out-of-range values
+rejected).
