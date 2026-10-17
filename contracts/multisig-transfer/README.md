@@ -134,8 +134,14 @@ crate in the workspace that does this.
 | `("ApproverRemoved",)` | `(approver, removed_by, timestamp)` |
 
 Topics here are string literals in `PascalCase`, while the rest of the workspace
-uses `symbol_short!` in `snake_case`. `ApproverAdded` and `ApproverRemoved` are
-`#[allow(dead_code)]` — declared but never emitted. See [SC-36].
+uses `symbol_short!` in `snake_case`.
+
+`ApproverAdded` and `ApproverRemoved` are emitted per address by
+`configure_approval_rule` whenever a rule's approver set changes — see [SC-74].
+Signers are not kept in a standalone registry; the set *is*
+`ApprovalRule.approvers`, which is why a rule rewrite is the only way a signer
+can change. A revocation affects **future** approvals only: a request already
+approved under the previous set stays executable.
 
 ## Errors
 
@@ -166,7 +172,7 @@ Resolving this is tracked in [SC-45].
 | `types.rs` | `TransferRequest`, `ApprovalRule`, `RequestStatus`. |
 | `approvals.rs` | Approval bookkeeping and double-approval guards. |
 | `registry.rs` | Cross-contract calls into the asset registry. |
-| `rules.rs` | Per-category approval rule lookup and approval-window arithmetic. |
+| `rules.rs` | Per-category approval rule lookup, approval-window arithmetic and the approver-set diff. |
 | `events.rs` | All event emission. |
 | `errors.rs` | `MultiSigError`. |
 | `utils.rs` | `require_admin`, `now`. |
