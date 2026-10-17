@@ -119,9 +119,14 @@ Reads: `get_asset`, `get_asset_info`, `batch_get_asset_info`,
 | `lock_tokens` | owner |
 | `unlock_tokens` | — |
 | `update_valuation` | — |
+| `bump_asset_ttl` | — (permissionless keeper) |
 
 Reads: `get_token_balance`, `get_token_holders`, `is_tokens_locked`,
 `get_ownership_percentage`, `get_tokenized_asset`.
+
+`bump_asset_ttl` extends the storage TTL of an asset's persistent entries so a
+keeper can stop an inactive-but-valid asset being archived. It is idempotent
+and exempt from the pause.
 
 ### Dividends, voting, detokenization
 
@@ -140,7 +145,14 @@ Reads: `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`,
 ### Transfer restrictions
 
 `set_transfer_restriction`, `add_to_whitelist`, `remove_from_whitelist`,
-`is_whitelisted`, `get_whitelist`. None currently call `require_auth`.
+`is_whitelisted`, `get_whitelist`, plus jurisdiction rules:
+`set_geographic_restriction`, `set_address_jurisdiction`,
+`get_address_jurisdiction`. None of the restriction setters currently call
+`require_auth` except `set_address_jurisdiction`, which is self-authenticated.
+
+When an asset has a non-empty `geographic_allowed` allow-list, `validate_transfer`
+requires the recipient to have a recorded jurisdiction that appears in it, or
+fails with `GeographicRestriction`.
 
 ### Leasing and insurance
 
@@ -164,6 +176,7 @@ Reads: `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`,
 | `("c_pause",)` | `pause_contract` |
 | `("c_unpause",)` | `unpause_contract` |
 | `("lease_new",)`, `("lease_ret",)`, `("lease_can",)`, `("lease_exp",)` | lease lifecycle |
+| `lease_terminated_early` | `return_leased_asset` when returned before the end date |
 
 Tokenization, dividends, voting, and detokenization emit events too; see the
 respective modules. Registrar allowlist changes emit **no** event. See [SC-36]

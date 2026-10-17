@@ -103,6 +103,8 @@ pub enum TokenDataKey {
     DetokenizationProposal(u64),
     /// Stores TokenMetadata for asset_id
     TokenMetadata(u64),
+    /// Stores the recorded ISO country code (jurisdiction) for an address
+    AddressJurisdiction(Address),
 }
 
 /// Represents a tokenized asset on-chain

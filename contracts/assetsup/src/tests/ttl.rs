@@ -6,7 +6,7 @@
 //! disappears from the contract's view.
 
 use soroban_sdk::testutils::{Address as _, Ledger as _, LedgerInfo};
-use soroban_sdk::{Address, BytesN, Env};
+use soroban_sdk::{Address, BytesN, Env, String};
 
 use super::helpers::{create_env, create_test_asset, initialize_contract};
 use crate::ttl::{LEDGERS_PER_DAY, PERSISTENT_EXTEND_TO};
@@ -113,4 +113,47 @@ fn contract_configuration_survives_past_the_default_lifetime() {
     assert_eq!(client.get_admin(), admin, "admin must still be readable");
     assert!(!client.is_paused());
     assert!(client.is_authorized_registrar(&admin));
+}
+
+#[test]
+fn bump_asset_ttl_keeps_an_inactive_tokenized_asset_alive() {
+    // Tokenization does not touch TTL on its own, so without the permissionless
+    // keeper path an asset that is held but never traded would be archived.
+    let env = create_env();
+    let (client, _admin) = setup(&env);
+    let tokenizer = Address::generate(&env);
+
+    client.tokenize_asset(
+        &1u64,
+        &String::from_str(&env, "KEEP"),
+        &1000i128,
+        &2u32,
+        &100i128,
+        &tokenizer,
+        &String::from_str(&env, "Keep Alive"),
+        &String::from_str(&env, "Inactive asset"),
+        &crate::types::AssetType::Digital,
+    );
+
+    // Two keeper hops. Each jump is longer than the default entry lifetime and
+    // leaves less than 30 days of headroom, so the next bump has work to do.
+    for _ in 0..2 {
+        client.bump_asset_ttl(&1u64);
+        advance_ledgers(&env, 70 * LEDGERS_PER_DAY);
+    }
+
+    let tokenized = client
+        .get_tokenized_asset(&1u64)
+        .expect("a bumped asset must still be readable");
+    assert_eq!(tokenized.total_supply, 1000);
+    // The holder balance entry must survive too, not just the asset record.
+    assert_eq!(client.get_token_balance(&1u64, &tokenizer).unwrap(), 1000);
+}
+
+#[test]
+fn bump_asset_ttl_rejects_an_asset_that_is_not_tokenized() {
+    let env = create_env();
+    let (client, _admin) = setup(&env);
+
+    assert!(client.try_bump_asset_ttl(&999u64).is_err());
 }

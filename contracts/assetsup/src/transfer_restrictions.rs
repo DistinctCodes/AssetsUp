@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::types::{TokenDataKey, TransferRestriction};
-use soroban_sdk::{Address, Env, Vec};
+use soroban_sdk::{Address, Env, String, Vec};
 
 /// Set transfer restrictions for an asset
 pub fn set_transfer_restriction(
@@ -18,6 +18,53 @@ pub fn set_transfer_restriction(
     crate::events::restriction_set(env, asset_id, restriction.require_accredited);
 
     Ok(())
+}
+
+/// Update the jurisdiction allow-list for an asset, preserving the accredited
+/// requirement.
+///
+/// When the allow-list is non-empty, a transfer is only permitted to an address
+/// whose recorded jurisdiction (see [`set_address_jurisdiction`]) appears in it.
+pub fn set_geographic_restriction(
+    env: &Env,
+    asset_id: u64,
+    allowed_jurisdictions: Vec<String>,
+) -> Result<(), Error> {
+    let store = env.storage().persistent();
+
+    let key = TokenDataKey::TransferRestriction(asset_id);
+    let mut restriction: TransferRestriction =
+        store.get(&key).flatten().unwrap_or(TransferRestriction {
+            require_accredited: false,
+            geographic_allowed: Vec::new(env),
+        });
+
+    restriction.geographic_allowed = allowed_jurisdictions;
+    store.set(&key, &restriction);
+
+    crate::events::restriction_set(env, asset_id, restriction.require_accredited);
+
+    Ok(())
+}
+
+/// Record (or update) the jurisdiction of an address as an ISO country code.
+pub fn set_address_jurisdiction(
+    env: &Env,
+    address: Address,
+    jurisdiction: String,
+) -> Result<(), Error> {
+    env.storage()
+        .persistent()
+        .set(&TokenDataKey::AddressJurisdiction(address), &jurisdiction);
+    Ok(())
+}
+
+/// Read the recorded jurisdiction of an address, if any.
+pub fn get_address_jurisdiction(env: &Env, address: Address) -> Option<String> {
+    env.storage()
+        .persistent()
+        .get(&TokenDataKey::AddressJurisdiction(address))
+        .flatten()
 }
 
 /// Add an address to the whitelist
@@ -116,6 +163,22 @@ pub fn validate_transfer(
         let is_listed = whitelist.iter().any(|a| a == to);
         if !is_listed {
             return Err(Error::AccreditedInvestorRequired);
+        }
+    }
+
+    // Jurisdiction rules: if a non-empty allow-list is configured, `to` must
+    // have a recorded jurisdiction that appears in it.
+    if !restriction.geographic_allowed.is_empty() {
+        let jurisdiction: Option<String> = store
+            .get(&TokenDataKey::AddressJurisdiction(to.clone()))
+            .flatten();
+        let jurisdiction = jurisdiction.ok_or(Error::GeographicRestriction)?;
+        let allowed = restriction
+            .geographic_allowed
+            .iter()
+            .any(|j| j == jurisdiction);
+        if !allowed {
+            return Err(Error::GeographicRestriction);
         }
     }
 

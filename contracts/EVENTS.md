@@ -109,6 +109,7 @@ assert_eq!(name, Symbol::new(&env, "asset_registered"));
 | `lease_returned` | `lease_id` | `caller`, `timestamp` | `return_leased_asset` |
 | `lease_cancelled` | `lease_id` | `caller`, `timestamp` | `cancel_lease` |
 | `lease_expired` | `lease_id` | `timestamp` | `expire_lease` |
+| `lease_terminated_early` | `lease_id` | `caller`, `end_timestamp`, `timestamp` | `return_leased_asset` (before end date) |
 
 ---
 

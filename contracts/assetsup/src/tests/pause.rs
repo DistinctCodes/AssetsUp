@@ -69,6 +69,10 @@ const PAUSE_EXEMPT: &[(&str, &str)] = &[
         "storage_version",
         "read-only: returns the current storage layout version",
     ),
+    (
+        "bump_asset_ttl",
+        "keeper path: extending TTL during a pause keeps valid entries from being archived",
+    ),
 ];
 
 /// Reads never mutate, so they are not in scope for the pause.

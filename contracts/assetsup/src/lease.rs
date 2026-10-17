@@ -149,7 +149,14 @@ pub fn return_leased_asset(env: &Env, lease_id: BytesN<32>, caller: Address) -> 
     save_lease(env, &lease);
     clear_asset_active_lease(env, &lease.asset_id);
 
-    crate::events::lease_returned(env, &lease_id, &caller);
+    // A return before the scheduled end date is an early termination and gets a
+    // distinct event, so off-chain consumers can tell it apart from a normal
+    // return.
+    if env.ledger().timestamp() < lease.end_timestamp {
+        crate::events::lease_terminated_early(env, &lease_id, &caller, lease.end_timestamp);
+    } else {
+        crate::events::lease_returned(env, &lease_id, &caller);
+    }
 
     Ok(())
 }
