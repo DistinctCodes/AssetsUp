@@ -51,9 +51,35 @@ pub enum MultiSigError {
     /// The requester may not approve their own transfer request.
     CannotApproveOwnRequest = 422,
     /// This approver has already approved this request.
+    ///
+    /// Returned only for a *repeat* approval from an address that is already
+    /// recorded against a request that is still `Pending`. It is deliberately
+    /// distinct from the generic refusals a caller can hit on the same
+    /// entrypoint, so a client can tell them apart:
+    ///
+    /// - [`MultiSigError::ApproverNotAuthorized`]: the caller is not an
+    ///   approver for the category at all.
+    /// - [`MultiSigError::CannotApproveOwnRequest`]: the caller is the
+    ///   requester.
+    /// - [`MultiSigError::RequestNotPending`]: the request has already left
+    ///   `Pending`. The status check runs before the duplicate check, so a
+    ///   repeat approval that arrives after the threshold was met reports
+    ///   `RequestNotPending`, not `AlreadyApproved`.
+    ///
+    /// A rejected duplicate changes no state: the approval count is not
+    /// incremented a second time.
     AlreadyApproved = 423,
     /// An approval rule must require at least one approver.
     InvalidThreshold = 424,
+    /// An approval rule must grant a non-zero approval window.
+    ///
+    /// Without this a rule could be written whose window closes the instant the
+    /// request is created, leaving the request permanently un-approvable and its
+    /// asset permanently locked.
+    MissingApprovalWindow = 425,
+    /// The request's approval window has not closed yet, so there is nothing to
+    /// auto-cancel.
+    ApprovalWindowStillOpen = 426,
 
     // ---------------------------------------------------------------
     // Registry interaction: 440–449
@@ -83,6 +109,28 @@ mod tests {
     }
 
     #[test]
+    fn already_approved_has_its_own_stable_code() {
+        // Clients match on this number, so it must not drift, and it must not
+        // be shared with any of the other refusals approve_transfer_request
+        // can return.
+        assert_eq!(MultiSigError::AlreadyApproved as u32, 423);
+
+        let others = [
+            MultiSigError::Unauthorized as u32,
+            MultiSigError::RequestNotPending as u32,
+            MultiSigError::ApproverNotAuthorized as u32,
+            MultiSigError::CannotApproveOwnRequest as u32,
+        ];
+        for code in others {
+            assert_ne!(
+                MultiSigError::AlreadyApproved as u32,
+                code,
+                "AlreadyApproved must not share a code with another approval refusal"
+            );
+        }
+    }
+
+    #[test]
     fn contract_specific_errors_stay_inside_the_transfer_block() {
         let codes = [
             MultiSigError::RequestNotFound as u32,
@@ -96,6 +144,8 @@ mod tests {
             MultiSigError::ApproverNotAuthorized as u32,
             MultiSigError::CannotApproveOwnRequest as u32,
             MultiSigError::AlreadyApproved as u32,
+            MultiSigError::MissingApprovalWindow as u32,
+            MultiSigError::ApprovalWindowStillOpen as u32,
             MultiSigError::AssetNotFound as u32,
             MultiSigError::AssetRetired as u32,
             MultiSigError::InvalidOwner as u32,

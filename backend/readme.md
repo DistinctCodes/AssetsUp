@@ -58,6 +58,44 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Response format
+
+Every successful response is wrapped by `ResponseTransformInterceptor`:
+
+```json
+{ "success": true, "data": { "id": "…", "email": "user@example.com" } }
+```
+
+List endpoints put the pagination fields inside `data`:
+
+```json
+{
+  "success": true,
+  "data": { "items": [], "total": 0, "page": 1, "limit": 20, "totalPages": 0 }
+}
+```
+
+Errors are shaped by `AllExceptionsFilter`. `message` is a string, or an array
+of strings for validation failures:
+
+```json
+{
+  "success": false,
+  "statusCode": 404,
+  "error": "Not Found",
+  "message": "Asset ast-1 not found",
+  "path": "/api/assets/ast-1",
+  "timestamp": "2025-01-01T12:00:00.000Z"
+}
+```
+
+In Swagger, document success bodies with `@ApiEnvelope(Model)`
+(`{ isArray: true }` or `{ paginated: true }` for lists) and errors with
+`@ApiErrorEnvelope(status, description)` from
+`src/common/swagger/api-envelope.decorator.ts`, so the generated schema matches
+what is actually returned. Endpoints that still use a bare `@ApiResponse` are
+documented without the envelope and should be migrated over time.
+
 ## Testing Conventions
 
 All modules must include unit tests covering their controllers and services. Follow these guidelines:

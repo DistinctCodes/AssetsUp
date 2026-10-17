@@ -69,6 +69,23 @@ pub struct TransferCancelled {
     pub timestamp: u64,
 }
 
+/// A pending transfer request's approval window closed before the threshold was
+/// reached, so it was auto-cancelled and the asset unlocked.
+///
+/// Distinct from [`TransferCancelled`]: nobody chose to cancel this, the clock
+/// did. Indexers that reconcile "assets with no pending transfer" need both.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferRequestExpired {
+    #[topic]
+    pub request_id: u64,
+    pub asset_id: BytesN<32>,
+    pub approvals_received: u32,
+    pub approvals_required: u32,
+    pub approval_deadline: u64,
+    pub timestamp: u64,
+}
+
 /// The approval rule for an asset category was created or changed.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -204,6 +221,26 @@ pub fn approval_rule_updated(e: &Env, category: &BytesN<32>, required: u32, time
     ApprovalRuleUpdated {
         category: category.clone(),
         required_approvals: required,
+        timestamp,
+    }
+    .publish(e);
+}
+
+pub fn transfer_request_expired(
+    e: &Env,
+    request_id: u64,
+    asset_id: &BytesN<32>,
+    received: u32,
+    required: u32,
+    approval_deadline: u64,
+    timestamp: u64,
+) {
+    TransferRequestExpired {
+        request_id,
+        asset_id: asset_id.clone(),
+        approvals_received: received,
+        approvals_required: required,
+        approval_deadline,
         timestamp,
     }
     .publish(e);

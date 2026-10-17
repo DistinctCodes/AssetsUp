@@ -68,6 +68,15 @@ pub struct MaintenanceScheduleUpdated {
     pub timestamp: u64,
 }
 
+/// A scheduled maintenance was cancelled and its schedule removed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaintenanceScheduleCancelled {
+    #[topic]
+    pub asset_id: u64,
+    pub timestamp: u64,
+}
+
 /// A scheduled maintenance was completed and recorded.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -184,6 +193,14 @@ pub fn maintenance_schedule_updated(env: &Env, schedule: &ScheduledMaintenance) 
     MaintenanceScheduleUpdated {
         asset_id: schedule.asset_id,
         next_service_due: schedule.next_service_due,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn maintenance_schedule_cancelled(env: &Env, asset_id: u64) {
+    MaintenanceScheduleCancelled {
+        asset_id,
         timestamp: env.ledger().timestamp(),
     }
     .publish(env);
