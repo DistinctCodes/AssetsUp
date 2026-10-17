@@ -267,3 +267,81 @@ fn test_validate_transfer_accredited_required_uses_whitelist() {
     assert!(ok_result.is_ok());
     assert!(err_result.is_err());
 }
+
+#[test]
+fn test_jurisdiction_restriction_allows_only_listed_jurisdictions() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let eu_holder = Address::generate(&env);
+    let us_holder = Address::generate(&env);
+    let unknown_holder = Address::generate(&env);
+    let asset_id = 904u64;
+
+    let (eu_ok, us_err, unknown_err) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+
+        // Only German holders may receive this asset.
+        let allowed = soroban_sdk::vec![&env, String::from_str(&env, "DE")];
+        transfer_restrictions::set_geographic_restriction(&env, asset_id, allowed).unwrap();
+
+        transfer_restrictions::set_address_jurisdiction(
+            &env,
+            eu_holder.clone(),
+            String::from_str(&env, "DE"),
+        )
+        .unwrap();
+        transfer_restrictions::set_address_jurisdiction(
+            &env,
+            us_holder.clone(),
+            String::from_str(&env, "US"),
+        )
+        .unwrap();
+
+        let eu = transfer_restrictions::validate_transfer(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            eu_holder.clone(),
+        );
+        let us = transfer_restrictions::validate_transfer(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            us_holder.clone(),
+        );
+        // No jurisdiction on record: also blocked.
+        let unknown = transfer_restrictions::validate_transfer(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            unknown_holder.clone(),
+        );
+
+        (eu, us, unknown)
+    });
+
+    assert!(eu_ok.is_ok());
+    assert!(us_err.is_err());
+    assert!(unknown_err.is_err());
+}
+
+#[test]
+fn test_jurisdiction_is_readable() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let who = Address::generate(&env);
+
+    let recorded = env.as_contract(&contract_id, || {
+        assert!(transfer_restrictions::get_address_jurisdiction(&env, who.clone()).is_none());
+        transfer_restrictions::set_address_jurisdiction(
+            &env,
+            who.clone(),
+            String::from_str(&env, "JP"),
+        )
+        .unwrap();
+        transfer_restrictions::get_address_jurisdiction(&env, who.clone())
+    });
+
+    assert_eq!(recorded, Some(String::from_str(&env, "JP")));
+}

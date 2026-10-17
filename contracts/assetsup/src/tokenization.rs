@@ -477,3 +477,34 @@ pub fn update_valuation(env: &Env, asset_id: u64, new_valuation: i128) -> Result
 
     Ok(())
 }
+
+/// Extend the storage TTL of every persistent entry that makes up a tokenized
+/// asset: the asset record, its holders list and metadata, and each holder's
+/// ownership record.
+///
+/// Permissionless and idempotent, so an off-chain keeper can run it ahead of
+/// expiry to keep inactive-but-still-valid assets from being archived.
+pub fn bump_asset_ttl(env: &Env, asset_id: u64) -> Result<(), Error> {
+    let store = env.storage().persistent();
+
+    let asset_key = TokenDataKey::TokenizedAsset(asset_id);
+    if !store.has(&asset_key) {
+        return Err(Error::AssetNotTokenized);
+    }
+
+    crate::ttl::extend_persistent(env, &asset_key);
+    crate::ttl::extend_persistent(env, &TokenDataKey::TokenMetadata(asset_id));
+
+    let holders_key = TokenDataKey::TokenHoldersList(asset_id);
+    crate::ttl::extend_persistent(env, &holders_key);
+
+    // Extend each holder's ownership record too; otherwise the asset record
+    // survives while the balances quietly expire.
+    if let Some(holders) = store.get::<_, Vec<Address>>(&holders_key) {
+        for holder in holders.iter() {
+            crate::ttl::extend_persistent(env, &TokenDataKey::TokenHolder(asset_id, holder));
+        }
+    }
+
+    Ok(())
+}

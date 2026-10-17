@@ -909,6 +909,13 @@ impl AssetUpContract {
         tokenization::update_valuation(&env, asset_id, new_valuation)
     }
 
+    /// Extend the storage TTL of a tokenized asset's persistent entries
+    /// (permissionless keeper path; idempotent)
+    pub fn bump_asset_ttl(env: Env, asset_id: u64) -> Result<(), Error> {
+        ttl::extend_instance(&env);
+        tokenization::bump_asset_ttl(&env, asset_id)
+    }
+
     // =====================
     // Dividend Functions
     // =====================
@@ -1030,6 +1037,34 @@ impl AssetUpContract {
     /// Get whitelist
     pub fn get_whitelist(env: Env, asset_id: u64) -> Result<Vec<Address>, Error> {
         transfer_restrictions::get_whitelist(&env, asset_id)
+    }
+
+    /// Set the jurisdiction allow-list for an asset's transfers
+    pub fn set_geographic_restriction(
+        env: Env,
+        asset_id: u64,
+        allowed_jurisdictions: Vec<String>,
+    ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
+        transfer_restrictions::set_geographic_restriction(&env, asset_id, allowed_jurisdictions)
+    }
+
+    /// Record the jurisdiction (ISO country code) of an address; self-authenticated
+    pub fn set_address_jurisdiction(
+        env: Env,
+        address: Address,
+        jurisdiction: String,
+    ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
+        address.require_auth();
+        transfer_restrictions::set_address_jurisdiction(&env, address, jurisdiction)
+    }
+
+    /// Get the recorded jurisdiction of an address
+    pub fn get_address_jurisdiction(env: Env, address: Address) -> Option<String> {
+        transfer_restrictions::get_address_jurisdiction(&env, address)
     }
 
     // =====================
