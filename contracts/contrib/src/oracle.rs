@@ -115,3 +115,25 @@ pub fn get_valuation_history(env: Env, asset_id: u64) -> Vec<ValuationEntry> {
         .get(&DataKey::History(asset_id))
         .unwrap_or_else(|| Vec::new(&env))
 }
+
+/// True when `entry` is older than `max_age` seconds at `now`.
+///
+/// Callers that feed a valuation into a calculation should reject stale
+/// entries instead of using whatever was reported last.
+#[allow(dead_code)]
+pub fn is_stale(entry: &ValuationEntry, now: u64, max_age: u64) -> bool {
+    now.saturating_sub(entry.timestamp) > max_age
+}
+
+/// Median of several sources' values (the upper middle value for an even
+/// count), or `None` when there are no values.
+///
+/// Taking the median means one bad feed cannot move the result on its own.
+#[allow(dead_code)]
+pub fn median(values: &mut [i128]) -> Option<i128> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_unstable();
+    Some(values[values.len() / 2])
+}

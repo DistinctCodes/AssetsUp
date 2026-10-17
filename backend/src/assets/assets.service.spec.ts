@@ -127,4 +127,35 @@ describe('AssetsService', () => {
       expect(qb.orderBy).toHaveBeenLastCalledWith('asset.createdAt', 'DESC');
     });
   });
+
+  describe('findPublicByScan', () => {
+    it('looks up a UUID by id and returns the public shape', async () => {
+      jest.spyOn(repository, 'findOne').mockResolvedValue({
+        id: '3b241101-e2bb-4255-8caf-4136c566a962',
+        assetTag: 'AST-1',
+        name: 'Laptop',
+        status: 'AVAILABLE',
+        purchaseCost: 5,
+      } as any);
+      const out = await service.findPublicByScan(
+        '3b241101-e2bb-4255-8caf-4136c566a962',
+      );
+      expect(repository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: '3b241101-e2bb-4255-8caf-4136c566a962' },
+        }),
+      );
+      expect(out).not.toHaveProperty('purchaseCost');
+    });
+
+    it('looks up a non-UUID by asset tag', async () => {
+      jest.spyOn(repository, 'findOne').mockResolvedValue(null);
+      await expect(service.findPublicByScan('AST-9')).rejects.toThrow(
+        'Asset not found',
+      );
+      expect(repository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { assetTag: 'AST-9' } }),
+      );
+    });
+  });
 });

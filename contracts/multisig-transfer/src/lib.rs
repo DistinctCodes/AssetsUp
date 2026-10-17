@@ -21,6 +21,9 @@
 //! - Execution requires `approvals >= rule.required_approvals` for the asset's
 //!   category.
 //! - Retired assets cannot be transferred.
+//! - A request whose approval window closes short of its threshold is
+//!   auto-cancelled by `expire_transfer_request`, releasing the asset lock. A
+//!   request that *did* reach its threshold stays executable.
 //!
 //! ## Not to be confused with `multisig-wallet`
 //!
@@ -37,12 +40,22 @@ mod auth_tests;
 mod errors;
 mod events;
 #[cfg(test)]
+mod expiry_tests;
+#[cfg(test)]
 mod integration_tests;
 #[cfg(test)]
 mod pagination_tests;
 mod registry;
+#[cfg(test)]
+mod revocation_tests;
 mod rules;
+#[cfg(test)]
+mod signer_count_tests;
+#[cfg(test)]
+mod signer_events_tests;
 mod storage;
+#[cfg(test)]
+mod ttl_tests;
 mod types;
 mod utils;
 
@@ -59,6 +72,8 @@ impl MultiSigTransferContract {
     // Init
     // ----------------------------
     pub fn initialize(e: Env, admin: Address, asset_registry: Address) {
+        ttl::extend_all(&e);
+
         // Without this, whoever calls initialize first becomes admin of a
         // freshly deployed contract, regardless of who deployed it.
         admin.require_auth();
@@ -80,21 +95,50 @@ impl MultiSigTransferContract {
         caller: Address,
         rule: ApprovalRule,
     ) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
         // require_admin only compares `caller` against the stored admin.
         // Without authenticating `caller` first, anyone could pass the admin's
         // address and pass that check.
         caller.require_auth();
         utils::require_admin(&e, &caller)?;
 
-        if rule.required_approvals == 0 {
-            return Err(MultiSigError::InvalidThreshold);
+        // Rejects rules that could never be satisfied: no threshold at all
+        // (`InvalidThreshold`), a threshold above the rule's own signer set
+        // (`ThresholdExceedsSignerCount`), or a signer set below `MIN_SIGNERS`.
+        rules::validate(&rule)?;
+
+        // A zero-length window closes before the first approval can land, so the
+        // request could never reach its threshold and its asset would stay
+        // locked in `AssetPendingRequest` until someone cancelled by hand.
+        if rule.approval_timeout_secs == 0 {
+            return Err(MultiSigError::MissingApprovalWindow);
         }
 
         let mut rules_map = storage::rules_map(&e);
+
+        // Read the outgoing rule before overwriting it. Signers are not stored
+        // in a standalone registry -- the set *is* `rule.approvers`, replaced
+        // wholesale here -- so the only way to report a signer leaving is to
+        // have captured the previous set first.
+        let previous = rules_map.get(rule.category.clone());
+
         rules_map.set(rule.category.clone(), rule.clone());
         storage::set_rules_map(&e, &rules_map);
 
-        events::approval_rule_updated(&e, &rule.category, rule.required_approvals, utils::now(&e));
+        let now = utils::now(&e);
+        events::approval_rule_updated(&e, &rule.category, rule.required_approvals, now);
+
+        // `ApprovalRuleUpdated` reports the new threshold but not who changed.
+        // Emitting a per-approver delta is what lets off-chain monitoring alert
+        // on a signer being added or revoked without re-reading contract state.
+        for approver in rules::added_approvers(&e, &previous, &rule).iter() {
+            events::approver_added(&e, &approver, &caller, now);
+        }
+        for approver in rules::removed_approvers(&e, &previous, &rule).iter() {
+            events::approver_removed(&e, &approver, &caller, now);
+        }
+
         Ok(())
     }
 
@@ -112,6 +156,8 @@ impl MultiSigTransferContract {
         expires_at: u64,
         execute_after: Option<u64>,
     ) -> Result<u64, MultiSigError> {
+        ttl::extend_all(&e);
+
         // The ownership check below compares the registry's owner against a
         // caller-supplied address; authenticate it first.
         caller.require_auth();
@@ -150,7 +196,7 @@ impl MultiSigTransferContract {
             return Err(MultiSigError::RequestExpired);
         }
 
-        let approval_deadline = now + rule.approval_timeout_secs;
+        let approval_deadline = rules::approval_deadline(now, &rule);
 
         let request_id = storage::bump_request_id(&e);
 
@@ -209,6 +255,8 @@ impl MultiSigTransferContract {
         caller: Address,
         request_id: u64,
     ) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
         // The approver-membership check below compares against a
         // caller-supplied address; authenticate it first or approvals can be
         // forged by naming an authorized approver.
@@ -228,7 +276,7 @@ impl MultiSigTransferContract {
         if now > req.expires_at {
             return Err(MultiSigError::RequestExpired);
         }
-        if now > req.approval_deadline {
+        if rules::window_closed(now, req.approval_deadline) {
             return Err(MultiSigError::ApprovalDeadlinePassed);
         }
         if caller == req.initiator {
@@ -269,6 +317,8 @@ impl MultiSigTransferContract {
         request_id: u64,
         reason_hash: BytesN<32>,
     ) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
         caller.require_auth();
         let (_admin, _registry) = utils::require_init(&e)?;
 
@@ -303,6 +353,8 @@ impl MultiSigTransferContract {
     // Execute transfer (anyone can trigger once approved)
     // ----------------------------
     pub fn execute_transfer(e: Env, caller: Address, request_id: u64) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
         let (_admin, registry_addr) = utils::require_init(&e)?;
         // Deliberately permissionless, like multisig-wallet's execute_*: the
         // authorization decision was already made by the approvers, and
@@ -355,6 +407,8 @@ impl MultiSigTransferContract {
         caller: Address,
         request_id: u64,
     ) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
         // Cancellation is restricted to the requester or the admin, both
         // compared against a caller-supplied address.
         caller.require_auth();
@@ -387,9 +441,67 @@ impl MultiSigTransferContract {
     }
 
     // ----------------------------
+    // Auto-cancel a request whose approval window closed short
+    // ----------------------------
+    /// Cancels a `Pending` request whose approval window has closed before it
+    /// reached `required_approvals`, releasing the asset lock.
+    ///
+    /// Permissionless, for the same reason `execute_transfer` is: the outcome is
+    /// fully determined by stored state plus the ledger clock, so there is no
+    /// decision left for a caller to make. Anyone may submit it, which is what
+    /// lets a keeper sweep expired requests without the contract having to hold
+    /// a keeper key. `caller` is retained for the audit trail only and is
+    /// intentionally not authenticated.
+    pub fn expire_transfer_request(e: Env, caller: Address, request_id: u64) -> Result<(), MultiSigError> {
+        let (_admin, _registry) = utils::require_init(&e)?;
+        let _ = caller;
+
+        let mut requests = storage::requests_map(&e);
+        let mut req = requests
+            .get(request_id)
+            .ok_or(MultiSigError::RequestNotFound)?;
+
+        // Only a still-pending request can be swept. A request that reached its
+        // threshold is `Approved` and must stay executable: its window closing
+        // is not a reason to throw away a valid signature set.
+        if req.status != RequestStatus::Pending {
+            return Err(MultiSigError::RequestNotPending);
+        }
+
+        let now = utils::now(&e);
+        if !rules::window_closed(now, req.approval_deadline) {
+            return Err(MultiSigError::ApprovalWindowStillOpen);
+        }
+
+        req.status = RequestStatus::Cancelled;
+        requests.set(request_id, req.clone());
+        storage::set_requests_map(&e, &requests);
+
+        // Release the asset lock. Without this the asset is wedged: no further
+        // request can be created for it, because `create_transfer_request`
+        // rejects an asset that already has a pending request.
+        let mut asset_pending = storage::asset_pending_map(&e);
+        asset_pending.remove(req.asset_id.clone());
+        storage::set_asset_pending_map(&e, &asset_pending);
+
+        events::transfer_request_expired(
+            &e,
+            request_id,
+            &req.asset_id,
+            req.received_approvals,
+            req.required_approvals,
+            req.approval_deadline,
+            now,
+        );
+        Ok(())
+    }
+
+    // ----------------------------
     // Queries
     // ----------------------------
     pub fn get_request(e: Env, request_id: u64) -> Result<TransferRequest, MultiSigError> {
+        ttl::extend_all(&e);
+
         let requests = storage::requests_map(&e);
         requests
             .get(request_id)
@@ -397,6 +509,8 @@ impl MultiSigTransferContract {
     }
 
     pub fn get_asset_history(e: Env, asset_id: BytesN<32>, offset: u32, limit: u32) -> Vec<u64> {
+        ttl::extend_all(&e);
+
         let hist = storage::asset_history_map(&e);
         let list = hist.get(asset_id).unwrap_or(Vec::new(&e));
         paginate(&e, &list, offset, limit)
@@ -408,6 +522,8 @@ impl MultiSigTransferContract {
         offset: u32,
         limit: u32,
     ) -> Vec<u64> {
+        ttl::extend_all(&e);
+
         // gas-friendly simple scan approach. If scale grows, add reverse-index.
         let requests = storage::requests_map(&e);
         let mut result = Vec::new(&e);
@@ -444,6 +560,8 @@ impl MultiSigTransferContract {
         offset: u32,
         limit: u32,
     ) -> Result<Vec<Address>, MultiSigError> {
+        ttl::extend_all(&e);
+
         let rule = rules::get_rule(&e, &category)?;
         Ok(paginate(&e, &rule.approvers, offset, limit))
     }

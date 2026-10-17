@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,8 +17,12 @@ import {
   ApiBadRequestResponse,
   ApiResponse,
 } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AssetsService } from './assets.service';
 import { ListAssetsQueryDto } from './dto/list-assets-query.dto';
+import { AssetLabelService } from './asset-label.service';
+import { AssetQrQueryDto, AssetLabelQueryDto } from './dto/asset-qr-query.dto';
+import { PublicAssetDto } from './dto/public-asset.dto';
 import { AssetHistoryService } from './asset-history.service';
 import { ReservationsService } from '../reservations/reservations.service';
 import { AssetHistoryAction } from './entities/asset-history-event.entity';
@@ -34,12 +39,14 @@ import { User } from '../users/entities/user.entity';
 
 @ApiTags('assets')
 @ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard)
 @Controller('assets')
 export class AssetsController {
   constructor(
     private readonly assetsService: AssetsService,
     private readonly assetHistoryService: AssetHistoryService,
     private readonly reservationsService: ReservationsService,
+    private readonly labelService: AssetLabelService,
   ) {}
 
   @Get()
@@ -56,12 +63,71 @@ export class AssetsController {
     return this.assetsService.create(dto);
   }
 
+  /**
+   * Public (no JWT) landing data for a scanned QR label. Declared before the
+   * `:id` routes so `scan` is never captured as an asset id.
+   */
+  @Get('scan/:assetId')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Public asset info for a scanned QR code' })
+  @ApiResponse({ status: 200, type: PublicAssetDto })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  scan(@Param('assetId') assetId: string) {
+    return this.assetsService.findPublicByScan(assetId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get asset details' })
   @ApiResponse({ status: 200, description: 'Asset details' })
   @ApiResponse({ status: 404, description: 'Asset not found' })
   findOne(@Param('id') id: string) {
     return this.assetsService.findDetail(id);
+  }
+
+  @Get(':id/qr')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'QR code image (PNG or SVG) encoding the asset scan URL',
+  })
+  @ApiResponse({ status: 200, description: 'QR image' })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  async qr(@Param('id') id: string, @Query() query: AssetQrQueryDto) {
+    const img = await this.labelService.qr(id, query.format, query.size);
+    return new StreamableFile(Buffer.from(img.body), { type: img.contentType });
+  }
+
+  @Get(':id/label')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Printable Code 128 barcode label (PNG) of the asset tag',
+  })
+  @ApiResponse({ status: 200, description: 'Barcode label image' })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  async label(@Param('id') id: string, @Query() query: AssetLabelQueryDto) {
+    const img = await this.labelService.label(id, query.scale);
+    return new StreamableFile(Buffer.from(img.body), { type: img.contentType });
+  }
+
+  // Literal `bulk` routes must be declared before the `:id` routes below,
+  // otherwise Express matches `bulk` as an id and these handlers never run.
+  @Patch('bulk/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Bulk update asset status' })
+  @ApiResponse({ status: 200, description: 'Bulk status update result' })
+  bulkStatus(@Body() dto: BulkStatusDto, @GetUser() user: User) {
+    return this.assetsService.bulkStatus(dto, user.id);
+  }
+
+  @Delete('bulk')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Bulk soft delete assets (ADMIN only)' })
+  @ApiResponse({ status: 200, description: 'Bulk delete result' })
+  @ApiResponse({ status: 403, description: 'Forbidden — requires ADMIN role' })
+  bulkDelete(@Body() dto: BulkDeleteDto, @GetUser() user: User) {
+    return this.assetsService.bulkDelete(dto, user.id);
   }
 
   @Patch(':id')
@@ -131,30 +197,12 @@ export class AssetsController {
     return this.assetsService.transfer(id, dto, user?.id);
   }
 
-  @Patch('bulk/status')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Bulk update asset status' })
-  @ApiResponse({ status: 200, description: 'Bulk status update result' })
-  bulkStatus(@Body() dto: BulkStatusDto, @GetUser() user: User) {
-    return this.assetsService.bulkStatus(dto, user.id);
-  }
-
   @Patch('bulk/assign')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Bulk assign assets to user or department' })
   @ApiResponse({ status: 200, description: 'Bulk assignment result' })
   bulkAssign(@Body() dto: BulkAssignDto, @GetUser() user: User) {
     return this.assetsService.bulkAssign(dto, user.id);
-  }
-
-  @Delete('bulk')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'Bulk soft delete assets (ADMIN only)' })
-  @ApiResponse({ status: 200, description: 'Bulk delete result' })
-  @ApiResponse({ status: 403, description: 'Forbidden — requires ADMIN role' })
-  bulkDelete(@Body() dto: BulkDeleteDto, @GetUser() user: User) {
-    return this.assetsService.bulkDelete(dto, user.id);
   }
 
   @Get(':id/availability')
