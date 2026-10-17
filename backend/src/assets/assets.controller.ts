@@ -33,6 +33,7 @@ import { User } from '../users/entities/user.entity';
 
 @ApiTags('assets')
 @ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard)
 @Controller('assets')
 export class AssetsController {
   constructor(
