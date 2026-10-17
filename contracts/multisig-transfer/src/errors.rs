@@ -71,6 +71,17 @@ pub enum MultiSigError {
     AlreadyApproved = 423,
     /// An approval rule must require at least one approver.
     InvalidThreshold = 424,
+    /// The rule's threshold is higher than its signer set, so no combination of
+    /// approvals could ever satisfy it.
+    ///
+    /// This is the dangerous version of a misconfigured rule: it is accepted at
+    /// write time and then silently wedges every transfer raised under it.
+    ThresholdExceedsSignerCount = 427,
+    /// The rule's signer set is smaller than the contract's minimum.
+    ///
+    /// A category with no approvers cannot approve anything, which strands the
+    /// asset lock on any request already in flight.
+    InsufficientSigners = 428,
     /// An approval rule must grant a non-zero approval window.
     ///
     /// Without this a rule could be written whose window closes the instant the
@@ -144,6 +155,8 @@ mod tests {
             MultiSigError::ApproverNotAuthorized as u32,
             MultiSigError::CannotApproveOwnRequest as u32,
             MultiSigError::AlreadyApproved as u32,
+            MultiSigError::ThresholdExceedsSignerCount as u32,
+            MultiSigError::InsufficientSigners as u32,
             MultiSigError::MissingApprovalWindow as u32,
             MultiSigError::ApprovalWindowStillOpen as u32,
             MultiSigError::AssetNotFound as u32,

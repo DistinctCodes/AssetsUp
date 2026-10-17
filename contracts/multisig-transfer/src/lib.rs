@@ -50,6 +50,8 @@ mod registry;
 mod revocation_tests;
 mod rules;
 #[cfg(test)]
+mod signer_count_tests;
+#[cfg(test)]
 mod signer_events_tests;
 mod storage;
 #[cfg(test)]
@@ -101,9 +103,10 @@ impl MultiSigTransferContract {
         caller.require_auth();
         utils::require_admin(&e, &caller)?;
 
-        if rule.required_approvals == 0 {
-            return Err(MultiSigError::InvalidThreshold);
-        }
+        // Rejects rules that could never be satisfied: no threshold at all
+        // (`InvalidThreshold`), a threshold above the rule's own signer set
+        // (`ThresholdExceedsSignerCount`), or a signer set below `MIN_SIGNERS`.
+        rules::validate(&rule)?;
 
         // A zero-length window closes before the first approval can land, so the
         // request could never reach its threshold and its asset would stay
