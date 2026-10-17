@@ -27,8 +27,10 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Ve
 
 pub mod error;
 pub mod events;
+pub mod ttl;
 mod test;
 mod tests_coverage;
+mod proptests;
 
 pub use crate::error::{handle_error, Error};
 
@@ -212,6 +214,8 @@ impl AssetMaintenanceContract {
         // deployed contract, regardless of who deployed it.
         admin.require_auth();
 
+        ttl::extend_instance(&env);
+
         if env.storage().persistent().has(&DataKey::Admin) {
             panic!("already initialized");
         }
@@ -219,6 +223,11 @@ impl AssetMaintenanceContract {
         env.storage()
             .persistent()
             .set(&DataKey::AssetRegistry, &registry);
+
+        // Extend on write, not only on read: a freshly written entry gets the
+        // network's minimum lifetime, which is short.
+        ttl::extend_persistent(&env, &DataKey::Admin);
+        ttl::extend_persistent(&env, &DataKey::AssetRegistry);
 
         events::contract_initialized(&env, &admin, &registry);
     }
@@ -317,6 +326,7 @@ impl AssetMaintenanceContract {
         env.storage()
             .persistent()
             .set(&DataKey::MaintenanceHistory(record.asset_id), &history);
+        ttl::extend_persistent(&env, &DataKey::MaintenanceHistory(record.asset_id));
 
         // 5. Update Asset Stats
         let mut stats = env
@@ -339,12 +349,17 @@ impl AssetMaintenanceContract {
         env.storage()
             .persistent()
             .set(&DataKey::AssetStats(record.asset_id), &stats);
+        ttl::extend_persistent(&env, &DataKey::AssetStats(record.asset_id));
 
         // 6. Emit Event
         events::maintenance_recorded(&env, &record);
     }
 
     pub fn get_maintenance_history(env: Env, asset_id: u64) -> Vec<MaintenanceRecord> {
+        // Extend on read too. An asset that is only ever queried and never
+        // serviced again would otherwise be archived despite still being
+        // referenced as audit evidence.
+        ttl::extend_persistent(&env, &DataKey::MaintenanceHistory(asset_id));
         env.storage()
             .persistent()
             .get(&DataKey::MaintenanceHistory(asset_id))
@@ -385,9 +400,38 @@ impl AssetMaintenanceContract {
         env.storage()
             .persistent()
             .set(&DataKey::MaintenanceSchedule(schedule.asset_id), schedule);
+        ttl::extend_persistent(env, &DataKey::MaintenanceSchedule(schedule.asset_id));
+    }
+
+    /// Cancels a scheduled maintenance and removes the stored schedule.
+    ///
+    /// Authorized by the passed `owner` (mirroring [`Self::schedule_maintenance`]),
+    /// which must authenticate. Fails if no schedule exists for the asset, so a
+    /// cancellation of a schedule that was never created cannot masquerade as a
+    /// successful removal. Unlike completing a service, cancelling leaves no
+    /// record in the append-only history — it is a schedule mutation, not audit
+    /// evidence — and it is surfaced off-chain through the
+    /// [`events::MaintenanceScheduleCancelled`] event.
+    pub fn cancel_scheduled_maintenance(env: Env, owner: Address, asset_id: u64) {
+        owner.require_auth();
+
+        if !env
+            .storage()
+            .persistent()
+            .has(&DataKey::MaintenanceSchedule(asset_id))
+        {
+            handle_error(&env, Error::ScheduleNotFound);
+        }
+
+        env.storage()
+            .persistent()
+            .remove(&DataKey::MaintenanceSchedule(asset_id));
+
+        events::maintenance_schedule_cancelled(&env, asset_id);
     }
 
     pub fn get_upcoming_maintenance(env: Env, asset_id: u64) -> Option<ScheduledMaintenance> {
+        ttl::extend_persistent(&env, &DataKey::MaintenanceSchedule(asset_id));
         env.storage()
             .persistent()
             .get(&DataKey::MaintenanceSchedule(asset_id))

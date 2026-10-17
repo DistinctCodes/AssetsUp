@@ -614,6 +614,65 @@ fn update_maintenance_schedule_replaces_the_existing_schedule() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// Cancelling a schedule (#1480)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cancelling_a_schedule_removes_it() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    ctx.client
+        .schedule_maintenance(&ctx.admin, &schedule(&env, &ctx.provider, 7, NOW + 500));
+
+    ctx.client.cancel_scheduled_maintenance(&ctx.admin, &7);
+
+    assert!(ctx.client.get_upcoming_maintenance(&7).is_none());
+}
+
+#[test]
+fn cancelling_a_schedule_emits_an_event() {
+    use soroban_sdk::{Symbol, TryIntoVal};
+
+    let env = Env::default();
+    let ctx = setup(&env);
+    ctx.client
+        .schedule_maintenance(&ctx.admin, &schedule(&env, &ctx.provider, 7, NOW + 500));
+
+    ctx.client.cancel_scheduled_maintenance(&ctx.admin, &7);
+
+    let events = env.events().all();
+    assert_eq!(events.len(), 1, "cancellation must emit exactly one event");
+    let (_contract, topics, _data) = events.last().unwrap();
+    let name: Symbol = topics.get(0).unwrap().try_into_val(&env).unwrap();
+    assert_eq!(name, Symbol::new(&env, "maintenance_schedule_cancelled"));
+}
+
+#[test]
+fn cancelling_a_missing_schedule_is_rejected() {
+    let env = Env::default();
+    let ctx = setup(&env);
+
+    assert!(ctx
+        .client
+        .try_cancel_scheduled_maintenance(&ctx.admin, &7)
+        .is_err());
+}
+
+#[test]
+fn cancelling_a_schedule_does_not_touch_the_append_only_history() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    ctx.client
+        .add_maintenance_record(&record(&env, &ctx.provider, 1, 7));
+    ctx.client
+        .schedule_maintenance(&ctx.admin, &schedule(&env, &ctx.provider, 7, NOW + 500));
+
+    ctx.client.cancel_scheduled_maintenance(&ctx.admin, &7);
+
+    assert_eq!(ctx.client.get_maintenance_history(&7).len(), 1);
+}
+
 #[test]
 fn schedule_maintenance_requires_the_owners_authorization() {
     let env = Env::default();
