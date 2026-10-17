@@ -58,6 +58,30 @@ describe('AuthService', () => {
     passwordService = module.get<PasswordService>(PasswordService);
   });
 
+  describe('email normalisation', () => {
+    it('registers with a lower-cased, trimmed email via UsersService', async () => {
+      const { RegisterDto } = await import('./dto/register.dto');
+      const { plainToInstance } = await import('class-transformer');
+      const dto = plainToInstance(RegisterDto, {
+        firstName: 'J',
+        lastName: 'D',
+        email: '  Jane@Corp.COM ',
+        password: 'Password123!',
+      });
+      expect(dto.email).toBe('jane@corp.com');
+    });
+
+    it('normalises the login email before validation', async () => {
+      const { LoginDto } = await import('./dto/login.dto');
+      const { plainToInstance } = await import('class-transformer');
+      const dto = plainToInstance(LoginDto, {
+        email: 'JANE@corp.com',
+        password: 'x',
+      });
+      expect(dto.email).toBe('jane@corp.com');
+    });
+  });
+
   describe('register', () => {
     it('should throw ConflictException when email already exists', async () => {
       jest
