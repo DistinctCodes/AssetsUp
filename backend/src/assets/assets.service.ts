@@ -6,6 +6,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  LIKE_ESCAPE,
+  containsPattern,
+  resolveSort,
+} from '../common/utils/list-query';
+import { ASSET_SORT_COLUMNS } from './dto/list-assets-query.dto';
 import { PublicAssetDto, toPublicAsset } from './dto/public-asset.dto';
 import { Asset, ASSET_DETAIL_RELATIONS } from './entities/asset.entity';
 import { AssetLifecycleService, AssetStatus } from './asset-lifecycle.service';
@@ -26,6 +32,8 @@ export interface BulkResult {
   skipped: string[];
 }
 
+/** Hard ceiling on list page size, enforced again here as defence in depth. */
+const MAX_PAGE_SIZE = 100;
 const PROTECTED_ASSET_FIELDS = [
   'id',
   'createdAt',
@@ -54,18 +62,29 @@ export class AssetsService {
     status?: string;
     page?: number;
     limit?: number;
+    sortBy?: string;
+    sortOrder?: string;
   }) {
     const page = query?.page || 1;
-    const limit = query?.limit || 20;
+    const limit = Math.min(query?.limit || 20, MAX_PAGE_SIZE);
+    const sort = resolveSort(
+      query?.sortBy,
+      query?.sortOrder,
+      ASSET_SORT_COLUMNS,
+      'createdAt',
+    );
     const qb = this.assetRepo
       .createQueryBuilder('asset')
       .skip((page - 1) * limit)
-      .take(limit);
+      .take(limit)
+      // `id` breaks ties so rows never move between pages.
+      .orderBy(`asset.${sort.column}`, sort.order)
+      .addOrderBy('asset.id', 'ASC');
 
     if (query?.search) {
       qb.andWhere(
-        '(asset.name ILIKE :s OR asset.assetTag ILIKE :s OR asset.serialNumber ILIKE :s)',
-        { s: `%${query.search}%` },
+        `(asset.name ILIKE :s ${LIKE_ESCAPE} OR asset.assetTag ILIKE :s ${LIKE_ESCAPE} OR asset.serialNumber ILIKE :s ${LIKE_ESCAPE})`,
+        { s: containsPattern(query.search) },
       );
     }
     if (query?.categoryId)

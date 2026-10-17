@@ -8,6 +8,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import {
+  LIKE_ESCAPE,
+  containsPattern,
+  resolveSort,
+} from '../common/utils/list-query';
+import { USER_SORT_COLUMNS } from './dto/list-users-query.dto';
 import { PasswordService } from '../common/security/password.service';
 import { User, UserRole } from './entities/user.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -32,18 +38,28 @@ export class UsersService {
     role?: UserRole;
     page?: number;
     limit?: number;
+    sortBy?: string;
+    sortOrder?: string;
   }) {
     const page = query?.page || 1;
-    const limit = query?.limit || 20;
+    const limit = Math.min(query?.limit || 20, 100);
+    const sort = resolveSort(
+      query?.sortBy,
+      query?.sortOrder,
+      USER_SORT_COLUMNS,
+      'createdAt',
+    );
     const qb = this.userRepository
       .createQueryBuilder('user')
       .skip((page - 1) * limit)
-      .take(limit);
+      .take(limit)
+      .orderBy(`user.${sort.column}`, sort.order)
+      .addOrderBy('user.id', 'ASC');
 
     if (query?.search) {
       qb.andWhere(
-        '(user.email ILIKE :s OR user.firstName ILIKE :s OR user.lastName ILIKE :s)',
-        { s: `%${query.search}%` },
+        `(user.email ILIKE :s ${LIKE_ESCAPE} OR user.firstName ILIKE :s ${LIKE_ESCAPE} OR user.lastName ILIKE :s ${LIKE_ESCAPE})`,
+        { s: containsPattern(query.search) },
       );
     }
     if (query?.role) {

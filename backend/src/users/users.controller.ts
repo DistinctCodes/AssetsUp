@@ -19,6 +19,7 @@ import { ApiEnvelope, ApiErrorEnvelope } from '../common/swagger/api-envelope.de
 import { UsersService } from './users.service';
 import { User, UserRole } from './entities/user.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ListUsersQueryDto } from './dto/list-users-query.dto';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -34,13 +35,8 @@ export class UsersController {
   @Get()
   @ApiOperation({ summary: 'List users (paginated, searchable)' })
   @ApiResponse({ status: 200, description: 'List of users' })
-  findAll(
-    @Query('search') search?: string,
-    @Query('role') role?: UserRole,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.usersService.findAll({ search, role, page, limit });
+  findAll(@Query() query: ListUsersQueryDto) {
+    return this.usersService.findAll(query);
   }
 
   @Get('me')

@@ -87,6 +87,47 @@ describe('AssetsService', () => {
     expect(repository.softRemove).toHaveBeenCalledWith(mockAsset);
   });
 
+  describe('findAll', () => {
+    function mockQb() {
+      const qb: any = {
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      jest.spyOn(repository, 'createQueryBuilder').mockReturnValue(qb);
+      return qb;
+    }
+
+    it('escapes LIKE wildcards so "100%" matches literally', async () => {
+      const qb = mockQb();
+      await service.findAll({ search: '100%' });
+      const [sql, params] = qb.andWhere.mock.calls[0];
+      expect(params).toEqual({ s: '%100\\%%' });
+      expect(sql).toContain("ESCAPE '\\'");
+    });
+
+    it('clamps limit to 100 and uses an id tiebreaker for stable pages', async () => {
+      const qb = mockQb();
+      const result = await service.findAll({ page: 3, limit: 1_000_000 });
+      expect(qb.take).toHaveBeenCalledWith(100);
+      expect(qb.skip).toHaveBeenCalledWith(200);
+      expect(qb.orderBy).toHaveBeenCalledWith('asset.createdAt', 'DESC');
+      expect(qb.addOrderBy).toHaveBeenCalledWith('asset.id', 'ASC');
+      expect(result.limit).toBe(100);
+    });
+
+    it('sorts by a whitelisted column and ignores unknown ones', async () => {
+      const qb = mockQb();
+      await service.findAll({ sortBy: 'name', sortOrder: 'ASC' });
+      expect(qb.orderBy).toHaveBeenCalledWith('asset.name', 'ASC');
+      await service.findAll({ sortBy: 'passwordHash; --' });
+      expect(qb.orderBy).toHaveBeenLastCalledWith('asset.createdAt', 'DESC');
+    });
+  });
+
   describe('findPublicByScan', () => {
     it('looks up a UUID by id and returns the public shape', async () => {
       jest.spyOn(repository, 'findOne').mockResolvedValue({
