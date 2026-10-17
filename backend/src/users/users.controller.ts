@@ -14,8 +14,9 @@ import {
   ApiBearerAuth,
   ApiResponse,
 } from '@nestjs/swagger';
+import { ApiEnvelope, ApiErrorEnvelope } from '../common/swagger/api-envelope.decorator';
 import { UsersService } from './users.service';
-import { UserRole } from './entities/user.entity';
+import { User, UserRole } from './entities/user.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -43,7 +44,8 @@ export class UsersController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({ status: 200, description: 'Current user profile' })
+  @ApiEnvelope(User, { description: 'Current user profile' })
+  @ApiErrorEnvelope(401, 'Missing or invalid token')
   async getProfile(@Req() req: any) {
     const userId = req.user?.id || req.user?.sub;
     if (!userId) {
