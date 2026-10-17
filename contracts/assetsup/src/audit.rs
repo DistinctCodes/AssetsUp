@@ -1,5 +1,5 @@
 //! On-chain audit log and its reconciliation contract with the off-chain
-//! `audit-logs` service ([SC-43]).
+//! `audit-logs` service.
 //!
 //! ## What is written on-chain
 //!
