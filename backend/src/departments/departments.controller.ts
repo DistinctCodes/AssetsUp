@@ -48,6 +48,22 @@ export class DepartmentsController {
     return this.deptService.findById(id);
   }
 
+  @Get(':id/assets')
+  @ApiOperation({ summary: 'List assets in a department (paginated)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of assets' })
+  @ApiResponse({ status: 404, description: 'Department not found' })
+  findAssets(@Param('id') id: string, @Query() query: PaginationQueryDto) {
+    return this.deptService.findAssets(id, query);
+  }
+
+  @Get(':id/users')
+  @ApiOperation({ summary: 'List users in a department (paginated)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of users' })
+  @ApiResponse({ status: 404, description: 'Department not found' })
+  findUsers(@Param('id') id: string, @Query() query: PaginationQueryDto) {
+    return this.deptService.findUsers(id, query);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update a department' })
   @ApiResponse({ status: 200, description: 'Department updated' })
