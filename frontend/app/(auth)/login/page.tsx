@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth.store';
+import { getSafeRedirect } from '@/lib/utils/redirect-validation';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -32,7 +33,7 @@ function LoginForm() {
   const onSubmit = async (values: FormValues) => {
     try {
       await login(values);
-      const redirect = searchParams.get('redirect') || '/dashboard';
+      const redirect = getSafeRedirect(searchParams.get('redirect'));
       router.push(redirect);
     } catch (err: unknown) {
       const message =
