@@ -37,7 +37,10 @@ jobs:
       - name: Run TypeScript type-check
         run: npm run type-check
 
+      - name: Run unit tests
+        run: npm run test
+
       - name: Run Next.js build
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:4000/api
+          NEXT_PUBLIC_API_URL: http://localhost:6003/api
         run: npm run build
