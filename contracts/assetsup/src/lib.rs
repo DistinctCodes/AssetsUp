@@ -589,6 +589,10 @@ impl AssetUpContract {
     ///
     /// Authorized by the *incoming* address, which is the whole point — an
     /// address that never accepts leaves the original admin in place forever.
+    ///
+    /// Deliberately reachable while paused. An incident may be *caused* by a
+    /// compromised admin key, so rotating it must not require unpausing first.
+    /// See `PAUSE_EXEMPT` in `src/tests/pause.rs`.
     pub fn accept_admin(env: Env) -> Result<(), Error> {
         let pending: Address = env
             .storage()
@@ -617,6 +621,8 @@ impl AssetUpContract {
     }
 
     /// Withdraws a pending proposal. Only the current admin may cancel.
+    ///
+    /// Reachable while paused, as part of the admin-rotation exemption.
     pub fn cancel_admin_proposal(env: Env) -> Result<(), Error> {
         let current_admin = Self::get_admin(env.clone())?;
         current_admin.require_auth();
@@ -721,17 +727,29 @@ impl AssetUpContract {
 
         env.storage().persistent().set(&DataKey::Paused, &true);
 
+        // Bump the flag's TTL. An emergency pause that is never touched again
+        // is exactly the entry nobody renews, and a lapsed `Paused` key reads
+        // back as absent -- which silently resumes a contract that an operator
+        // believes is frozen. `initialize` and `is_paused` both extend this key
+        // for the same reason.
+        ttl::extend_persistent(&env, &DataKey::Paused);
+
         // Emit event
         events::contract_paused(&env, &admin);
 
         Ok(())
     }
 
+    /// Unfreezes the contract.
+    ///
+    /// Deliberately reachable while paused -- that is the only way out of an
+    /// emergency pause -- and like `upgrade`, admin-gated on its own.
     pub fn unpause_contract(env: Env) -> Result<(), Error> {
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
 
         env.storage().persistent().set(&DataKey::Paused, &false);
+        ttl::extend_persistent(&env, &DataKey::Paused);
 
         // Emit event
         events::contract_unpaused(&env, &admin);
