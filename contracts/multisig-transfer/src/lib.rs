@@ -46,6 +46,8 @@ mod integration_tests;
 #[cfg(test)]
 mod pagination_tests;
 mod registry;
+#[cfg(test)]
+mod revocation_tests;
 mod rules;
 mod storage;
 #[cfg(test)]
