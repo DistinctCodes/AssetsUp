@@ -6,13 +6,26 @@ use crate::types::{
 use crate::voting;
 use soroban_sdk::{Address, Env};
 
+/// Minimum delay between tokenizing an asset and proposing its detokenization.
+///
+/// Without it an asset could be tokenized and immediately unwound in the same
+/// ledger or two, laundering ownership through the token layer. A week is long
+/// enough that any such round-trip is visible off-chain before it completes.
+pub const DETOKENIZE_COOLDOWN_SECONDS: u64 = 7 * 24 * 60 * 60;
+
 /// Propose detokenization (requires voting)
 pub fn propose_detokenization(env: &Env, asset_id: u64, proposer: Address) -> Result<u64, Error> {
     let store = env.storage().persistent();
 
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
+    let tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
+
+    // Enforce the post-tokenization cooldown.
+    let cooldown_until = tokenized_asset.tokenization_timestamp + DETOKENIZE_COOLDOWN_SECONDS;
+    if env.ledger().timestamp() < cooldown_until {
+        return Err(Error::DetokenizationCooldownActive);
+    }
 
     // Check if proposal already exists
     let proposal_key = TokenDataKey::DetokenizationProposal(asset_id);

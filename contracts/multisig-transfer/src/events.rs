@@ -69,6 +69,23 @@ pub struct TransferCancelled {
     pub timestamp: u64,
 }
 
+/// A pending transfer request's approval window closed before the threshold was
+/// reached, so it was auto-cancelled and the asset unlocked.
+///
+/// Distinct from [`TransferCancelled`]: nobody chose to cancel this, the clock
+/// did. Indexers that reconcile "assets with no pending transfer" need both.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferRequestExpired {
+    #[topic]
+    pub request_id: u64,
+    pub asset_id: BytesN<32>,
+    pub approvals_received: u32,
+    pub approvals_required: u32,
+    pub approval_deadline: u64,
+    pub timestamp: u64,
+}
+
 /// The approval rule for an asset category was created or changed.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -80,6 +97,8 @@ pub struct ApprovalRuleUpdated {
 }
 
 /// An address was granted approver rights.
+///
+/// Emitted once per address that is newly present in a rule's approver set.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ApproverAdded {
@@ -90,6 +109,10 @@ pub struct ApproverAdded {
 }
 
 /// An address had its approver rights revoked.
+///
+/// Emitted once per address that is no longer present in a rule's approver set.
+/// Note this revokes *future* approvals only: a request already approved under
+/// the previous set stays `Approved` and executable.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ApproverRemoved {
@@ -203,7 +226,26 @@ pub fn approval_rule_updated(e: &Env, category: &BytesN<32>, required: u32, time
     .publish(e);
 }
 
-#[allow(dead_code)]
+pub fn transfer_request_expired(
+    e: &Env,
+    request_id: u64,
+    asset_id: &BytesN<32>,
+    received: u32,
+    required: u32,
+    approval_deadline: u64,
+    timestamp: u64,
+) {
+    TransferRequestExpired {
+        request_id,
+        asset_id: asset_id.clone(),
+        approvals_received: received,
+        approvals_required: required,
+        approval_deadline,
+        timestamp,
+    }
+    .publish(e);
+}
+
 pub fn approver_added(e: &Env, approver: &Address, added_by: &Address, timestamp: u64) {
     ApproverAdded {
         approver: approver.clone(),
@@ -213,7 +255,6 @@ pub fn approver_added(e: &Env, approver: &Address, added_by: &Address, timestamp
     .publish(e);
 }
 
-#[allow(dead_code)]
 pub fn approver_removed(e: &Env, approver: &Address, removed_by: &Address, timestamp: u64) {
     ApproverRemoved {
         approver: approver.clone(),

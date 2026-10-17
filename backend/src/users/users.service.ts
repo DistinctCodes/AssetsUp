@@ -8,10 +8,17 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as bcrypt from 'bcryptjs';
+import {
+  LIKE_ESCAPE,
+  containsPattern,
+  resolveSort,
+} from '../common/utils/list-query';
+import { USER_SORT_COLUMNS } from './dto/list-users-query.dto';
+import { PasswordService } from '../common/security/password.service';
 import { User, UserRole } from './entities/user.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { normalizeEmail } from './utils/normalize-email';
 
 @Injectable()
 export class UsersService {
@@ -19,25 +26,40 @@ export class UsersService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @Optional() private readonly auditLogsService?: AuditLogsService,
-  ) {}
+    @Optional() passwords?: PasswordService,
+  ) {
+    this.passwords = passwords ?? new PasswordService();
+  }
+
+  private readonly passwords: PasswordService;
 
   async findAll(query?: {
     search?: string;
     role?: UserRole;
     page?: number;
     limit?: number;
+    sortBy?: string;
+    sortOrder?: string;
   }) {
     const page = query?.page || 1;
-    const limit = query?.limit || 20;
+    const limit = Math.min(query?.limit || 20, 100);
+    const sort = resolveSort(
+      query?.sortBy,
+      query?.sortOrder,
+      USER_SORT_COLUMNS,
+      'createdAt',
+    );
     const qb = this.userRepository
       .createQueryBuilder('user')
       .skip((page - 1) * limit)
-      .take(limit);
+      .take(limit)
+      .orderBy(`user.${sort.column}`, sort.order)
+      .addOrderBy('user.id', 'ASC');
 
     if (query?.search) {
       qb.andWhere(
-        '(user.email ILIKE :s OR user.firstName ILIKE :s OR user.lastName ILIKE :s)',
-        { s: `%${query.search}%` },
+        `(user.email ILIKE :s ${LIKE_ESCAPE} OR user.firstName ILIKE :s ${LIKE_ESCAPE} OR user.lastName ILIKE :s ${LIKE_ESCAPE})`,
+        { s: containsPattern(query.search) },
       );
     }
     if (query?.role) {
@@ -61,7 +83,9 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { email } });
+    return this.userRepository.findOne({
+      where: { email: normalizeEmail(email) },
+    });
   }
 
   async create(dto: {
@@ -74,9 +98,9 @@ export class UsersService {
     const existing = await this.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email already in use');
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const passwordHash = await this.passwords.hash(dto.password);
     const user = this.userRepository.create({
-      email: dto.email,
+      email: normalizeEmail(dto.email),
       passwordHash,
       firstName: dto.firstName,
       lastName: dto.lastName,
@@ -141,14 +165,14 @@ export class UsersService {
           'Current password is required to change password',
         );
       }
-      const isMatch = await bcrypt.compare(
+      const isMatch = await this.passwords.compare(
         dto.currentPassword,
         user.passwordHash,
       );
       if (!isMatch) {
         throw new BadRequestException('Current password is incorrect');
       }
-      user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+      user.passwordHash = await this.passwords.hash(dto.newPassword);
       user.passwordResetToken = null;
       user.passwordResetExpires = null;
     }
@@ -194,6 +218,8 @@ export class UsersService {
       passwordHash,
       passwordResetToken: null,
       passwordResetExpires: null,
+      // Revoke existing sessions: an old refresh token must stop working.
+      refreshTokenHash: null,
     });
   }
 }

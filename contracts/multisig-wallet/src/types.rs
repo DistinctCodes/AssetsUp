@@ -104,3 +104,9 @@ pub enum DataKey {
     ProposalConfirmation(u64, Address),
     Admin, // Address (for initialization)
 }
+
+/// Layout version of the wallet's persisted storage (`DataKey`, `Transaction`,
+/// `OwnerProfile`, `OwnershipProposal`). Bump it on any breaking change to
+/// those types so an upgrade can detect and migrate older wallets.
+#[allow(dead_code)]
+pub const STORAGE_VERSION: u32 = 1;

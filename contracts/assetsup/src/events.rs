@@ -351,6 +351,35 @@ pub struct LeaseExpired {
     pub timestamp: u64,
 }
 
+/// A lease was terminated early: the asset was returned before the lease's end
+/// date. Distinct from `lease_returned` so consumers can tell a scheduled end
+/// from a break.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LeaseTerminatedEarly {
+    #[topic]
+    pub lease_id: BytesN<32>,
+    pub caller: Address,
+    pub end_timestamp: u64,
+    pub timestamp: u64,
+}
+
+// ---------------------------------------------------------------------------
+// Insurance
+// ---------------------------------------------------------------------------
+
+/// A policy is approaching its end date. Off-chain services watch for this to
+/// trigger expiry/renewal reminders; it carries no state change on its own.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct InsurancePolicyExpiryReminder {
+    #[topic]
+    pub policy_id: BytesN<32>,
+    pub asset_id: BytesN<32>,
+    pub end_date: u64,
+    pub timestamp: u64,
+}
+
 // ---------------------------------------------------------------------------
 // Upgrade and migration
 // ---------------------------------------------------------------------------
@@ -683,6 +712,36 @@ pub fn lease_cancelled(env: &Env, lease_id: &BytesN<32>, caller: &Address) {
 pub fn lease_expired(env: &Env, lease_id: &BytesN<32>) {
     LeaseExpired {
         lease_id: lease_id.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn lease_terminated_early(
+    env: &Env,
+    lease_id: &BytesN<32>,
+    caller: &Address,
+    end_timestamp: u64,
+) {
+    LeaseTerminatedEarly {
+        lease_id: lease_id.clone(),
+        caller: caller.clone(),
+        end_timestamp,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn insurance_policy_expiry_reminder(
+    env: &Env,
+    policy_id: &BytesN<32>,
+    asset_id: &BytesN<32>,
+    end_date: u64,
+) {
+    InsurancePolicyExpiryReminder {
+        policy_id: policy_id.clone(),
+        asset_id: asset_id.clone(),
+        end_date,
         timestamp: env.ledger().timestamp(),
     }
     .publish(env);

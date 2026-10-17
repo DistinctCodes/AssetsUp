@@ -433,3 +433,107 @@ fn test_status_transition_validation() {
     assert!(cancel_after_suspend_ok);
     assert!(suspend_cancelled_err);
 }
+
+#[test]
+fn test_expiry_reminder_due_only_inside_the_window() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let holder = Address::generate(&env);
+    let insurer = Address::generate(&env);
+    let asset_id = BytesN::from_array(&env, &[1u8; 32]);
+    let policy_id = BytesN::from_array(&env, &[2u8; 32]);
+
+    let (too_early, inside, after_expiry) = env.as_contract(&contract_id, || {
+        let policy = create_test_policy(&env, policy_id.clone(), holder, insurer, asset_id);
+        let end_date = policy.end_date;
+        insurance::create_policy(env.clone(), policy).unwrap();
+
+        let window = insurance::POLICY_EXPIRY_REMINDER_WINDOW_SECONDS;
+
+        // One second before the window opens: not due.
+        env.ledger().with_mut(|li| {
+            li.timestamp = end_date - window - 1;
+        });
+        let too_early = insurance::is_expiry_reminder_due(&env, &policy_id);
+
+        // Inside the window: due.
+        env.ledger().with_mut(|li| {
+            li.timestamp = end_date - 1;
+        });
+        let inside = insurance::is_expiry_reminder_due(&env, &policy_id);
+
+        // At the end date: no reminder, the policy should expire instead.
+        env.ledger().with_mut(|li| {
+            li.timestamp = end_date;
+        });
+        let after = insurance::is_expiry_reminder_due(&env, &policy_id);
+
+        (too_early, inside, after)
+    });
+
+    assert!(!too_early);
+    assert!(inside);
+    assert!(!after_expiry);
+}
+
+#[test]
+fn test_emit_expiry_reminder_requires_the_window() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let holder = Address::generate(&env);
+    let insurer = Address::generate(&env);
+    let asset_id = BytesN::from_array(&env, &[1u8; 32]);
+    let policy_id = BytesN::from_array(&env, &[2u8; 32]);
+
+    let (early_err, inside_ok) = env.as_contract(&contract_id, || {
+        let policy = create_test_policy(&env, policy_id.clone(), holder, insurer, asset_id);
+        let end_date = policy.end_date;
+        insurance::create_policy(env.clone(), policy).unwrap();
+
+        let window = insurance::POLICY_EXPIRY_REMINDER_WINDOW_SECONDS;
+
+        env.ledger().with_mut(|li| {
+            li.timestamp = end_date - window - 1;
+        });
+        let early = insurance::emit_expiry_reminder(env.clone(), policy_id.clone()).is_err();
+
+        env.ledger().with_mut(|li| {
+            li.timestamp = end_date - 1;
+        });
+        let inside = insurance::emit_expiry_reminder(env.clone(), policy_id.clone()).is_ok();
+
+        (early, inside)
+    });
+
+    assert!(early_err);
+    assert!(inside_ok);
+}
+
+#[test]
+fn test_expiry_reminder_skips_inactive_policies() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let holder = Address::generate(&env);
+    let insurer = Address::generate(&env);
+    let asset_id = BytesN::from_array(&env, &[1u8; 32]);
+    let policy_id = BytesN::from_array(&env, &[2u8; 32]);
+
+    let (cancelled_due, cancelled_emit_err) = env.as_contract(&contract_id, || {
+        let policy = create_test_policy(&env, policy_id.clone(), holder.clone(), insurer, asset_id);
+        let end_date = policy.end_date;
+        insurance::create_policy(env.clone(), policy).unwrap();
+        insurance::cancel_policy(env.clone(), policy_id.clone(), holder.clone()).unwrap();
+
+        env.ledger().with_mut(|li| {
+            li.timestamp = end_date - 1;
+        });
+
+        let due = insurance::is_expiry_reminder_due(&env, &policy_id);
+        let emit_err = insurance::emit_expiry_reminder(env.clone(), policy_id.clone()).is_err();
+
+        (due, emit_err)
+    });
+
+    assert!(!cancelled_due);
+    assert!(cancelled_emit_err);
+}

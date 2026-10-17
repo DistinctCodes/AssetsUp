@@ -38,6 +38,18 @@ pub fn tokenize_asset(
         return Err(Error::AssetAlreadyTokenized);
     }
 
+    // Prevent double-tokenizing the same underlying asset under a *different*
+    // token id. The registry keys assets by `BytesN<32>` while tokenization
+    // keys them by `u64`, and the contract does not link the two spaces, so a
+    // caller could otherwise mint a second token record for an asset that is
+    // already tokenized. The symbol is the caller-supplied identity of the
+    // asset, so a symbol already claimed by another tokenized asset is
+    // rejected.
+    let symbol_key = TokenDataKey::SymbolRegistry(symbol.clone());
+    if store.has(&symbol_key) {
+        return Err(Error::DuplicateTokenSymbol);
+    }
+
     // Create tokenized asset
     let timestamp = env.ledger().timestamp();
     let tokenized_asset = TokenizedAsset {
@@ -58,6 +70,10 @@ pub fn tokenize_asset(
 
     // Store tokenized asset
     store.set(&key, &tokenized_asset);
+
+    // Claim the symbol so a later call cannot tokenize the same asset again
+    // under a different id.
+    store.set(&symbol_key, &asset_id);
 
     // Store metadata
     let metadata_key = TokenDataKey::TokenMetadata(asset_id);
@@ -458,6 +474,37 @@ pub fn update_valuation(env: &Env, asset_id: u64, new_valuation: i128) -> Result
 
     // Emit event: (asset_id, new_valuation)
     crate::events::valuation_updated(env, asset_id, new_valuation);
+
+    Ok(())
+}
+
+/// Extend the storage TTL of every persistent entry that makes up a tokenized
+/// asset: the asset record, its holders list and metadata, and each holder's
+/// ownership record.
+///
+/// Permissionless and idempotent, so an off-chain keeper can run it ahead of
+/// expiry to keep inactive-but-still-valid assets from being archived.
+pub fn bump_asset_ttl(env: &Env, asset_id: u64) -> Result<(), Error> {
+    let store = env.storage().persistent();
+
+    let asset_key = TokenDataKey::TokenizedAsset(asset_id);
+    if !store.has(&asset_key) {
+        return Err(Error::AssetNotTokenized);
+    }
+
+    crate::ttl::extend_persistent(env, &asset_key);
+    crate::ttl::extend_persistent(env, &TokenDataKey::TokenMetadata(asset_id));
+
+    let holders_key = TokenDataKey::TokenHoldersList(asset_id);
+    crate::ttl::extend_persistent(env, &holders_key);
+
+    // Extend each holder's ownership record too; otherwise the asset record
+    // survives while the balances quietly expire.
+    if let Some(holders) = store.get::<_, Vec<Address>>(&holders_key) {
+        for holder in holders.iter() {
+            crate::ttl::extend_persistent(env, &TokenDataKey::TokenHolder(asset_id, holder));
+        }
+    }
 
     Ok(())
 }

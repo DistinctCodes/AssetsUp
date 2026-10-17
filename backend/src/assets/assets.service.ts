@@ -6,6 +6,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  LIKE_ESCAPE,
+  containsPattern,
+  resolveSort,
+} from '../common/utils/list-query';
+import { ASSET_SORT_COLUMNS } from './dto/list-assets-query.dto';
+import { PublicAssetDto, toPublicAsset } from './dto/public-asset.dto';
 import { Asset, ASSET_DETAIL_RELATIONS } from './entities/asset.entity';
 import { AssetLifecycleService, AssetStatus } from './asset-lifecycle.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -24,6 +31,16 @@ export interface BulkResult {
   failed: { id: string; reason: string }[];
   skipped: string[];
 }
+
+/** Hard ceiling on list page size, enforced again here as defence in depth. */
+const MAX_PAGE_SIZE = 100;
+const PROTECTED_ASSET_FIELDS = [
+  'id',
+  'createdAt',
+  'updatedAt',
+  'deletedAt',
+  'assignedToUserId',
+] as const;
 
 @Injectable()
 export class AssetsService {
@@ -45,18 +62,29 @@ export class AssetsService {
     status?: string;
     page?: number;
     limit?: number;
+    sortBy?: string;
+    sortOrder?: string;
   }) {
     const page = query?.page || 1;
-    const limit = query?.limit || 20;
+    const limit = Math.min(query?.limit || 20, MAX_PAGE_SIZE);
+    const sort = resolveSort(
+      query?.sortBy,
+      query?.sortOrder,
+      ASSET_SORT_COLUMNS,
+      'createdAt',
+    );
     const qb = this.assetRepo
       .createQueryBuilder('asset')
       .skip((page - 1) * limit)
-      .take(limit);
+      .take(limit)
+      // `id` breaks ties so rows never move between pages.
+      .orderBy(`asset.${sort.column}`, sort.order)
+      .addOrderBy('asset.id', 'ASC');
 
     if (query?.search) {
       qb.andWhere(
-        '(asset.name ILIKE :s OR asset.assetTag ILIKE :s OR asset.serialNumber ILIKE :s)',
-        { s: `%${query.search}%` },
+        `(asset.name ILIKE :s ${LIKE_ESCAPE} OR asset.assetTag ILIKE :s ${LIKE_ESCAPE} OR asset.serialNumber ILIKE :s ${LIKE_ESCAPE})`,
+        { s: containsPattern(query.search) },
       );
     }
     if (query?.categoryId)
@@ -83,17 +111,30 @@ export class AssetsService {
     return asset;
   }
 
-  async create(dto: Partial<Asset>) {
-    const count = await this.assetRepo.count();
-    const assetTag =
-      dto.assetTag || `AST-${String(count + 1).padStart(5, '0')}`;
-    const asset = this.assetRepo.create({ ...dto, assetTag });
+  async create(dto: Partial<Asset> & { purchasePrice?: number }) {
+    // The frontend sends `purchasePrice`; the column is `purchaseCost`.
+    const { purchasePrice, ...rest } = dto;
+    const assetTag = rest.assetTag || (await this.nextAssetTag());
+    const asset = this.assetRepo.create({
+      ...rest,
+      purchaseCost: rest.purchaseCost ?? purchasePrice,
+      assetTag,
+    });
     return this.assetRepo.save(asset);
+  }
+
+  /** Next default tag. Counts soft-deleted rows so a used tag is not reissued. */
+  private async nextAssetTag() {
+    const count = await this.assetRepo.count({ withDeleted: true });
+    return `AST-${String(count + 1).padStart(5, '0')}`;
   }
 
   async update(id: string, dto: Partial<Asset>) {
     const asset = await this.findById(id);
-    Object.assign(asset, dto);
+    // Never let a request body overwrite identity, audit or ownership columns.
+    const changes = { ...dto };
+    for (const field of PROTECTED_ASSET_FIELDS) delete changes[field];
+    Object.assign(asset, changes);
     return this.assetRepo.save(asset);
   }
 
@@ -110,6 +151,23 @@ export class AssetsService {
     });
     if (!asset) throw new NotFoundException(`Asset ${id} not found`);
     return asset;
+  }
+
+  /**
+   * Public scan lookup by asset id (UUID) or printed asset tag. Returns only
+   * non-sensitive fields; unknown/soft-deleted assets are a 404.
+   */
+  async findPublicByScan(assetId: string): Promise<PublicAssetDto> {
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        assetId,
+      );
+    const asset = await this.assetRepo.findOne({
+      where: isUuid ? { id: assetId } : { assetTag: assetId },
+      relations: ['category', 'location'],
+    });
+    if (!asset) throw new NotFoundException('Asset not found');
+    return toPublicAsset(asset);
   }
 
   async updateStatus(id: string, dto: UpdateAssetStatusDto, actorId?: string) {

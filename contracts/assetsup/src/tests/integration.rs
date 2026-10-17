@@ -49,6 +49,11 @@ fn test_full_tokenization_workflow() {
 
         assert_eq!(tokenized.total_supply, 1000_i128);
 
+        // Move past the tokenize→detokenize cooldown (#1487).
+        env.ledger().with_mut(|li| {
+            li.timestamp = detokenization::DETOKENIZE_COOLDOWN_SECONDS + 1;
+        });
+
         // Step 2: Transfer tokens to other holders
         tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), 400)
             .unwrap();

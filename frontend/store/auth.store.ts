@@ -1,13 +1,14 @@
 import { create } from 'zustand';
+import { AUTH_COOKIE } from '@/lib/auth-routes';
 import { authApi, AuthUser, LoginPayload, RegisterPayload } from '@/lib/auth-api';
 
 // Cookie helpers for middleware access (middleware runs on Edge, can't read localStorage)
 function setAuthCookie(token: string) {
-  document.cookie = `accessToken=${token}; path=/; max-age=${15 * 60}; SameSite=Lax`;
+  document.cookie = `${AUTH_COOKIE}=${token}; path=/; max-age=${15 * 60}; SameSite=Lax`;
 }
 
 function clearAuthCookie() {
-  document.cookie = 'accessToken=; path=/; max-age=0';
+  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
 }
 
 interface AuthState {

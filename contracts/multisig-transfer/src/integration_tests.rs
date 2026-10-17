@@ -26,7 +26,8 @@ use assetsup::{AssetUpContract, AssetUpContractClient};
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{Address, BytesN, Env, String, Vec};
 
-use crate::types::ApprovalRule;
+use crate::errors::MultiSigError;
+use crate::types::{ApprovalRule, RequestStatus};
 use crate::{MultiSigTransferContract, MultiSigTransferContractClient};
 
 struct Fixture<'a> {
@@ -554,4 +555,271 @@ fn reconfiguring_a_rule_does_not_change_a_pending_request_s_requirement() {
         recipient,
         "ownership must move at the snapshot threshold, not the new rule"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Flow 7: [#1511] a duplicate approval has its own error
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_duplicate_approval_from_the_same_signer_returns_already_approved() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 2, 3);
+
+    let asset_id = f.register_governed_asset(50);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let signer = f.approvers.get(0).unwrap();
+
+    f.multisig.approve_transfer_request(&signer, &request_id);
+
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&signer, &request_id),
+        Err(Ok(MultiSigError::AlreadyApproved)),
+        "the same signer approving twice must report AlreadyApproved"
+    );
+
+    // The rejected duplicate must not have been counted a second time.
+    assert_eq!(
+        f.multisig.get_request(&request_id).received_approvals,
+        1,
+        "a duplicate approval must not increment the approval count"
+    );
+}
+
+#[test]
+fn already_approved_is_distinct_from_the_other_approval_refusals() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 2, 3);
+
+    let asset_id = f.register_governed_asset(51);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let signer = f.approvers.get(0).unwrap();
+    f.multisig.approve_transfer_request(&signer, &request_id);
+
+    // Not an approver at all.
+    let stranger = Address::generate(&env);
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&stranger, &request_id),
+        Err(Ok(MultiSigError::ApproverNotAuthorized))
+    );
+
+    // The requester approving their own request. The fixture raises requests
+    // as the multisig contract's own address, so that address is the
+    // initiator.
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&f.multisig_address, &request_id),
+        Err(Ok(MultiSigError::CannotApproveOwnRequest))
+    );
+
+    // A genuine repeat approval.
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&signer, &request_id),
+        Err(Ok(MultiSigError::AlreadyApproved))
+    );
+}
+
+#[test]
+fn a_rejected_duplicate_does_not_block_the_remaining_approvers() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 2, 3);
+
+    let asset_id = f.register_governed_asset(52);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let first = f.approvers.get(0).unwrap();
+    let second = f.approvers.get(1).unwrap();
+
+    f.multisig.approve_transfer_request(&first, &request_id);
+    assert!(f
+        .multisig
+        .try_approve_transfer_request(&first, &request_id)
+        .is_err());
+
+    // A different signer can still complete the threshold, and the transfer
+    // then executes: the duplicate left the request in a usable state.
+    f.multisig.approve_transfer_request(&second, &request_id);
+    f.multisig.execute_transfer(&f.admin, &request_id);
+
+    assert_eq!(f.registry.get_asset(&asset_id).owner, recipient);
+}
+
+#[test]
+fn a_repeat_approval_after_the_threshold_is_met_reports_the_request_state() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 1, 2);
+
+    let asset_id = f.register_governed_asset(53);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let signer = f.approvers.get(0).unwrap();
+
+    // One approval meets the threshold, so the request leaves Pending.
+    f.multisig.approve_transfer_request(&signer, &request_id);
+
+    // The status check runs before the duplicate check, so this is
+    // RequestNotPending rather than AlreadyApproved.
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&signer, &request_id),
+        Err(Ok(MultiSigError::RequestNotPending))
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Flow 8: [#1509] conflicting approvals in the same ledger close
+// ---------------------------------------------------------------------------
+//
+// Soroban applies the transactions of one ledger strictly one after another,
+// so two signers who submit conflicting decisions in the same ledger close do
+// not race: whichever lands first decides the outcome and the second is
+// evaluated against the state the first left behind. The tests below model
+// that as consecutive calls with no ledger advance between them, and assert
+// the ledger position at the end so that claim is checked rather than assumed.
+
+/// The `(sequence, timestamp)` of the current ledger.
+fn ledger_position(env: &Env) -> (u32, u64) {
+    (env.ledger().sequence(), env.ledger().timestamp())
+}
+
+fn reason(env: &Env) -> BytesN<32> {
+    BytesN::from_array(env, &[0u8; 32])
+}
+
+#[test]
+fn an_approval_then_a_reject_in_the_same_ledger_leaves_the_request_rejected() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 2, 3);
+
+    let asset_id = f.register_governed_asset(60);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let ledger = ledger_position(&env);
+
+    let approver = f.approvers.get(0).unwrap();
+    let rejecter = f.approvers.get(1).unwrap();
+    let late_approver = f.approvers.get(2).unwrap();
+
+    // Signer A approves (1 of 2), then signer B rejects, in the same ledger.
+    f.multisig.approve_transfer_request(&approver, &request_id);
+    f.multisig
+        .reject_transfer_request(&rejecter, &request_id, &reason(&env));
+
+    let request = f.multisig.get_request(&request_id);
+    assert_eq!(request.status, RequestStatus::Rejected);
+    assert_eq!(
+        request.received_approvals, 1,
+        "the approval that landed first is kept on record, but it does not carry the request"
+    );
+
+    // The request is now terminal: a third signer cannot revive it and it
+    // cannot execute.
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&late_approver, &request_id),
+        Err(Ok(MultiSigError::RequestNotPending))
+    );
+    assert_eq!(
+        f.multisig.try_execute_transfer(&f.admin, &request_id),
+        Err(Ok(MultiSigError::NotEnoughApprovals))
+    );
+    assert_eq!(
+        f.registry.get_asset(&asset_id).owner,
+        f.multisig_address,
+        "a rejected request must leave ownership untouched"
+    );
+
+    // The reject released the asset, so a fresh request can be raised.
+    let replacement = f.request_transfer(&asset_id, &recipient);
+    assert_ne!(replacement, request_id);
+
+    assert_eq!(
+        ledger_position(&env),
+        ledger,
+        "every call above must have landed in the same ledger"
+    );
+}
+
+#[test]
+fn a_reject_then_an_approval_in_the_same_ledger_is_refused() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 2, 3);
+
+    let asset_id = f.register_governed_asset(61);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let ledger = ledger_position(&env);
+
+    let rejecter = f.approvers.get(0).unwrap();
+    let approver = f.approvers.get(1).unwrap();
+
+    // The opposite order: the reject lands first, so the approval is
+    // evaluated against a request that is no longer pending.
+    f.multisig
+        .reject_transfer_request(&rejecter, &request_id, &reason(&env));
+    assert_eq!(
+        f.multisig
+            .try_approve_transfer_request(&approver, &request_id),
+        Err(Ok(MultiSigError::RequestNotPending))
+    );
+
+    let request = f.multisig.get_request(&request_id);
+    assert_eq!(request.status, RequestStatus::Rejected);
+    assert_eq!(
+        request.received_approvals, 0,
+        "a refused approval must not be counted"
+    );
+
+    // And it left no approval flag behind, so the signer is not blocked from
+    // approving a later request.
+    let flagged = env.as_contract(&f.multisig_address, || {
+        crate::approvals::was_approved(&env, request_id, &approver)
+    });
+    assert!(!flagged, "a refused approval must not be recorded");
+
+    assert_eq!(f.registry.get_asset(&asset_id).owner, f.multisig_address);
+    assert_eq!(ledger_position(&env), ledger);
+}
+
+#[test]
+fn the_approval_that_meets_the_threshold_wins_over_a_later_reject_in_the_same_ledger() {
+    let env = Env::default();
+    let f = Fixture::new(&env, 2, 3);
+
+    let asset_id = f.register_governed_asset(62);
+    let recipient = Address::generate(&env);
+    let request_id = f.request_transfer(&asset_id, &recipient);
+    let ledger = ledger_position(&env);
+
+    // Two approvals meet the threshold, so the request is Approved before
+    // the third signer's reject is evaluated.
+    f.multisig
+        .approve_transfer_request(&f.approvers.get(0).unwrap(), &request_id);
+    f.multisig
+        .approve_transfer_request(&f.approvers.get(1).unwrap(), &request_id);
+
+    assert_eq!(
+        f.multisig.try_reject_transfer_request(
+            &f.approvers.get(2).unwrap(),
+            &request_id,
+            &reason(&env),
+        ),
+        Err(Ok(MultiSigError::RequestNotPending)),
+        "an Approved request can no longer be rejected"
+    );
+    assert_eq!(
+        f.multisig.get_request(&request_id).status,
+        RequestStatus::Approved
+    );
+
+    // The late reject changed nothing, so the transfer still executes.
+    f.multisig.execute_transfer(&f.admin, &request_id);
+    assert_eq!(f.registry.get_asset(&asset_id).owner, recipient);
+
+    assert_eq!(ledger_position(&env), ledger);
 }

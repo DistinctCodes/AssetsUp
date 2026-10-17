@@ -6,7 +6,7 @@
 //!
 //! See `contracts/EVENTS.md` for the catalogue these assertions pin down.
 
-use soroban_sdk::testutils::{Address as _, Events as _};
+use soroban_sdk::testutils::{Address as _, Events as _, Ledger as _};
 use soroban_sdk::{Address, BytesN, Env, Symbol, TryIntoVal, Val, Vec};
 
 use super::helpers::{create_env, create_test_asset, initialize_contract};
@@ -219,4 +219,52 @@ fn pause_and_unpause_emit_distinct_events() {
     client.unpause_contract();
     let (topics, _) = only_event(&env);
     assert_event_name(&env, &topics, "contract_unpaused");
+}
+
+#[test]
+fn returning_a_lease_early_emits_a_distinct_event() {
+    // A break before the scheduled end date must be distinguishable from a
+    // normal return, which the old single `lease_returned` could not express.
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    let lessor = Address::generate(&env);
+    let lessee = Address::generate(&env);
+    let asset_id = asset_id(&env, 4);
+    let lease_id = asset_id(&env, 5);
+
+    client.create_lease(
+        &asset_id, &lease_id, &lessor, &lessee, &0u64, &1000u64, &100i128, &50i128,
+    );
+
+    // Ledger time is still 0, well before the end date of 1000.
+    client.return_leased_asset(&lease_id, &lessor);
+
+    let (topics, _) = only_event(&env);
+    assert_event_name(&env, &topics, "lease_terminated_early");
+    let emitted: BytesN<32> = topics.get(1).unwrap().try_into_val(&env).unwrap();
+    assert_eq!(emitted, lease_id);
+}
+
+#[test]
+fn returning_a_lease_at_its_end_emits_lease_returned() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    let lessor = Address::generate(&env);
+    let lessee = Address::generate(&env);
+    let asset_id = asset_id(&env, 6);
+    let lease_id = asset_id(&env, 7);
+
+    client.create_lease(
+        &asset_id, &lease_id, &lessor, &lessee, &0u64, &1000u64, &100i128, &50i128,
+    );
+
+    env.ledger().with_mut(|li| {
+        li.timestamp = 1000;
+    });
+    client.return_leased_asset(&lease_id, &lessor);
+
+    let (topics, _) = only_event(&env);
+    assert_event_name(&env, &topics, "lease_returned");
 }

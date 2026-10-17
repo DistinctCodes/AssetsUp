@@ -82,6 +82,57 @@ fn test_tokenize_asset() {
 }
 
 #[test]
+fn test_tokenize_asset_rejects_duplicate_symbol() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+
+    let metadata = || crate::types::TokenMetadata {
+        name: String::from_str(&env, "Test Asset"),
+        description: String::from_str(&env, "Testing tokenization"),
+        asset_type: AssetType::Digital,
+        ipfs_uri: None,
+        legal_docs_hash: None,
+        valuation_report_hash: None,
+        accredited_investor_required: false,
+        geographic_restrictions: soroban_sdk::Vec::new(&env),
+    };
+
+    let (first_ok, second_err) = env.as_contract(&contract_id, || {
+        let first = tokenization::tokenize_asset(
+            &env,
+            1,
+            String::from_str(&env, "SHARED"),
+            1000,
+            2,
+            100,
+            tokenizer.clone(),
+            metadata(),
+        )
+        .is_ok();
+
+        // A different asset id reusing the claimed symbol must be rejected, so
+        // the same underlying asset cannot be tokenized twice.
+        let second = tokenization::tokenize_asset(
+            &env,
+            2,
+            String::from_str(&env, "SHARED"),
+            1000,
+            2,
+            100,
+            tokenizer.clone(),
+            metadata(),
+        )
+        .is_err();
+
+        (first, second)
+    });
+
+    assert!(first_ok);
+    assert!(second_err);
+}
+
+#[test]
 fn test_tokenize_asset_invalid_supply() {
     let env = Env::default();
     let contract_id = env.register(AssetUpContract, ());

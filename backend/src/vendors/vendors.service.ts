@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Not, Repository } from 'typeorm';
 import { Vendor } from './entities/vendor.entity';
+import { Asset } from '../assets/entities/asset.entity';
 import { PurchaseOrder, POStatus } from '../purchase-orders/entities/purchase-order.entity';
 import { PaginationQueryDto, PaginatedResponse } from '../common/dto/pagination.dto';
 
@@ -16,6 +17,8 @@ export class VendorsService {
     private readonly vendorRepo: Repository<Vendor>,
     @InjectRepository(PurchaseOrder)
     private readonly poRepo: Repository<PurchaseOrder>,
+    @InjectRepository(Asset)
+    private readonly assetRepo: Repository<Asset>,
   ) {}
 
   async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<Vendor>> {
@@ -23,6 +26,22 @@ export class VendorsService {
     const where = search ? { name: ILike(`%${search}%`) } : {};
     const [items, total] = await this.vendorRepo.findAndCount({
       where,
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { createdAt: 'DESC' },
+    });
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  /** Assets supplied by a vendor (`Asset.supplierId`), newest first. */
+  async findAssets(
+    id: string,
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<Asset>> {
+    await this.findById(id);
+    const { page = 1, limit = 20 } = query;
+    const [items, total] = await this.assetRepo.findAndCount({
+      where: { supplierId: id },
       skip: (page - 1) * limit,
       take: limit,
       order: { createdAt: 'DESC' },

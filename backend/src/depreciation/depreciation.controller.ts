@@ -3,6 +3,7 @@ import {
   Get,
   Param,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -10,10 +11,12 @@ import {
   ApiBearerAuth,
   ApiResponse,
 } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DepreciationService } from './depreciation.service';
 
 @ApiTags('depreciation')
 @ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard)
 @Controller()
 export class DepreciationController {
   constructor(private readonly depreciationService: DepreciationService) {}

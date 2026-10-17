@@ -52,6 +52,14 @@ export class VendorsController {
     return this.vendorsService.findById(id);
   }
 
+  @Get(':id/assets')
+  @ApiOperation({ summary: 'List assets supplied by a vendor (paginated)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of assets' })
+  @ApiResponse({ status: 404, description: 'Vendor not found' })
+  findAssets(@Param('id') id: string, @Query() query: PaginationQueryDto) {
+    return this.vendorsService.findAssets(id, query);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update a vendor' })
   @ApiResponse({ status: 200, description: 'Vendor updated' })

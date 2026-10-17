@@ -138,9 +138,18 @@ service are documented in [`src/audit.rs`](src/audit.rs).
 | `lock_tokens` | owner |
 | `unlock_tokens` | — |
 | `update_valuation` | — |
+| `bump_asset_ttl` | — (permissionless keeper) |
 
 Reads: `get_token_balance`, `get_token_holders`, `is_tokens_locked`,
 `get_ownership_percentage`, `get_tokenized_asset`.
+
+`bump_asset_ttl` extends the storage TTL of an asset's persistent entries so a
+keeper can stop an inactive-but-valid asset being archived. It is idempotent
+and exempt from the pause.
+
+A token symbol may be claimed by at most one tokenized asset. Reusing a symbol
+is rejected with `DuplicateTokenSymbol` (`132`), which stops the same underlying
+asset being tokenized twice under different ids.
 
 ### Dividends, voting, detokenization
 
@@ -156,10 +165,21 @@ Reads: `get_token_balance`, `get_token_holders`, `is_tokens_locked`,
 Reads: `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`,
 `proposal_passed`, `get_detokenization_proposal`, `is_detokenization_active`.
 
+`propose_detokenization` is rejected with `DetokenizationCooldownActive` (`163`)
+until `DETOKENIZE_COOLDOWN_SECONDS` (7 days) have elapsed since the asset was
+tokenized, preventing immediate tokenize→detokenize round-trips.
+
 ### Transfer restrictions
 
 `set_transfer_restriction`, `add_to_whitelist`, `remove_from_whitelist`,
-`is_whitelisted`, `get_whitelist`. None currently call `require_auth`.
+`is_whitelisted`, `get_whitelist`, plus jurisdiction rules:
+`set_geographic_restriction`, `set_address_jurisdiction`,
+`get_address_jurisdiction`. None of the restriction setters currently call
+`require_auth` except `set_address_jurisdiction`, which is self-authenticated.
+
+When an asset has a non-empty `geographic_allowed` allow-list, `validate_transfer`
+requires the recipient to have a recorded jurisdiction that appears in it, or
+fails with `GeographicRestriction`.
 
 ### Leasing and insurance
 
@@ -170,6 +190,15 @@ Reads: `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`,
 | `create_insurance_policy` | insurer |
 | `cancel_insurance_policy`, `suspend_insurance_policy`, `renew_insurance_policy` | `caller`/insurer |
 | `expire_insurance_policy` | — |
+| `emit_insurance_expiry_reminder` | — (permissionless keeper) |
+
+Reads: `is_insurance_expiry_reminder_due`.
+
+`emit_insurance_expiry_reminder` only emits once a policy is inside its
+`POLICY_EXPIRY_REMINDER_WINDOW_SECONDS` (7 day) pre-expiry window, giving
+off-chain services a chain-native renewal signal. A vote outcome now also
+requires a `QUORUM_PERCENT` (30%) turnout in addition to the approval
+threshold.
 
 ## Events
 
@@ -184,6 +213,7 @@ Reads: `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`,
 | `("c_unpause",)` | `unpause_contract` |
 | `("branch_registered",)`, `("asset_assigned_to_branch",)` | `register_branch`, `assign_asset_to_branch` |
 | `("lease_new",)`, `("lease_ret",)`, `("lease_can",)`, `("lease_exp",)` | lease lifecycle |
+| `lease_terminated_early` | `return_leased_asset` when returned before the end date |
 
 Tokenization, dividends, voting, and detokenization emit events too; see the
 respective modules. Registrar allowlist changes emit **no** event. See [SC-36]

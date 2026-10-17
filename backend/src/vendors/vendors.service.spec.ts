@@ -6,6 +6,7 @@ describe('VendorsService', () => {
   let service: VendorsService;
   let mockVendorRepo: any;
   let mockPoRepo: any;
+  let mockAssetRepo: any;
 
   beforeEach(() => {
     mockVendorRepo = {
@@ -18,11 +19,45 @@ describe('VendorsService', () => {
     mockPoRepo = {
       findOne: jest.fn(),
     };
-    service = new VendorsService(mockVendorRepo, mockPoRepo);
+    mockAssetRepo = { findAndCount: jest.fn() };
+    service = new VendorsService(mockVendorRepo, mockPoRepo, mockAssetRepo);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('findAssets', () => {
+    it('returns paginated assets scoped by supplierId', async () => {
+      mockVendorRepo.findOne.mockResolvedValue({ id: 'v-1' });
+      mockAssetRepo.findAndCount.mockResolvedValue([[{ id: 'a-1' }], 41]);
+
+      const result = await service.findAssets('v-1', { page: 2, limit: 20 });
+
+      expect(mockAssetRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { supplierId: 'v-1' },
+          skip: 20,
+          take: 20,
+        }),
+      );
+      expect(result).toMatchObject({ total: 41, page: 2, totalPages: 3 });
+    });
+
+    it('returns an empty page when the vendor has no assets', async () => {
+      mockVendorRepo.findOne.mockResolvedValue({ id: 'v-1' });
+      mockAssetRepo.findAndCount.mockResolvedValue([[], 0]);
+      const result = await service.findAssets('v-1', {});
+      expect(result).toMatchObject({ items: [], total: 0, totalPages: 0 });
+    });
+
+    it('throws NotFoundException for an unknown vendor', async () => {
+      mockVendorRepo.findOne.mockResolvedValue(null);
+      await expect(service.findAssets('nope', {})).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockAssetRepo.findAndCount).not.toHaveBeenCalled();
+    });
   });
 
   describe('findAll', () => {

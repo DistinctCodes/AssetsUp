@@ -717,6 +717,10 @@ impl AssetUpContract {
     ///
     /// Authorized by the *incoming* address, which is the whole point — an
     /// address that never accepts leaves the original admin in place forever.
+    ///
+    /// Deliberately reachable while paused. An incident may be *caused* by a
+    /// compromised admin key, so rotating it must not require unpausing first.
+    /// See `PAUSE_EXEMPT` in `src/tests/pause.rs`.
     pub fn accept_admin(env: Env) -> Result<(), Error> {
         let pending: Address = env
             .storage()
@@ -745,6 +749,8 @@ impl AssetUpContract {
     }
 
     /// Withdraws a pending proposal. Only the current admin may cancel.
+    ///
+    /// Reachable while paused, as part of the admin-rotation exemption.
     pub fn cancel_admin_proposal(env: Env) -> Result<(), Error> {
         let current_admin = Self::get_admin(env.clone())?;
         current_admin.require_auth();
@@ -849,17 +855,29 @@ impl AssetUpContract {
 
         env.storage().persistent().set(&DataKey::Paused, &true);
 
+        // Bump the flag's TTL. An emergency pause that is never touched again
+        // is exactly the entry nobody renews, and a lapsed `Paused` key reads
+        // back as absent -- which silently resumes a contract that an operator
+        // believes is frozen. `initialize` and `is_paused` both extend this key
+        // for the same reason.
+        ttl::extend_persistent(&env, &DataKey::Paused);
+
         // Emit event
         events::contract_paused(&env, &admin);
 
         Ok(())
     }
 
+    /// Unfreezes the contract.
+    ///
+    /// Deliberately reachable while paused -- that is the only way out of an
+    /// emergency pause -- and like `upgrade`, admin-gated on its own.
     pub fn unpause_contract(env: Env) -> Result<(), Error> {
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
 
         env.storage().persistent().set(&DataKey::Paused, &false);
+        ttl::extend_persistent(&env, &DataKey::Paused);
 
         // Emit event
         events::contract_unpaused(&env, &admin);
@@ -1019,6 +1037,13 @@ impl AssetUpContract {
         tokenization::update_valuation(&env, asset_id, new_valuation)
     }
 
+    /// Extend the storage TTL of a tokenized asset's persistent entries
+    /// (permissionless keeper path; idempotent)
+    pub fn bump_asset_ttl(env: Env, asset_id: u64) -> Result<(), Error> {
+        ttl::extend_instance(&env);
+        tokenization::bump_asset_ttl(&env, asset_id)
+    }
+
     // =====================
     // Dividend Functions
     // =====================
@@ -1142,6 +1167,34 @@ impl AssetUpContract {
         transfer_restrictions::get_whitelist(&env, asset_id)
     }
 
+    /// Set the jurisdiction allow-list for an asset's transfers
+    pub fn set_geographic_restriction(
+        env: Env,
+        asset_id: u64,
+        allowed_jurisdictions: Vec<String>,
+    ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
+        transfer_restrictions::set_geographic_restriction(&env, asset_id, allowed_jurisdictions)
+    }
+
+    /// Record the jurisdiction (ISO country code) of an address; self-authenticated
+    pub fn set_address_jurisdiction(
+        env: Env,
+        address: Address,
+        jurisdiction: String,
+    ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
+        address.require_auth();
+        transfer_restrictions::set_address_jurisdiction(&env, address, jurisdiction)
+    }
+
+    /// Get the recorded jurisdiction of an address
+    pub fn get_address_jurisdiction(env: Env, address: Address) -> Option<String> {
+        transfer_restrictions::get_address_jurisdiction(&env, address)
+    }
+
     // =====================
     // Detokenization
     // =====================
@@ -1249,6 +1302,22 @@ impl AssetUpContract {
     /// Get all policies for an asset
     pub fn get_asset_insurance_policies(env: Env, asset_id: BytesN<32>) -> Vec<BytesN<32>> {
         insurance::get_asset_policies(env, asset_id)
+    }
+
+    /// Emit an on-chain expiry reminder for a policy nearing its end date
+    /// (permissionless; only fires inside the reminder window)
+    pub fn emit_insurance_expiry_reminder(
+        env: Env,
+        policy_id: BytesN<32>,
+    ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
+        insurance::emit_expiry_reminder(env, policy_id)
+    }
+
+    /// Whether a policy is inside its pre-expiry reminder window
+    pub fn is_insurance_expiry_reminder_due(env: Env, policy_id: BytesN<32>) -> bool {
+        insurance::is_expiry_reminder_due(&env, &policy_id)
     }
 
     /// Create a new lease. Lessor authenticates; asset must not already be actively leased.
