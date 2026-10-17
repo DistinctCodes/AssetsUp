@@ -25,6 +25,14 @@ export interface BulkResult {
   skipped: string[];
 }
 
+const PROTECTED_ASSET_FIELDS = [
+  'id',
+  'createdAt',
+  'updatedAt',
+  'deletedAt',
+  'assignedToUserId',
+] as const;
+
 @Injectable()
 export class AssetsService {
   constructor(
@@ -83,17 +91,30 @@ export class AssetsService {
     return asset;
   }
 
-  async create(dto: Partial<Asset>) {
-    const count = await this.assetRepo.count();
-    const assetTag =
-      dto.assetTag || `AST-${String(count + 1).padStart(5, '0')}`;
-    const asset = this.assetRepo.create({ ...dto, assetTag });
+  async create(dto: Partial<Asset> & { purchasePrice?: number }) {
+    // The frontend sends `purchasePrice`; the column is `purchaseCost`.
+    const { purchasePrice, ...rest } = dto;
+    const assetTag = rest.assetTag || (await this.nextAssetTag());
+    const asset = this.assetRepo.create({
+      ...rest,
+      purchaseCost: rest.purchaseCost ?? purchasePrice,
+      assetTag,
+    });
     return this.assetRepo.save(asset);
+  }
+
+  /** Next default tag. Counts soft-deleted rows so a used tag is not reissued. */
+  private async nextAssetTag() {
+    const count = await this.assetRepo.count({ withDeleted: true });
+    return `AST-${String(count + 1).padStart(5, '0')}`;
   }
 
   async update(id: string, dto: Partial<Asset>) {
     const asset = await this.findById(id);
-    Object.assign(asset, dto);
+    // Never let a request body overwrite identity, audit or ownership columns.
+    const changes = { ...dto };
+    for (const field of PROTECTED_ASSET_FIELDS) delete changes[field];
+    Object.assign(asset, changes);
     return this.assetRepo.save(asset);
   }
 
