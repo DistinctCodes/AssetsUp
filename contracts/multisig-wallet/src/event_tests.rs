@@ -160,3 +160,19 @@ fn set_daily_limit_emits_daily_limit_changed() {
         Symbol::new(&env, "daily_limit_changed")
     );
 }
+
+#[test]
+fn wallet_initialized_event_carries_the_threshold() {
+    // Topics identify the event; the payload map carries the other fields.
+    let env = Env::default();
+    let (_client, _admin, _alice, _bob) = setup(&env);
+
+    let (_contract, _topics, data) = env.events().all().last().unwrap();
+    let payload: soroban_sdk::Map<Symbol, Val> = data.try_into_val(&env).unwrap();
+    let threshold: u32 = payload
+        .get(Symbol::new(&env, "threshold"))
+        .unwrap()
+        .try_into_val(&env)
+        .unwrap();
+    assert_eq!(threshold, 2);
+}

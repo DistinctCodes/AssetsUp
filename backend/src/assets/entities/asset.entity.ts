@@ -27,7 +27,9 @@ export class Asset {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Index({ unique: true })
+  // Partial unique index: only live rows must be unique, so the tag of a
+  // soft-deleted asset can be reused.
+  @Index({ unique: true, where: '"deletedAt" IS NULL' })
   @Column()
   assetTag: string;
 

@@ -2,13 +2,12 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
   Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcryptjs';
+import { PasswordService } from '../common/security/password.service';
 import { UsersService } from '../users/users.service';
 import { User, UserRole } from '../users/entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
@@ -44,7 +43,12 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @Optional() private readonly auditLogsService?: AuditLogsService,
-  ) {}
+    @Optional() passwords?: PasswordService,
+  ) {
+    this.passwords = passwords ?? new PasswordService(configService);
+  }
+
+  private readonly passwords: PasswordService;
 
   private pruneExpiredRevocations() {
     const now = Math.floor(Date.now() / 1000);
@@ -137,7 +141,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isMatch = await bcrypt.compare(dto.password, user.passwordHash);
+    const isMatch = await this.passwords.compare(dto.password, user.passwordHash);
     if (!isMatch) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -227,7 +231,8 @@ export class AuthService {
     }
     const user = await this.usersService.findByEmail(email);
     if (!user) {
-      throw new NotFoundException('User not found');
+      // Same response as the success path, so emails cannot be enumerated.
+      return { message: 'Password reset instructions sent' };
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -241,9 +246,10 @@ export class AuthService {
     );
 
     // TODO: send the resetToken via email instead of returning it.
-    // Never return the raw token in production — anyone who knows a user's
-    // email could otherwise call this endpoint and take over the account.
-    if (process.env.NODE_ENV !== 'production') {
+    // Never return the raw token unless explicitly opted in for local
+    // development: relying on NODE_ENV alone exposed it on any environment
+    // that forgot to set NODE_ENV=production.
+    if (process.env.EXPOSE_RESET_TOKEN === 'true') {
       return {
         message: 'Password reset instructions sent',
         resetToken,
@@ -269,7 +275,7 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
-    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const passwordHash = await this.passwords.hash(newPassword);
     await this.usersService.updatePassword(user.id, passwordHash);
 
     return { message: 'Password reset successfully' };

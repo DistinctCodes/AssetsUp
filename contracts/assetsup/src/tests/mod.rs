@@ -9,6 +9,7 @@ mod audit_trail;
 mod auth;
 mod initialization;
 mod pause;
+mod pause_ttl;
 
 // Tokenization and ownership tests
 mod detokenization;

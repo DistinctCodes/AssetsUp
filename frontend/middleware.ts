@@ -1,35 +1,22 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-const PROTECTED = ["/assets", "/departments", "/users"];
-const AUTH_PAGES = ["/signin", "/signup"];
+import { AUTH_COOKIE, decideAuth } from "@/lib/auth-routes";
 
 export const middleware = (req: NextRequest) => {
-  const token = req.cookies.get("auth-token")?.value;
+  const token = req.cookies.get(AUTH_COOKIE)?.value;
   const { pathname } = req.nextUrl;
 
-  const isProtected = PROTECTED.some((route) => pathname.startsWith(route));
-  const isAuthPage = AUTH_PAGES.includes(pathname);
+  const decision = decideAuth(pathname, Boolean(token));
+  if (decision.action === "next") return NextResponse.next();
 
-  if (isProtected && !token) {
-    const url = new URL("/login", req.url);
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
+  const url = new URL(decision.to, req.url);
+  if (decision.redirectParam) {
+    url.searchParams.set("redirect", decision.redirectParam);
   }
-
-  // if (isAuthPage && token) {
-  //   return NextResponse.redirect(new URL('/dashboard', req.url));
-  // }
-
-  return NextResponse.next();
+  return NextResponse.redirect(url);
 };
 
 export const config = {
-  matcher: [
-    "/dashboard/:path*",
-    "/assets/:path*",
-    "/departments/:path*",
-    "/users/:path*",
-    "/signin",
-    "/signup",
-  ],
+  // Run on every page except Next internals, API routes and static files.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

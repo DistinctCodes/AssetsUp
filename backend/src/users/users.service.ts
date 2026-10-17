@@ -8,10 +8,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as bcrypt from 'bcryptjs';
+import { PasswordService } from '../common/security/password.service';
 import { User, UserRole } from './entities/user.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { normalizeEmail } from './utils/normalize-email';
 
 @Injectable()
 export class UsersService {
@@ -19,7 +20,12 @@ export class UsersService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @Optional() private readonly auditLogsService?: AuditLogsService,
-  ) {}
+    @Optional() passwords?: PasswordService,
+  ) {
+    this.passwords = passwords ?? new PasswordService();
+  }
+
+  private readonly passwords: PasswordService;
 
   async findAll(query?: {
     search?: string;
@@ -61,7 +67,9 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { email } });
+    return this.userRepository.findOne({
+      where: { email: normalizeEmail(email) },
+    });
   }
 
   async create(dto: {
@@ -74,9 +82,9 @@ export class UsersService {
     const existing = await this.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email already in use');
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const passwordHash = await this.passwords.hash(dto.password);
     const user = this.userRepository.create({
-      email: dto.email,
+      email: normalizeEmail(dto.email),
       passwordHash,
       firstName: dto.firstName,
       lastName: dto.lastName,
@@ -141,14 +149,14 @@ export class UsersService {
           'Current password is required to change password',
         );
       }
-      const isMatch = await bcrypt.compare(
+      const isMatch = await this.passwords.compare(
         dto.currentPassword,
         user.passwordHash,
       );
       if (!isMatch) {
         throw new BadRequestException('Current password is incorrect');
       }
-      user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+      user.passwordHash = await this.passwords.hash(dto.newPassword);
       user.passwordResetToken = null;
       user.passwordResetExpires = null;
     }
@@ -194,6 +202,8 @@ export class UsersService {
       passwordHash,
       passwordResetToken: null,
       passwordResetExpires: null,
+      // Revoke existing sessions: an old refresh token must stop working.
+      refreshTokenHash: null,
     });
   }
 }
