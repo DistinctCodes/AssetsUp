@@ -2,6 +2,15 @@ use crate::error::Error;
 use crate::types::{OwnershipRecord, TokenDataKey, TokenizedAsset};
 use soroban_sdk::{Address, Env, Vec};
 
+/// Minimum share of the total supply (as a percentage) that must participate in
+/// a proposal before its outcome can be considered final.
+///
+/// With the default `detokenize_threshold` of 50% the approval bar already
+/// exceeds this, so the quorum is currently implicit; making it an explicit
+/// floor keeps a low-turnout vote from passing if that approval threshold is
+/// ever relaxed.
+pub const QUORUM_PERCENT: u32 = 30;
+
 /// Cast a vote on a proposal
 pub fn cast_vote(env: &Env, asset_id: u64, proposal_id: u64, voter: Address) -> Result<(), Error> {
     let store = env.storage().persistent();
@@ -72,7 +81,7 @@ pub fn has_voted(
     Ok(store.has(&vote_key))
 }
 
-/// Check if a proposal passed (vote tally > 50% of total supply)
+/// Check if a proposal passed (quorum met and vote tally > threshold of total supply)
 pub fn proposal_passed(env: &Env, asset_id: u64, proposal_id: u64) -> Result<bool, Error> {
     let store = env.storage().persistent();
 
@@ -84,11 +93,12 @@ pub fn proposal_passed(env: &Env, asset_id: u64, proposal_id: u64) -> Result<boo
     let tally_key = TokenDataKey::VoteTally(asset_id, proposal_id);
     let tally: i128 = store.get::<_, i128>(&tally_key).unwrap_or(0);
 
-    // Calculate required threshold
+    // Calculate required threshold and the minimum quorum participation
     let threshold =
         (tokenized_asset.total_supply * tokenized_asset.detokenize_threshold as i128) / 100;
+    let quorum = (tokenized_asset.total_supply * QUORUM_PERCENT as i128) / 100;
 
-    Ok(tally > threshold)
+    Ok(tally >= quorum && tally > threshold)
 }
 
 /// Get list of voters who participated in a proposal

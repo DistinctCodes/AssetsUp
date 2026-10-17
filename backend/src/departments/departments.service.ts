@@ -7,6 +7,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { Department } from './entities/department.entity';
+import { Asset } from '../assets/entities/asset.entity';
+import { User } from '../users/entities/user.entity';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { PaginationQueryDto, PaginatedResponse } from '../common/dto/pagination.dto';
 
@@ -15,6 +17,10 @@ export class DepartmentsService {
   constructor(
     @InjectRepository(Department)
     private readonly deptRepo: Repository<Department>,
+    @InjectRepository(Asset)
+    private readonly assetRepo: Repository<Asset>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     @Optional() private readonly auditLogsService?: AuditLogsService,
   ) {}
 
@@ -82,5 +88,47 @@ export class DepartmentsService {
       previousValue: { name: dept.name, code: dept.code },
     });
     return dept;
+  }
+
+  /** Assets belonging to a department, newest first. */
+  async findAssets(
+    id: string,
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<Asset>> {
+    await this.findById(id);
+    const { page = 1, limit = 20 } = query;
+    const [items, total] = await this.assetRepo.findAndCount({
+      where: { departmentId: id },
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { createdAt: 'DESC' },
+    });
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  /** Users in a department. Only non-sensitive columns are selected. */
+  async findUsers(
+    id: string,
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<Partial<User>>> {
+    await this.findById(id);
+    const { page = 1, limit = 20 } = query;
+    const [items, total] = await this.userRepo.findAndCount({
+      where: { departmentId: id },
+      select: [
+        'id',
+        'email',
+        'firstName',
+        'lastName',
+        'role',
+        'isActive',
+        'departmentId',
+        'avatarUrl',
+      ],
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { lastName: 'ASC', firstName: 'ASC' },
+    });
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 }

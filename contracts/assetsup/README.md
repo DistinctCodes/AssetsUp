@@ -128,6 +128,10 @@ Reads: `get_token_balance`, `get_token_holders`, `is_tokens_locked`,
 keeper can stop an inactive-but-valid asset being archived. It is idempotent
 and exempt from the pause.
 
+A token symbol may be claimed by at most one tokenized asset. Reusing a symbol
+is rejected with `DuplicateTokenSymbol` (`132`), which stops the same underlying
+asset being tokenized twice under different ids.
+
 ### Dividends, voting, detokenization
 
 | Entrypoint | Auth |
@@ -141,6 +145,10 @@ and exempt from the pause.
 
 Reads: `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`,
 `proposal_passed`, `get_detokenization_proposal`, `is_detokenization_active`.
+
+`propose_detokenization` is rejected with `DetokenizationCooldownActive` (`163`)
+until `DETOKENIZE_COOLDOWN_SECONDS` (7 days) have elapsed since the asset was
+tokenized, preventing immediate tokenize→detokenize round-trips.
 
 ### Transfer restrictions
 
@@ -163,6 +171,15 @@ fails with `GeographicRestriction`.
 | `create_insurance_policy` | insurer |
 | `cancel_insurance_policy`, `suspend_insurance_policy`, `renew_insurance_policy` | `caller`/insurer |
 | `expire_insurance_policy` | — |
+| `emit_insurance_expiry_reminder` | — (permissionless keeper) |
+
+Reads: `is_insurance_expiry_reminder_due`.
+
+`emit_insurance_expiry_reminder` only emits once a policy is inside its
+`POLICY_EXPIRY_REMINDER_WINDOW_SECONDS` (7 day) pre-expiry window, giving
+off-chain services a chain-native renewal signal. A vote outcome now also
+requires a `QUORUM_PERCENT` (30%) turnout in addition to the approval
+threshold.
 
 ## Events
 

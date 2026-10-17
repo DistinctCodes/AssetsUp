@@ -189,7 +189,7 @@ fn initialize_rejects_threshold_greater_than_owner_count() {
     let res = client
         .try_initialize(&admin, &owners, &3)
         .expect_err("an unreachable threshold would brick the wallet");
-    assert_eq!(res, Ok(Error::InvalidThreshold));
+    assert_eq!(res, Ok(Error::ThresholdTooHigh));
 }
 
 #[test]

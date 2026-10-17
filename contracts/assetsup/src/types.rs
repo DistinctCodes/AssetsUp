@@ -105,6 +105,9 @@ pub enum TokenDataKey {
     TokenMetadata(u64),
     /// Stores the recorded ISO country code (jurisdiction) for an address
     AddressJurisdiction(Address),
+    /// Maps a token symbol to the asset_id that claimed it, so the same
+    /// underlying asset cannot be tokenized twice under a reused symbol.
+    SymbolRegistry(String),
 }
 
 /// Represents a tokenized asset on-chain

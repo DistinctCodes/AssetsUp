@@ -111,6 +111,12 @@ assert_eq!(name, Symbol::new(&env, "asset_registered"));
 | `lease_expired` | `lease_id` | `timestamp` | `expire_lease` |
 | `lease_terminated_early` | `lease_id` | `caller`, `end_timestamp`, `timestamp` | `return_leased_asset` (before end date) |
 
+### Insurance
+
+| Event | Topic 1 | Data | Emitted by |
+|---|---|---|---|
+| `insurance_policy_expiry_reminder` | `policy_id` | `asset_id`, `end_date`, `timestamp` | `emit_insurance_expiry_reminder` |
+
 ---
 
 ## `contrib`

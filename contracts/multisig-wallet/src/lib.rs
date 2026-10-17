@@ -65,8 +65,11 @@ impl MultisigWallet {
             return Err(Error::InsufficientOwners);
         }
 
-        if threshold == 0 || threshold > owners.len() {
+        if threshold == 0 {
             return Err(Error::InvalidThreshold);
+        }
+        if threshold > owners.len() {
+            return Err(Error::ThresholdTooHigh);
         }
 
         env.storage().instance().set(&DataKey::Owners, &owners);
