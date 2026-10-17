@@ -157,6 +157,9 @@ pub enum Error {
     LeaseNotExpired = 185,
     /// The supplied start and end timestamps are inconsistent.
     InvalidTimestamps = 186,
+    /// No expiry reminder is due: the policy is inactive, already expired, or
+    /// still outside its pre-expiry reminder window.
+    ExpiryReminderNotDue = 187,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
@@ -253,6 +256,7 @@ mod tests {
             Error::LeaseAlreadyStarted as u32,
             Error::LeaseNotExpired as u32,
             Error::InvalidTimestamps as u32,
+            Error::ExpiryReminderNotDue as u32,
         ];
 
         for code in codes {

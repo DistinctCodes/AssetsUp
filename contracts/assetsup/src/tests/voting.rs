@@ -567,3 +567,44 @@ fn test_proposal_passed_multiple_voters_crossing_threshold() {
     assert!(!before_threshold);
     assert!(after_threshold);
 }
+
+#[test]
+fn test_proposal_passed_enforces_quorum_below_approval_threshold() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let holder2 = Address::generate(&env);
+    let holder3 = Address::generate(&env);
+    let asset_id = 816u64;
+
+    let (below_quorum, at_quorum) = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+        // Distribute: tokenizer=700, holder2=200 (20%), holder3=100 (10%).
+        tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder2.clone(), 200)
+            .unwrap();
+        tokenization::transfer_tokens(&env, asset_id, tokenizer.clone(), holder3.clone(), 100)
+            .unwrap();
+
+        // Relax the approval threshold so the quorum — not the 50% bar — is
+        // what decides the outcome.
+        let key = crate::types::TokenDataKey::TokenizedAsset(asset_id);
+        let mut tokenized: crate::types::TokenizedAsset =
+            env.storage().persistent().get(&key).unwrap();
+        tokenized.detokenize_threshold = 10;
+        env.storage().persistent().set(&key, &tokenized);
+
+        // 200 votes = 20%: clears the 10% approval threshold but misses the
+        // 30% quorum.
+        voting::cast_vote(&env, asset_id, 1, holder2.clone()).unwrap();
+        let before = voting::proposal_passed(&env, asset_id, 1).unwrap();
+
+        // 300 votes = 30%: meets the quorum and clears the threshold.
+        voting::cast_vote(&env, asset_id, 1, holder3.clone()).unwrap();
+        let after = voting::proposal_passed(&env, asset_id, 1).unwrap();
+
+        (before, after)
+    });
+
+    assert!(!below_quorum);
+    assert!(at_quorum);
+}
