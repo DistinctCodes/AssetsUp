@@ -1,22 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { Download, Plus, BarChart3, Table as TableIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { savedReportsApiClient, type SavedReport } from "@/lib/api/saved-reports";
 
 const DATASETS = ["assets", "maintenance", "transfers", "activity"] as const;
 const GROUP_BY_OPTIONS = ["status", "category", "department", "month"] as const;
-
-interface SavedReport {
-  id: string;
-  name: string;
-  dataset: string;
-  filters: Record<string, string>;
-  groupBy: string;
-}
 
 export default function ReportBuilderPage() {
   const [dataset, setDataset] = useState<string>("assets");
@@ -27,23 +18,43 @@ export default function ReportBuilderPage() {
   const [showSave, setShowSave] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "chart">("table");
 
+  // Load saved reports from the API on mount
+  useEffect(() => {
+    savedReportsApiClient
+      .list()
+      .then(setSavedReports)
+      .catch(() => setSavedReports([]));
+  }, []);
+
   const addFilter = () => setFilters((prev) => ({ ...prev, "": "" }));
 
-  const saveReport = () => {
+  const saveReport = async () => {
     if (!reportName) return;
-    setSavedReports((prev) => [...prev, {
-      id: Date.now().toString(),
-      name: reportName,
-      dataset,
-      filters: { ...filters },
-      groupBy,
-    }]);
+    try {
+      const created = await savedReportsApiClient.create({
+        name: reportName,
+        dataset,
+        filters: { ...filters },
+        groupBy,
+        viewMode,
+      });
+      setSavedReports((prev) => [...prev, created]);
+    } catch {
+      // Fallback: store locally if the API is not available yet
+      setSavedReports((prev) => [...prev, {
+        id: Date.now().toString(),
+        name: reportName,
+        dataset,
+        filters: { ...filters },
+        groupBy,
+        viewMode,
+      }]);
+    }
     setShowSave(false);
     setReportName("");
   };
 
   const exportCSV = () => {
-    // Placeholder — would generate CSV from preview data
     const blob = new Blob(["Not yet connected to live data"], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -52,7 +63,6 @@ export default function ReportBuilderPage() {
   };
 
   const exportPDF = async () => {
-    // Placeholder — would use jsPDF to render preview
     alert("PDF export coming soon");
   };
 
@@ -71,7 +81,6 @@ export default function ReportBuilderPage() {
       </div>
 
       <div className="grid grid-cols-12 gap-6">
-        {/* Sidebar — compose */}
         <div className="col-span-3 bg-white border rounded-xl p-4 space-y-4">
           <h3 className="font-medium text-sm text-gray-700">Dataset</h3>
           <select value={dataset} onChange={(e) => setDataset(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
@@ -99,7 +108,6 @@ export default function ReportBuilderPage() {
           </select>
         </div>
 
-        {/* Main — preview */}
         <div className="col-span-9 space-y-4">
           <div className="flex items-center gap-2">
             <Button variant={viewMode === "table" ? "default" : "outline"} size="sm" onClick={() => setViewMode("table")}><TableIcon className="w-4 h-4 mr-1" /> Table</Button>
@@ -111,7 +119,6 @@ export default function ReportBuilderPage() {
         </div>
       </div>
 
-      {/* Saved reports list */}
       {savedReports.length > 0 && (
         <div className="mt-8">
           <h3 className="font-medium text-gray-700 mb-3">Saved Reports</h3>
@@ -126,7 +133,6 @@ export default function ReportBuilderPage() {
         </div>
       )}
 
-      {/* Save dialog */}
       {showSave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowSave(false)} />

@@ -1,26 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Bell, Check, CheckCheck, Filter } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, CheckCheck, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface Notification {
-  id: string;
-  title: string;
-  message?: string;
-  type: "INFO" | "WARNING" | "ALERT";
-  isRead: boolean;
-  resourceType?: string;
-  resourceId?: string;
-  createdAt: string;
-}
-
-const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: "n1", title: "Transfer Approved", message: "Your transfer request for MacBook Pro M2 has been approved.", type: "INFO", isRead: false, resourceType: "transfer", resourceId: "tr-1", createdAt: "2026-08-25T10:30:00Z" },
-  { id: "n2", title: "Maintenance Due", message: "Scheduled maintenance for Dell Monitor is due in 3 days.", type: "WARNING", isRead: false, resourceType: "maintenance", createdAt: "2026-08-24T14:00:00Z" },
-  { id: "n3", title: "New Asset Assigned", message: "You have been assigned a new asset: Standing Desk.", type: "INFO", isRead: true, resourceType: "asset", resourceId: "a-1", createdAt: "2026-08-22T09:00:00Z" },
-  { id: "n4", title: "Transfer Rejected", message: "Your transfer request for Standing Desk was rejected.", type: "ALERT", isRead: true, resourceType: "transfer", resourceId: "tr-3", createdAt: "2026-08-20T16:00:00Z" },
-];
+import { notificationsApiClient, type NotificationItem } from "@/lib/api/notifications";
 
 const TYPE_ICONS: Record<string, string> = {
   INFO: "bg-blue-100 text-blue-600",
@@ -29,26 +12,69 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+
+  useEffect(() => {
+    notificationsApiClient
+      .list()
+      .then(setNotifications)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, []);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const filtered = filter === "all" ? notifications : notifications.filter((n) => !n.isRead);
 
-  const markRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
+  const markRead = async (id: string) => {
+    try {
+      await notificationsApiClient.markRead(id);
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+    } catch {
+      // ignore on error
+    }
   };
 
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  const markAllRead = async () => {
+    try {
+      await notificationsApiClient.markAllRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch {
+      // ignore on error
+    }
   };
 
-  const getLink = (n: Notification) => {
+  const getLink = (n: NotificationItem) => {
     if (n.resourceType === "asset" && n.resourceId) return `/assets/${n.resourceId}`;
     if (n.resourceType === "transfer") return "/transfers";
     if (n.resourceType === "maintenance") return "/maintenance";
     return "#";
   };
+
+  if (loading) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Notifications</h1>
+        <div className="bg-white border rounded-xl p-12 text-center">
+          <p className="text-gray-400">Loading notifications...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Notifications</h1>
+        <div className="bg-white border rounded-xl p-12 text-center">
+          <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">Failed to load notifications. Please try again later.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

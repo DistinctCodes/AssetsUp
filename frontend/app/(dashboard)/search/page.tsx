@@ -3,15 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Search, Package, Users, FileText, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-
-interface SearchResult {
-  id: string;
-  type: "asset" | "user" | "document";
-  title: string;
-  subtitle: string;
-  href: string;
-}
+import { searchApiClient, type SearchResult } from "@/lib/api/search";
 
 const TYPE_ICONS: Record<string, typeof Package> = {
   asset: Package,
@@ -36,16 +28,16 @@ export default function SearchPage() {
 
   useEffect(() => {
     if (!query.trim()) { setResults([]); return; }
+    const controller = new AbortController();
     const timer = setTimeout(() => {
       setLoading(true);
-      // In real implementation, calls GET /api/search?q=...
-      fetch(`/api/search?q=${encodeURIComponent(query)}`)
-        .then((r) => r.json())
-        .then((data) => setResults(data.results ?? []))
+      searchApiClient
+        .search(query)
+        .then((data) => setResults(data))
         .catch(() => setResults([]))
         .finally(() => setLoading(false));
     }, 300);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [query]);
 
   const filtered = activeType === "all" ? results : results.filter((r) => r.type === activeType);
