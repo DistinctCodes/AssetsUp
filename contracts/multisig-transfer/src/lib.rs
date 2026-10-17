@@ -21,6 +21,9 @@
 //! - Execution requires `approvals >= rule.required_approvals` for the asset's
 //!   category.
 //! - Retired assets cannot be transferred.
+//! - A request whose approval window closes short of its threshold is
+//!   auto-cancelled by `expire_transfer_request`, releasing the asset lock. A
+//!   request that *did* reach its threshold stays executable.
 //!
 //! ## Not to be confused with `multisig-wallet`
 //!
@@ -36,6 +39,8 @@ mod approvals;
 mod auth_tests;
 mod errors;
 mod events;
+#[cfg(test)]
+mod expiry_tests;
 #[cfg(test)]
 mod integration_tests;
 #[cfg(test)]
@@ -88,6 +93,13 @@ impl MultiSigTransferContract {
 
         if rule.required_approvals == 0 {
             return Err(MultiSigError::InvalidThreshold);
+        }
+
+        // A zero-length window closes before the first approval can land, so the
+        // request could never reach its threshold and its asset would stay
+        // locked in `AssetPendingRequest` until someone cancelled by hand.
+        if rule.approval_timeout_secs == 0 {
+            return Err(MultiSigError::MissingApprovalWindow);
         }
 
         let mut rules_map = storage::rules_map(&e);
@@ -150,7 +162,7 @@ impl MultiSigTransferContract {
             return Err(MultiSigError::RequestExpired);
         }
 
-        let approval_deadline = now + rule.approval_timeout_secs;
+        let approval_deadline = rules::approval_deadline(now, &rule);
 
         let request_id = storage::bump_request_id(&e);
 
@@ -228,7 +240,7 @@ impl MultiSigTransferContract {
         if now > req.expires_at {
             return Err(MultiSigError::RequestExpired);
         }
-        if now > req.approval_deadline {
+        if rules::window_closed(now, req.approval_deadline) {
             return Err(MultiSigError::ApprovalDeadlinePassed);
         }
         if caller == req.initiator {
@@ -383,6 +395,62 @@ impl MultiSigTransferContract {
         storage::set_asset_pending_map(&e, &asset_pending);
 
         events::transfer_cancelled(&e, request_id, &caller, utils::now(&e));
+        Ok(())
+    }
+
+    // ----------------------------
+    // Auto-cancel a request whose approval window closed short
+    // ----------------------------
+    /// Cancels a `Pending` request whose approval window has closed before it
+    /// reached `required_approvals`, releasing the asset lock.
+    ///
+    /// Permissionless, for the same reason `execute_transfer` is: the outcome is
+    /// fully determined by stored state plus the ledger clock, so there is no
+    /// decision left for a caller to make. Anyone may submit it, which is what
+    /// lets a keeper sweep expired requests without the contract having to hold
+    /// a keeper key. `caller` is retained for the audit trail only and is
+    /// intentionally not authenticated.
+    pub fn expire_transfer_request(e: Env, caller: Address, request_id: u64) -> Result<(), MultiSigError> {
+        let (_admin, _registry) = utils::require_init(&e)?;
+        let _ = caller;
+
+        let mut requests = storage::requests_map(&e);
+        let mut req = requests
+            .get(request_id)
+            .ok_or(MultiSigError::RequestNotFound)?;
+
+        // Only a still-pending request can be swept. A request that reached its
+        // threshold is `Approved` and must stay executable: its window closing
+        // is not a reason to throw away a valid signature set.
+        if req.status != RequestStatus::Pending {
+            return Err(MultiSigError::RequestNotPending);
+        }
+
+        let now = utils::now(&e);
+        if !rules::window_closed(now, req.approval_deadline) {
+            return Err(MultiSigError::ApprovalWindowStillOpen);
+        }
+
+        req.status = RequestStatus::Cancelled;
+        requests.set(request_id, req.clone());
+        storage::set_requests_map(&e, &requests);
+
+        // Release the asset lock. Without this the asset is wedged: no further
+        // request can be created for it, because `create_transfer_request`
+        // rejects an asset that already has a pending request.
+        let mut asset_pending = storage::asset_pending_map(&e);
+        asset_pending.remove(req.asset_id.clone());
+        storage::set_asset_pending_map(&e, &asset_pending);
+
+        events::transfer_request_expired(
+            &e,
+            request_id,
+            &req.asset_id,
+            req.received_approvals,
+            req.required_approvals,
+            req.approval_deadline,
+            now,
+        );
         Ok(())
     }
 
