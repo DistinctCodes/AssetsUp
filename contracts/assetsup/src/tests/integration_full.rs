@@ -1,5 +1,6 @@
 use crate::tests::helpers::*;
 use crate::types::AssetType;
+use soroban_sdk::testutils::Ledger as _;
 use soroban_sdk::String;
 
 #[test]
@@ -78,6 +79,11 @@ fn test_governance_and_detokenization_workflow() {
     // Distribute tokens
     client.transfer_tokens(&asset_id, &owner, &investor1, &600000i128);
     client.transfer_tokens(&asset_id, &owner, &investor2, &200000i128);
+
+    // Move past the tokenize→detokenize cooldown (#1487).
+    env.ledger().with_mut(|li| {
+        li.timestamp = crate::detokenization::DETOKENIZE_COOLDOWN_SECONDS + 1;
+    });
 
     // Propose detokenization
     let proposal_id = client.propose_detokenization(&asset_id, &owner);

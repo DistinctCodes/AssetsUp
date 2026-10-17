@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Response as ExpressResponse } from 'express';
 import * as ExcelJS from 'exceljs';
 import { Readable } from 'stream';
+import { contentDisposition } from '../utils/filename';
 
 export interface ColumnDefinition {
   header: string;
@@ -23,7 +24,7 @@ export class ExportService {
     const filename = `${filenamePrefix}-${new Date().toISOString().split('T')[0]}.csv`;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', contentDisposition(filename));
 
     // Write header row
     const headerRow =
@@ -57,7 +58,7 @@ export class ExportService {
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', contentDisposition(filename));
 
     // Use WorkbookWriter to stream directly to HTTP response
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({

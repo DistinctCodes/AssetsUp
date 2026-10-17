@@ -32,7 +32,7 @@ export default function ScanPage() {
         if (!r.ok) throw new Error("Not found");
         return r.json();
       })
-      .then((data) => setAsset(data))
+      .then((body) => setAsset(body?.data ?? body))
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [assetId]);

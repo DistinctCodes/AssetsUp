@@ -6,10 +6,11 @@
  * broken state.
  */
 
-const REQUIRED_ENV_VARS = [
-  'DATABASE_URL',
-  'JWT_SECRET',
-] as const;
+// The app connects with DB_HOST/DB_PORT/..., not DATABASE_URL, and main.ts
+// already requires both JWT secrets, so this list matches what is really read.
+const REQUIRED_ENV_VARS = ['JWT_SECRET', 'JWT_REFRESH_SECRET'] as const;
+
+const MIN_SECRET_LENGTH = 32;
 
 const NUMERIC_ENV_VARS = ['PORT', 'THROTTLE_TTL', 'THROTTLE_LIMIT'] as const;
 
@@ -23,6 +24,12 @@ export function validateEnv(
     throw new Error(
       `Missing required environment variables: ${missing.join(', ')}`,
     );
+  }
+
+  for (const key of REQUIRED_ENV_VARS) {
+    if (String(config[key]).length < MIN_SECRET_LENGTH) {
+      throw new Error(`${key} must be at least ${MIN_SECRET_LENGTH} characters`);
+    }
   }
 
   for (const key of NUMERIC_ENV_VARS) {
