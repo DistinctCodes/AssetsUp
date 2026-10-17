@@ -8,6 +8,8 @@ pub enum DataKey {
     Asset(BytesN<32>),
     OwnerRegistry(Address),
     AssetCounter,
+    /// Append-only, oldest-first list of ownership transfers for one asset.
+    TransferHistory(BytesN<32>),
 }
 
 #[contracttype]
@@ -34,6 +36,20 @@ pub struct AssetInfo {
     pub category: String,
     pub owner: Address,
     pub status: AssetStatus,
+}
+
+/// One entry in an asset's on-chain transfer history.
+///
+/// Recorded on every successful [`crate::AssetUpContract::transfer_asset_ownership`]
+/// call, oldest first, so integrators can reconstruct the chain of custody
+/// without replaying events. `from` is the owner that transferred the asset and
+/// `to` is the new owner.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferRecord {
+    pub from: Address,
+    pub to: Address,
+    pub timestamp: u64,
 }
 
 // Note: Contract methods implemented in lib.rs

@@ -424,10 +424,24 @@ impl AssetUpContract {
 
         // Update asset
         asset.owner = new_owner.clone();
-        asset.last_transfer_timestamp = env.ledger().timestamp();
+        let transferred_at = env.ledger().timestamp();
+        asset.last_transfer_timestamp = transferred_at;
         asset.status = AssetStatus::Transferred;
         store.set(&key, &asset);
         ttl::extend_persistent(&env, &key);
+
+        // Append to the asset's transfer history so the whole chain of custody
+        // stays queryable on-chain, not just the current owner.
+        let history_key = asset::DataKey::TransferHistory(asset_id.clone());
+        let mut history: Vec<asset::TransferRecord> =
+            store.get(&history_key).unwrap_or_else(|| Vec::new(&env));
+        history.push_back(asset::TransferRecord {
+            from: old_owner.clone(),
+            to: new_owner.clone(),
+            timestamp: transferred_at,
+        });
+        store.set(&history_key, &history);
+        ttl::extend_persistent(&env, &history_key);
 
         // Append audit log
         audit::append_audit_log(
@@ -512,6 +526,120 @@ impl AssetUpContract {
             Some(assets) => Ok(assets),
             None => Ok(Vec::new(&env)),
         }
+    }
+
+    /// The asset's full transfer history, oldest first.
+    ///
+    /// Each entry records the previous and new owner and the ledger time of the
+    /// transfer. Returns `AssetNotFound` for an unknown asset so a typo'd id
+    /// does not look like an asset that was never transferred.
+    pub fn get_asset_transfer_history(
+        env: Env,
+        asset_id: BytesN<32>,
+    ) -> Result<Vec<asset::TransferRecord>, Error> {
+        ttl::extend_instance(&env);
+
+        let asset_key = asset::DataKey::Asset(asset_id.clone());
+        if !env.storage().persistent().has(&asset_key) {
+            return Err(Error::AssetNotFound);
+        }
+
+        let key = asset::DataKey::TransferHistory(asset_id);
+        let store = env.storage().persistent();
+        Ok(store.get(&key).unwrap_or_else(|| Vec::new(&env)))
+    }
+
+    /// Registers a branch. Admin-gated, and the id must be unused.
+    pub fn register_branch(env: Env, branch: branch::Branch) -> Result<(), Error> {
+        ttl::extend_instance(&env);
+
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+
+        if Self::is_paused(env.clone())? {
+            return Err(Error::ContractPaused);
+        }
+
+        let key = branch::DataKey::Branch(branch.id.clone());
+        let store = env.storage().persistent();
+        if store.has(&key) {
+            return Err(Error::BranchAlreadyExists);
+        }
+        store.set(&key, &branch);
+        ttl::extend_persistent(&env, &key);
+
+        events::branch_registered(&env, &branch.id, &branch.admin);
+
+        Ok(())
+    }
+
+    /// Assigns an asset to a branch.
+    ///
+    /// Both the branch and the asset must exist: without the branch check an
+    /// asset could be pointed at a stale or misspelled branch id and silently
+    /// disappear from that branch's inventory. Authorized by the contract admin
+    /// or the branch's own admin.
+    pub fn assign_asset_to_branch(
+        env: Env,
+        branch_id: BytesN<32>,
+        asset_id: BytesN<32>,
+        caller: Address,
+    ) -> Result<(), Error> {
+        ttl::extend_instance(&env);
+
+        caller.require_auth();
+
+        if Self::is_paused(env.clone())? {
+            return Err(Error::ContractPaused);
+        }
+
+        let branch_key = branch::DataKey::Branch(branch_id.clone());
+        let asset_key = asset::DataKey::Asset(asset_id.clone());
+        let store = env.storage().persistent();
+
+        let branch: branch::Branch = store.get(&branch_key).ok_or(Error::BranchNotFound)?;
+        if !store.has(&asset_key) {
+            return Err(Error::AssetNotFound);
+        }
+
+        let admin = Self::get_admin(env.clone())?;
+        if caller != admin && caller != branch.admin {
+            return Err(Error::Unauthorized);
+        }
+
+        let list_key = branch::DataKey::AssetList(branch_id.clone());
+        let mut assets: Vec<BytesN<32>> =
+            store.get(&list_key).unwrap_or_else(|| Vec::new(&env));
+        if !assets.iter().any(|x| x == asset_id) {
+            assets.push_back(asset_id.clone());
+            store.set(&list_key, &assets);
+            ttl::extend_persistent(&env, &list_key);
+        }
+
+        events::asset_assigned_to_branch(&env, &branch_id, &asset_id, &caller);
+
+        Ok(())
+    }
+
+    /// A branch by id, or `BranchNotFound`.
+    pub fn get_branch(env: Env, branch_id: BytesN<32>) -> Result<branch::Branch, Error> {
+        let key = branch::DataKey::Branch(branch_id);
+        let store = env.storage().persistent();
+        match store.get(&key) {
+            Some(b) => {
+                ttl::extend_persistent(&env, &key);
+                Ok(b)
+            }
+            None => Err(Error::BranchNotFound),
+        }
+    }
+
+    /// The assets assigned to a branch, oldest first.
+    pub fn get_branch_assets(env: Env, branch_id: BytesN<32>) -> Result<Vec<BytesN<32>>, Error> {
+        let _ = Self::get_branch(env.clone(), branch_id.clone())?;
+        let key = branch::DataKey::AssetList(branch_id);
+        let store = env.storage().persistent();
+        Ok(store.get(&key).unwrap_or_else(|| Vec::new(&env)))
     }
 
     pub fn check_asset_exists(env: Env, asset_id: BytesN<32>) -> Result<bool, Error> {

@@ -338,3 +338,88 @@ fn test_batch_get_asset_info() {
     let infos = client.batch_get_asset_info(&ids);
     assert_eq!(infos.len(), 2);
 }
+
+#[test]
+fn test_transfer_history_records_every_transfer() {
+    let env = create_env();
+    let (admin, user1, user2, user3) = create_mock_addresses(&env);
+    let client = initialize_contract(&env, &admin);
+
+    let asset_id = generate_asset_id(&env, 1);
+    let asset = create_test_asset(&env, &user1, asset_id.clone());
+
+    env.mock_all_auths();
+    client.register_asset(&asset, &admin);
+
+    client.transfer_asset_ownership(&asset_id, &user2, &user1);
+    client.transfer_asset_ownership(&asset_id, &user3, &user2);
+
+    let history = client.get_asset_transfer_history(&asset_id);
+    assert_eq!(history.len(), 2);
+
+    let first = history.get(0).unwrap();
+    assert_eq!(first.from, user1);
+    assert_eq!(first.to, user2);
+
+    let second = history.get(1).unwrap();
+    assert_eq!(second.from, user2);
+    assert_eq!(second.to, user3);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #102)")]
+fn test_transfer_history_rejects_unknown_asset() {
+    let env = create_env();
+    let (admin, _, _, _) = create_mock_addresses(&env);
+    let client = initialize_contract(&env, &admin);
+
+    let asset_id = generate_asset_id(&env, 999);
+    client.get_asset_transfer_history(&asset_id);
+}
+
+#[test]
+fn test_register_branch_and_assign_asset() {
+    let env = create_env();
+    let (admin, user1, _, _) = create_mock_addresses(&env);
+    let client = initialize_contract(&env, &admin);
+
+    let branch_id = generate_asset_id(&env, 50);
+    let branch = crate::branch::Branch {
+        id: branch_id.clone(),
+        name: String::from_str(&env, "North Depot"),
+        location: String::from_str(&env, "Lagos"),
+        admin: admin.clone(),
+    };
+
+    let asset_id = generate_asset_id(&env, 1);
+    let asset = create_test_asset(&env, &user1, asset_id.clone());
+
+    env.mock_all_auths();
+    client.register_branch(&branch);
+    client.register_asset(&asset, &admin);
+    client.assign_asset_to_branch(&branch_id, &asset_id, &admin);
+
+    let stored = client.get_branch(&branch_id);
+    assert_eq!(stored.id, branch_id);
+
+    let assets = client.get_branch_assets(&branch_id);
+    assert_eq!(assets.len(), 1);
+    assert_eq!(assets.get(0).unwrap(), asset_id);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #104)")]
+fn test_assign_asset_to_unknown_branch_fails() {
+    let env = create_env();
+    let (admin, user1, _, _) = create_mock_addresses(&env);
+    let client = initialize_contract(&env, &admin);
+
+    let asset_id = generate_asset_id(&env, 1);
+    let asset = create_test_asset(&env, &user1, asset_id.clone());
+    let missing_branch = generate_asset_id(&env, 777);
+
+    env.mock_all_auths();
+    client.register_asset(&asset, &admin);
+
+    client.assign_asset_to_branch(&missing_branch, &asset_id, &admin);
+}

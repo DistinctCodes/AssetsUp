@@ -174,6 +174,39 @@ fn registrar_changes_are_observable() {
 }
 
 #[test]
+fn branch_registration_and_assignment_are_observable() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    let owner = Address::generate(&env);
+    let id = asset_id(&env, 4);
+    let branch_id = asset_id(&env, 60);
+
+    let branch = crate::branch::Branch {
+        id: branch_id.clone(),
+        name: soroban_sdk::String::from_str(&env, "North Depot"),
+        location: soroban_sdk::String::from_str(&env, "Lagos"),
+        admin: admin.clone(),
+    };
+    client.register_branch(&branch);
+
+    let (topics, _) = only_event(&env);
+    assert_event_name(&env, &topics, "branch_registered");
+    let emitted: BytesN<32> = topics.get(1).unwrap().try_into_val(&env).unwrap();
+    assert_eq!(emitted, branch_id);
+
+    client.register_asset(&create_test_asset(&env, &owner, id.clone()), &admin);
+    client.assign_asset_to_branch(&branch_id, &id, &admin);
+
+    let (topics, _) = only_event(&env);
+    assert_event_name(&env, &topics, "asset_assigned_to_branch");
+    let topic1: BytesN<32> = topics.get(1).unwrap().try_into_val(&env).unwrap();
+    let topic2: BytesN<32> = topics.get(2).unwrap().try_into_val(&env).unwrap();
+    assert_eq!(topic1, branch_id);
+    assert_eq!(topic2, id);
+}
+
+#[test]
 fn pause_and_unpause_emit_distinct_events() {
     let env = create_env();
     let admin = Address::generate(&env);

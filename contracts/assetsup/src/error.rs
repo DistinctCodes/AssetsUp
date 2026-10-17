@@ -160,6 +160,22 @@ pub enum Error {
     /// No expiry reminder is due: the policy is inactive, already expired, or
     /// still outside its pre-expiry reminder window.
     ExpiryReminderNotDue = 187,
+    /// No insurance policy is stored under this id.
+    PolicyNotFound = 188,
+    /// No insurance claim is stored under this id.
+    ClaimNotFound = 189,
+    /// The policy is not in a state that permits this action.
+    InvalidPolicyStatus = 190,
+    /// The claim is not in a state that permits this action.
+    InvalidClaimStatus = 191,
+    /// The policy terms are unusable (bad coverage, premium, or dates).
+    InvalidPolicyTerms = 192,
+    /// The claim amount is zero, negative, or above the policy coverage.
+    InvalidClaimAmount = 193,
+    /// A policy with this id already exists.
+    PolicyAlreadyExists = 194,
+    /// A claim with this id already exists.
+    ClaimAlreadyExists = 195,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
@@ -256,6 +272,14 @@ mod tests {
             Error::LeaseAlreadyStarted as u32,
             Error::LeaseNotExpired as u32,
             Error::InvalidTimestamps as u32,
+            Error::PolicyNotFound as u32,
+            Error::ClaimNotFound as u32,
+            Error::InvalidPolicyStatus as u32,
+            Error::InvalidClaimStatus as u32,
+            Error::InvalidPolicyTerms as u32,
+            Error::InvalidClaimAmount as u32,
+            Error::PolicyAlreadyExists as u32,
+            Error::ClaimAlreadyExists as u32,
             Error::ExpiryReminderNotDue as u32,
         ];
 
