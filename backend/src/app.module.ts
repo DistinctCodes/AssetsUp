@@ -29,6 +29,8 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { StellarModule } from './stellar/stellar.module';
 import { DepreciationModule } from './depreciation/depreciation.module';
 import { ReservationsModule } from './reservations/reservations.module';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -58,6 +60,17 @@ import { ReservationsModule } from './reservations/reservations.module';
     StellarModule,
     DepreciationModule,
     ReservationsModule,
+    // Rate limiting. Configure with THROTTLE_TTL (ms) and THROTTLE_LIMIT.
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: Number(config.get('THROTTLE_TTL', 60000)),
+          limit: Number(config.get('THROTTLE_LIMIT', 100)),
+        },
+      ],
+    }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -74,6 +87,6 @@ import { ReservationsModule } from './reservations/reservations.module';
     }),
   ],
   controllers: [AppController, NotesDocsController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

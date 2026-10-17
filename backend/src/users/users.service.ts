@@ -194,6 +194,8 @@ export class UsersService {
       passwordHash,
       passwordResetToken: null,
       passwordResetExpires: null,
+      // Revoke existing sessions: an old refresh token must stop working.
+      refreshTokenHash: null,
     });
   }
 }

@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
   Optional,
 } from '@nestjs/common';
@@ -227,7 +226,8 @@ export class AuthService {
     }
     const user = await this.usersService.findByEmail(email);
     if (!user) {
-      throw new NotFoundException('User not found');
+      // Same response as the success path, so emails cannot be enumerated.
+      return { message: 'Password reset instructions sent' };
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -241,9 +241,10 @@ export class AuthService {
     );
 
     // TODO: send the resetToken via email instead of returning it.
-    // Never return the raw token in production — anyone who knows a user's
-    // email could otherwise call this endpoint and take over the account.
-    if (process.env.NODE_ENV !== 'production') {
+    // Never return the raw token unless explicitly opted in for local
+    // development: relying on NODE_ENV alone exposed it on any environment
+    // that forgot to set NODE_ENV=production.
+    if (process.env.EXPOSE_RESET_TOKEN === 'true') {
       return {
         message: 'Password reset instructions sent',
         resetToken,
