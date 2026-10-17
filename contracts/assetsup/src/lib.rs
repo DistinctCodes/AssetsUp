@@ -1123,6 +1123,22 @@ impl AssetUpContract {
         insurance::get_asset_policies(env, asset_id)
     }
 
+    /// Emit an on-chain expiry reminder for a policy nearing its end date
+    /// (permissionless; only fires inside the reminder window)
+    pub fn emit_insurance_expiry_reminder(
+        env: Env,
+        policy_id: BytesN<32>,
+    ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
+        insurance::emit_expiry_reminder(env, policy_id)
+    }
+
+    /// Whether a policy is inside its pre-expiry reminder window
+    pub fn is_insurance_expiry_reminder_due(env: Env, policy_id: BytesN<32>) -> bool {
+        insurance::is_expiry_reminder_due(&env, &policy_id)
+    }
+
     /// Create a new lease. Lessor authenticates; asset must not already be actively leased.
     pub fn create_lease(
         env: Env,

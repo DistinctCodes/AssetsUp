@@ -151,6 +151,15 @@ Reads: `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`,
 | `create_insurance_policy` | insurer |
 | `cancel_insurance_policy`, `suspend_insurance_policy`, `renew_insurance_policy` | `caller`/insurer |
 | `expire_insurance_policy` | — |
+| `emit_insurance_expiry_reminder` | — (permissionless keeper) |
+
+Reads: `is_insurance_expiry_reminder_due`.
+
+`emit_insurance_expiry_reminder` only emits once a policy is inside its
+`POLICY_EXPIRY_REMINDER_WINDOW_SECONDS` (7 day) pre-expiry window, giving
+off-chain services a chain-native renewal signal. A vote outcome now also
+requires a `QUORUM_PERCENT` (30%) turnout in addition to the approval
+threshold.
 
 ## Events
 

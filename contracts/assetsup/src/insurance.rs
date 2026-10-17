@@ -516,3 +516,61 @@ pub fn get_asset_insurance_claims(env: Env, asset_id: BytesN<32>) -> Vec<BytesN<
 pub fn get_policy(env: Env, policy_id: BytesN<32>) -> Option<InsurancePolicy> {
     env.storage().persistent().get(&DataKey::Policy(policy_id))
 }
+
+/// How long before a policy's `end_date` the on-chain expiry reminder becomes
+/// available. Off-chain services watch for the reminder event to notify the
+/// holder and insurer that renewal is due.
+pub const POLICY_EXPIRY_REMINDER_WINDOW_SECONDS: u64 = 7 * 24 * 60 * 60;
+
+/// Loads an active policy that is currently inside its pre-expiry reminder
+/// window, or fails with `ExpiryReminderNotDue` (or `AssetNotFound`).
+fn policy_awaiting_reminder(env: &Env, policy_id: &BytesN<32>) -> Result<InsurancePolicy, Error> {
+    let policy: InsurancePolicy = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Policy(policy_id.clone()))
+        .ok_or(Error::AssetNotFound)?;
+
+    // Only active policies need a renewal reminder.
+    if policy.status != PolicyStatus::Active {
+        return Err(Error::ExpiryReminderNotDue);
+    }
+
+    let now = env.ledger().timestamp();
+
+    // Still outside the reminder window: too early.
+    if now + POLICY_EXPIRY_REMINDER_WINDOW_SECONDS < policy.end_date {
+        return Err(Error::ExpiryReminderNotDue);
+    }
+
+    // Past the end date: the policy should be expired, not reminded.
+    if now >= policy.end_date {
+        return Err(Error::ExpiryReminderNotDue);
+    }
+
+    Ok(policy)
+}
+
+/// Whether an active policy is inside its pre-expiry reminder window.
+pub fn is_expiry_reminder_due(env: &Env, policy_id: &BytesN<32>) -> bool {
+    policy_awaiting_reminder(env, policy_id).is_ok()
+}
+
+/// Emit an on-chain expiry reminder for a policy nearing its `end_date`.
+///
+/// Permissionless: any keeper or off-chain service may trigger it once the
+/// policy enters the reminder window, giving renewal systems a chain-native
+/// signal ahead of expiry.
+pub fn emit_expiry_reminder(env: Env, policy_id: BytesN<32>) -> Result<(), Error> {
+    let policy = policy_awaiting_reminder(&env, &policy_id)?;
+
+    crate::events::insurance_policy_expiry_reminder(
+        &env,
+        &policy.policy_id,
+        &policy.asset_id,
+        policy.end_date,
+    );
+
+    log!(&env, "PolicyExpiryReminder: {:?}", policy_id);
+    Ok(())
+}
