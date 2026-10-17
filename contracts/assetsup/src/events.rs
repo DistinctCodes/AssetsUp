@@ -65,6 +65,28 @@ pub struct AssetRetired {
     pub timestamp: u64,
 }
 
+/// A branch was registered.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BranchRegistered {
+    #[topic]
+    pub branch_id: BytesN<32>,
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
+/// An asset was assigned to a branch.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AssetAssignedToBranch {
+    #[topic]
+    pub branch_id: BytesN<32>,
+    #[topic]
+    pub asset_id: BytesN<32>,
+    pub caller: Address,
+    pub timestamp: u64,
+}
+
 /// An admin transfer was nominated. The role does **not** move until the
 /// proposed address accepts.
 #[contractevent]
@@ -400,6 +422,30 @@ pub fn asset_transferred(
 
 pub fn asset_retired(env: &Env, asset_id: &BytesN<32>, caller: &Address) {
     AssetRetired {
+        asset_id: asset_id.clone(),
+        caller: caller.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn branch_registered(env: &Env, branch_id: &BytesN<32>, admin: &Address) {
+    BranchRegistered {
+        branch_id: branch_id.clone(),
+        admin: admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn asset_assigned_to_branch(
+    env: &Env,
+    branch_id: &BytesN<32>,
+    asset_id: &BytesN<32>,
+    caller: &Address,
+) {
+    AssetAssignedToBranch {
+        branch_id: branch_id.clone(),
         asset_id: asset_id.clone(),
         caller: caller.clone(),
         timestamp: env.ledger().timestamp(),

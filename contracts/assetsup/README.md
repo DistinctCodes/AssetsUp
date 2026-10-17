@@ -105,9 +105,28 @@ permanently bricks administration. A two-step transfer is tracked in [SC-48].
 > [SC-42]; it is the highest-severity item in the workspace.
 
 Reads: `get_asset`, `get_asset_info`, `batch_get_asset_info`,
-`get_assets_by_owner`, `check_asset_exists`, `get_total_asset_count`,
-`get_admin`, `is_paused`, `is_authorized_registrar`, `get_contract_metadata`,
-`get_asset_audit_logs`.
+`get_assets_by_owner`, `get_asset_transfer_history`, `check_asset_exists`,
+`get_total_asset_count`, `get_admin`, `is_paused`, `is_authorized_registrar`,
+`get_contract_metadata`, `get_asset_audit_logs`.
+
+### Branches
+
+| Entrypoint | Auth |
+|---|---|
+| `register_branch` | admin |
+| `assign_asset_to_branch` | admin or branch admin |
+| `get_branch`, `get_branch_assets` | — |
+
+`assign_asset_to_branch` rejects an unknown branch (`BranchNotFound`) and an
+unknown asset (`AssetNotFound`), so an asset can never be pointed at a stale or
+misspelled branch id.
+
+### Transfer history
+
+`get_asset_transfer_history` returns the asset's append-only list of ownership
+transfers (oldest first), recorded on every `transfer_asset_ownership` call. The
+on-chain audit log and its reconciliation with the off-chain `audit-logs`
+service are documented in [`src/audit.rs`](src/audit.rs).
 
 ### Tokenization
 
@@ -163,6 +182,7 @@ Reads: `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`,
 | `("admin_chg",)` | `update_admin` |
 | `("c_pause",)` | `pause_contract` |
 | `("c_unpause",)` | `unpause_contract` |
+| `("branch_registered",)`, `("asset_assigned_to_branch",)` | `register_branch`, `assign_asset_to_branch` |
 | `("lease_new",)`, `("lease_ret",)`, `("lease_can",)`, `("lease_exp",)` | lease lifecycle |
 
 Tokenization, dividends, voting, and detokenization emit events too; see the
@@ -171,10 +191,11 @@ for the workspace-wide event catalogue.
 
 ## Errors
 
-`Error`, defined in [`src/error.rs`](src/error.rs), codes 1–46, grouped by
-concern (registry 1–9, tokenization 10–20, voting 21–25, dividends 26–27,
-detokenization 28–29, valuation 30, holders 31, math 32–33, contract state
-34–35, validation 36–39, leasing 40–46).
+`Error`, defined in [`src/error.rs`](src/error.rs), follows the workspace
+allocation in [`../ERRORS.md`](../ERRORS.md): shared codes 1–99 mean the same
+thing in every contract, and `assetsup`-specific codes occupy 100–199 (registry
+100–119, tokenization 120–139, voting 140–149, dividends 150–159, detokenization
+160–169, validation 170–179, leasing and insurance 180–199).
 
 Note that most entrypoints return `Result<_, Error>`, but `handle_error` panics
 with the error instead of returning it in some paths, so callers see a trap

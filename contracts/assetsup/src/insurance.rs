@@ -88,23 +88,23 @@ pub enum DataKey {
 pub fn create_policy(env: Env, policy: InsurancePolicy) -> Result<(), Error> {
     // Validate coverage and deductible
     if policy.coverage_amount <= 0 || policy.deductible >= policy.coverage_amount {
-        return Err(Error::InvalidPayment);
+        return Err(Error::InvalidPolicyTerms);
     }
 
     // Validate premium
     if policy.premium <= 0 {
-        return Err(Error::InvalidPayment);
+        return Err(Error::InvalidPolicyTerms);
     }
 
     // Validate dates: start_date must be before end_date
     if policy.start_date >= policy.end_date {
-        return Err(Error::InvalidPayment);
+        return Err(Error::InvalidPolicyTerms);
     }
 
     // Validate that start_date is not in the past (allow current timestamp)
     let current_time = env.ledger().timestamp();
     if policy.start_date < current_time {
-        return Err(Error::InvalidPayment);
+        return Err(Error::InvalidPolicyTerms);
     }
 
     let key = DataKey::Policy(policy.policy_id.clone());
@@ -112,7 +112,7 @@ pub fn create_policy(env: Env, policy: InsurancePolicy) -> Result<(), Error> {
 
     // Check if policy already exists
     if store.has(&key) {
-        return Err(Error::AssetAlreadyExists);
+        return Err(Error::PolicyAlreadyExists);
     }
 
     // Store the policy
@@ -144,7 +144,7 @@ pub fn cancel_policy(env: Env, policy_id: BytesN<32>, caller: Address) -> Result
     let store = env.storage().persistent();
     let key = DataKey::Policy(policy_id.clone());
 
-    let mut policy: InsurancePolicy = store.get(&key).ok_or(Error::AssetNotFound)?;
+    let mut policy: InsurancePolicy = store.get(&key).ok_or(Error::PolicyNotFound)?;
 
     // Only holder or insurer can cancel
     if caller != policy.holder && caller != policy.insurer {
@@ -153,7 +153,7 @@ pub fn cancel_policy(env: Env, policy_id: BytesN<32>, caller: Address) -> Result
 
     // Validate status transition: only Active or Suspended policies can be cancelled
     if policy.status != PolicyStatus::Active && policy.status != PolicyStatus::Suspended {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidPolicyStatus);
     }
 
     policy.status = PolicyStatus::Cancelled;
@@ -177,7 +177,7 @@ pub fn suspend_policy(env: Env, policy_id: BytesN<32>, insurer: Address) -> Resu
     let store = env.storage().persistent();
     let key = DataKey::Policy(policy_id.clone());
 
-    let mut policy: InsurancePolicy = store.get(&key).ok_or(Error::AssetNotFound)?;
+    let mut policy: InsurancePolicy = store.get(&key).ok_or(Error::PolicyNotFound)?;
 
     // Only insurer can suspend
     if insurer != policy.insurer {
@@ -186,7 +186,7 @@ pub fn suspend_policy(env: Env, policy_id: BytesN<32>, insurer: Address) -> Resu
 
     // Validate status transition: only Active policies can be suspended
     if policy.status != PolicyStatus::Active {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidPolicyStatus);
     }
 
     policy.status = PolicyStatus::Suspended;
@@ -201,18 +201,18 @@ pub fn expire_policy(env: Env, policy_id: BytesN<32>) -> Result<(), Error> {
     let store = env.storage().persistent();
     let key = DataKey::Policy(policy_id.clone());
 
-    let mut policy: InsurancePolicy = store.get(&key).ok_or(Error::AssetNotFound)?;
+    let mut policy: InsurancePolicy = store.get(&key).ok_or(Error::PolicyNotFound)?;
 
     let current_time = env.ledger().timestamp();
 
     // Require that end_date has passed
     if policy.end_date >= current_time {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidPolicyStatus);
     }
 
     // Validate status transition: only Active or Suspended policies can expire
     if policy.status != PolicyStatus::Active && policy.status != PolicyStatus::Suspended {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidPolicyStatus);
     }
 
     policy.status = PolicyStatus::Expired;
@@ -233,7 +233,7 @@ pub fn renew_policy(
     let store = env.storage().persistent();
     let key = DataKey::Policy(policy_id.clone());
 
-    let mut policy: InsurancePolicy = store.get(&key).ok_or(Error::AssetNotFound)?;
+    let mut policy: InsurancePolicy = store.get(&key).ok_or(Error::PolicyNotFound)?;
 
     // Only insurer can renew
     if insurer != policy.insurer {
@@ -242,19 +242,19 @@ pub fn renew_policy(
 
     // Validate status transition: only Active or Expired policies can be renewed
     if policy.status != PolicyStatus::Active && policy.status != PolicyStatus::Expired {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidPolicyStatus);
     }
 
     let current_time = env.ledger().timestamp();
 
     // Validate new end date is in the future
     if new_end_date <= current_time {
-        return Err(Error::InvalidPayment);
+        return Err(Error::InvalidPolicyTerms);
     }
 
     // Validate new premium is positive
     if new_premium <= 0 {
-        return Err(Error::InvalidPayment);
+        return Err(Error::InvalidPolicyTerms);
     }
 
     // Update policy
@@ -295,25 +295,25 @@ pub fn file_insurance_claim(env: Env, claim: InsuranceClaim) -> Result<(), Error
     let policy_key = DataKey::Policy(claim.policy_id.clone());
 
     // Verify policy exists and is Active
-    let policy: InsurancePolicy = store.get(&policy_key).ok_or(Error::AssetNotFound)?;
+    let policy: InsurancePolicy = store.get(&policy_key).ok_or(Error::PolicyNotFound)?;
     if policy.status != PolicyStatus::Active {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidPolicyStatus);
     }
 
     // Verify claim amount is positive
     if claim.amount <= 0 {
-        return Err(Error::InvalidPayment);
+        return Err(Error::InvalidClaimAmount);
     }
 
     // Verify claim doesn't already exist
     let claim_key = DataKey::Claim(claim.claim_id.clone());
     if store.has(&claim_key) {
-        return Err(Error::AssetAlreadyExists);
+        return Err(Error::ClaimAlreadyExists);
     }
 
     // Verify claim status is Submitted
     if claim.status != ClaimStatus::Submitted {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidClaimStatus);
     }
 
     // Store the claim
@@ -341,19 +341,19 @@ pub fn mark_insurance_claim_under_review(
     let store = env.storage().persistent();
     let claim_key = DataKey::Claim(claim_id.clone());
 
-    let mut claim: InsuranceClaim = store.get(&claim_key).ok_or(Error::AssetNotFound)?;
+    let mut claim: InsuranceClaim = store.get(&claim_key).ok_or(Error::ClaimNotFound)?;
 
     // Verify insurer is authorized
     let policy: InsurancePolicy = store
         .get(&DataKey::Policy(claim.policy_id.clone()))
-        .ok_or(Error::AssetNotFound)?;
+        .ok_or(Error::PolicyNotFound)?;
     if insurer != policy.insurer {
         return Err(Error::Unauthorized);
     }
 
     // Validate status transition: only Submitted claims can move to UnderReview
     if claim.status != ClaimStatus::Submitted {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidClaimStatus);
     }
 
     claim.status = ClaimStatus::UnderReview;
@@ -375,29 +375,29 @@ pub fn approve_insurance_claim(
     let store = env.storage().persistent();
     let claim_key = DataKey::Claim(claim_id.clone());
 
-    let mut claim: InsuranceClaim = store.get(&claim_key).ok_or(Error::AssetNotFound)?;
+    let mut claim: InsuranceClaim = store.get(&claim_key).ok_or(Error::ClaimNotFound)?;
 
     // Verify insurer is authorized
     let policy: InsurancePolicy = store
         .get(&DataKey::Policy(claim.policy_id.clone()))
-        .ok_or(Error::AssetNotFound)?;
+        .ok_or(Error::PolicyNotFound)?;
     if insurer != policy.insurer {
         return Err(Error::Unauthorized);
     }
 
     // Validate status transition: only UnderReview claims can be approved
     if claim.status != ClaimStatus::UnderReview {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidClaimStatus);
     }
 
     // Validate approved amount
     if approved_amount <= 0 {
-        return Err(Error::InvalidPayment);
+        return Err(Error::InvalidClaimAmount);
     }
 
     // Approved amount cannot exceed coverage amount
     if approved_amount > policy.coverage_amount {
-        return Err(Error::InvalidPayment);
+        return Err(Error::InvalidClaimAmount);
     }
 
     claim.status = ClaimStatus::Approved;
@@ -419,19 +419,19 @@ pub fn reject_insurance_claim(
     let store = env.storage().persistent();
     let claim_key = DataKey::Claim(claim_id.clone());
 
-    let mut claim: InsuranceClaim = store.get(&claim_key).ok_or(Error::AssetNotFound)?;
+    let mut claim: InsuranceClaim = store.get(&claim_key).ok_or(Error::ClaimNotFound)?;
 
     // Verify insurer is authorized
     let policy: InsurancePolicy = store
         .get(&DataKey::Policy(claim.policy_id.clone()))
-        .ok_or(Error::AssetNotFound)?;
+        .ok_or(Error::PolicyNotFound)?;
     if insurer != policy.insurer {
         return Err(Error::Unauthorized);
     }
 
     // Validate status transition: only Submitted or UnderReview claims can be rejected
     if claim.status != ClaimStatus::Submitted && claim.status != ClaimStatus::UnderReview {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidClaimStatus);
     }
 
     claim.status = ClaimStatus::Rejected;
@@ -452,7 +452,7 @@ pub fn dispute_insurance_claim(
     let store = env.storage().persistent();
     let claim_key = DataKey::Claim(claim_id.clone());
 
-    let mut claim: InsuranceClaim = store.get(&claim_key).ok_or(Error::AssetNotFound)?;
+    let mut claim: InsuranceClaim = store.get(&claim_key).ok_or(Error::ClaimNotFound)?;
 
     // Verify claimant is authorized
     if claimant != claim.claimant {
@@ -461,7 +461,7 @@ pub fn dispute_insurance_claim(
 
     // Validate status transition: only Rejected claims can be disputed
     if claim.status != ClaimStatus::Rejected {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidClaimStatus);
     }
 
     claim.status = ClaimStatus::Disputed;
@@ -478,19 +478,19 @@ pub fn pay_insurance_claim(env: Env, claim_id: BytesN<32>, insurer: Address) -> 
     let store = env.storage().persistent();
     let claim_key = DataKey::Claim(claim_id.clone());
 
-    let mut claim: InsuranceClaim = store.get(&claim_key).ok_or(Error::AssetNotFound)?;
+    let mut claim: InsuranceClaim = store.get(&claim_key).ok_or(Error::ClaimNotFound)?;
 
     // Verify insurer is authorized
     let policy: InsurancePolicy = store
         .get(&DataKey::Policy(claim.policy_id.clone()))
-        .ok_or(Error::AssetNotFound)?;
+        .ok_or(Error::PolicyNotFound)?;
     if insurer != policy.insurer {
         return Err(Error::Unauthorized);
     }
 
     // Validate status transition: only Approved claims can be paid
     if claim.status != ClaimStatus::Approved {
-        return Err(Error::Unauthorized);
+        return Err(Error::InvalidClaimStatus);
     }
 
     claim.status = ClaimStatus::Paid;

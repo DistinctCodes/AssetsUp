@@ -72,6 +72,13 @@ assert_eq!(name, Symbol::new(&env, "asset_registered"));
 | `contract_paused` | `admin` | `timestamp` | `pause_contract` |
 | `contract_unpaused` | `admin` | `timestamp` | `unpause_contract` |
 
+### Branches
+
+| Event (topic 0) | Topic 1 | Data | Emitted by |
+|---|---|---|---|
+| `branch_registered` | `branch_id` | `admin`, `timestamp` | `register_branch` |
+| `asset_assigned_to_branch` | `branch_id`, `asset_id` | `caller`, `timestamp` | `assign_asset_to_branch` |
+
 ### Tokenization
 
 | Event | Topic 1 | Data | Emitted by |
