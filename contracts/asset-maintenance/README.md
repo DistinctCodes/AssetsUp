@@ -83,6 +83,7 @@ unguarded.
 | Entrypoint | Args | Returns | Auth |
 |---|---|---|---|
 | `add_maintenance_record` | `record: MaintenanceRecord` | `()` | `record.provider` |
+| `add_maintenance_records_batch` | `records: Vec<MaintenanceRecord>` | `()` | each `record.provider` (via `add_maintenance_record`) |
 | `get_maintenance_history` | `asset_id` | `Vec<MaintenanceRecord>` | read-only |
 | `schedule_maintenance` | `owner, schedule` | `()` | `owner` |
 | `update_maintenance_schedule` | `owner, schedule` | `()` | `owner` (via `schedule_maintenance`) |
@@ -91,11 +92,11 @@ unguarded.
 | `get_upcoming_maintenance` | `asset_id` | `Option<ScheduledMaintenance>` | read-only |
 | `get_overdue_maintenance` | `asset_id` | `bool` | read-only |
 
-`update_maintenance_schedule` and `complete_scheduled_maintenance` authenticate
-indirectly: they delegate to `schedule_maintenance` and
-`add_maintenance_record` respectively, which call `require_auth()`. The
-protection is real but easy to miss, and easy to break by refactoring the
-delegation away.
+`update_maintenance_schedule`, `complete_scheduled_maintenance` and
+`add_maintenance_records_batch` authenticate indirectly: they delegate to
+`schedule_maintenance` and `add_maintenance_record` respectively, which call
+`require_auth()`. The protection is real but easy to miss, and easy to break by
+refactoring the delegation away.
 
 ### Warranties
 

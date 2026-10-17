@@ -355,6 +355,22 @@ impl AssetMaintenanceContract {
         events::maintenance_recorded(&env, &record);
     }
 
+    /// Adds several maintenance records in a single invocation.
+    ///
+    /// Each record is validated and stored exactly as if it had been submitted
+    /// through [`Self::add_maintenance_record`]; the call is atomic, so if any
+    /// record is invalid the whole invocation reverts and none are persisted.
+    /// An empty batch is rejected rather than accepted as a silent no-op.
+    pub fn add_maintenance_records_batch(env: Env, records: Vec<MaintenanceRecord>) {
+        if records.is_empty() {
+            handle_error(&env, Error::InvalidArguments);
+        }
+
+        for record in records.iter() {
+            Self::add_maintenance_record(env.clone(), record);
+        }
+    }
+
     pub fn get_maintenance_history(env: Env, asset_id: u64) -> Vec<MaintenanceRecord> {
         // Extend on read too. An asset that is only ever queried and never
         // serviced again would otherwise be archived despite still being

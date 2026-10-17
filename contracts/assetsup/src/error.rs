@@ -88,6 +88,10 @@ pub enum Error {
     GeographicRestriction = 130,
     /// No ownership record exists for this holder.
     HolderNotFound = 131,
+    /// The token symbol is already claimed by another tokenized asset. A unique
+    /// symbol per underlying asset is the on-chain guard against tokenizing the
+    /// same asset twice under a different id.
+    DuplicateTokenSymbol = 132,
 
     // ---------------------------------------------------------------
     // Voting: 140–149
@@ -120,6 +124,9 @@ pub enum Error {
     DetokenizationAlreadyProposed = 161,
     /// The supplied valuation is zero or negative.
     InvalidValuation = 162,
+    /// Detokenization was proposed before the post-tokenization cooldown
+    /// elapsed. Prevents rapid wash-tokenizing.
+    DetokenizationCooldownActive = 163,
 
     // ---------------------------------------------------------------
     // Validation: 170–179
@@ -223,6 +230,7 @@ mod tests {
             Error::AccreditedInvestorRequired as u32,
             Error::GeographicRestriction as u32,
             Error::HolderNotFound as u32,
+            Error::DuplicateTokenSymbol as u32,
             Error::InsufficientVotingPower as u32,
             Error::AlreadyVoted as u32,
             Error::ProposalNotFound as u32,
@@ -233,6 +241,7 @@ mod tests {
             Error::DetokenizationNotApproved as u32,
             Error::DetokenizationAlreadyProposed as u32,
             Error::InvalidValuation as u32,
+            Error::DetokenizationCooldownActive as u32,
             Error::InvalidAssetName as u32,
             Error::InvalidPurchaseValue as u32,
             Error::InvalidMetadataUri as u32,

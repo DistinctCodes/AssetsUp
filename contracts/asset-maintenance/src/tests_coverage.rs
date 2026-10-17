@@ -255,6 +255,33 @@ fn add_maintenance_record_appends_to_history() {
 }
 
 #[test]
+fn add_maintenance_records_batch_appends_every_record() {
+    let env = Env::default();
+    let ctx = setup(&env);
+
+    let records = vec![
+        &env,
+        record(&env, &ctx.provider, 1, 7),
+        record(&env, &ctx.provider, 2, 7),
+        record(&env, &ctx.provider, 3, 8),
+    ];
+
+    ctx.client.add_maintenance_records_batch(&records);
+
+    assert_eq!(ctx.client.get_maintenance_history(&7).len(), 2);
+    assert_eq!(ctx.client.get_maintenance_history(&8).len(), 1);
+}
+
+#[test]
+fn an_empty_maintenance_batch_is_rejected() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    let records: Vec<MaintenanceRecord> = Vec::new(&env);
+
+    assert!(ctx.client.try_add_maintenance_records_batch(&records).is_err());
+}
+
+#[test]
 fn maintenance_history_is_empty_for_an_unknown_asset() {
     let env = Env::default();
     let ctx = setup(&env);
