@@ -1,5 +1,6 @@
 "use client";
 
+import { env } from "@/lib/env";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Package, AlertTriangle, LogIn, WifiOff } from "lucide-react";
@@ -18,7 +19,7 @@ interface PublicAsset {
   contactEmail?: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:6003/api";
+const API_BASE = env.NEXT_PUBLIC_API_URL;
 
 export default function ScanPage() {
   const params = useParams();

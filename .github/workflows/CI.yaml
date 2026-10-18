@@ -340,7 +340,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_API_URL: http://localhost:6003/api
 
       - name: Unit tests
         run: npm run test -- --passWithNoTests

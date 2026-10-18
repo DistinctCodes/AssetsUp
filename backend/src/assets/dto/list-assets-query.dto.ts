@@ -9,6 +9,8 @@ export const ASSET_SORT_COLUMNS = [
   'assetTag',
   'status',
   'purchaseDate',
+  'purchaseCost',
+  'warrantyExpiry',
 ] as const;
 
 export class ListAssetsQueryDto extends PaginationQueryDto {

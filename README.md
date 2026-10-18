@@ -140,11 +140,22 @@ The backend will be available at `http://localhost:3001`.
 
 ```bash
 cd frontend
+cp .env.example .env.local   # optional: defaults work for local development
 npm install
 npm run dev
 ```
 
 The frontend will be available at `http://localhost:3000`.
+
+#### Frontend environment variables
+
+Validated at startup by `frontend/lib/env.ts`; a missing optional value falls back to the default, an invalid one fails fast with a readable message.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:6003/api` | Backend REST API base URL, including `/api` |
+| `NEXT_PUBLIC_WS_URL` | derived from `NEXT_PUBLIC_API_URL` | Socket.IO endpoint for real-time notifications |
+| `NEXT_PUBLIC_STELLAR_NETWORK` | `testnet` | Network the Freighter wallet must use (`testnet` or `mainnet`) |
 
 ---
 

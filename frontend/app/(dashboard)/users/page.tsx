@@ -6,6 +6,8 @@ import { format } from 'date-fns';
 import { clsx } from 'clsx';
 import { useUsersList, useUpdateUserRole, useToggleUserActive, useInviteUser } from '@/lib/query/hooks/useUsers';
 import { useAuthStore } from '@/store/auth.store';
+import { getUserActionErrorMessage } from '@/lib/api/users';
+import { toast } from '@/components/ui/toast';
 import { AppUser, UserRole } from '@/lib/api/users';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,7 +49,10 @@ export default function UsersPage() {
 
   const handleRoleChange = (user: AppUser, newRole: UserRole) => {
     if (newRole === user.role) return;
-    updateRole.mutate({ id: user.id, role: newRole });
+    updateRole.mutate(
+      { id: user.id, role: newRole },
+      { onError: (err) => toast.error(getUserActionErrorMessage(err, 'update')) },
+    );
   };
 
   return (
@@ -267,10 +272,14 @@ export default function UsersPage() {
         open={!!deactivateTarget}
         onConfirm={async () => {
           if (deactivateTarget) {
-            await toggleActive.mutateAsync({
-              id: deactivateTarget.id,
-              isActive: deactivateTarget.isActive === false,
-            });
+            try {
+              await toggleActive.mutateAsync({
+                id: deactivateTarget.id,
+                isActive: deactivateTarget.isActive === false,
+              });
+            } catch (err) {
+              toast.error(getUserActionErrorMessage(err, 'update'));
+            }
           }
           setDeactivateTarget(null);
         }}
@@ -335,7 +344,7 @@ function InviteUserModal({ onClose }: { onClose: () => void }) {
       await inviteUser.mutateAsync(form);
       onClose();
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to invite user");
+      setError(getUserActionErrorMessage(err, 'invite'));
     }
   };
 

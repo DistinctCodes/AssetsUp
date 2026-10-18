@@ -1,5 +1,6 @@
 'use client';
 
+import { env } from '@/lib/env';
 import { useState, useEffect, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
@@ -26,7 +27,7 @@ interface UseWebSocketOptions {
 
 /** Derive the WebSocket URL from the API base URL, falling back to port 6003 */
 function getWsUrl(): string {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6003/api';
+  const apiBase = env.NEXT_PUBLIC_API_URL;
   try {
     const url = new URL(apiBase);
     return `${url.protocol === 'https:' ? 'wss' : 'ws'}://${url.host}`;
@@ -44,7 +45,7 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
     if (!options.userId) return;
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    const newSocket = io(process.env.NEXT_PUBLIC_WS_URL || getWsUrl(), {
+    const newSocket = io(env.NEXT_PUBLIC_WS_URL || getWsUrl(), {
       transports: ['websocket'],
       auth: { token },
       query: { userId: options.userId },
