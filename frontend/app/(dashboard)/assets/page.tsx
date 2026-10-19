@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, SlidersHorizontal, MapPin, X, Package, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,14 +13,86 @@ import { AssetStatus, AssetCondition } from "@/lib/query/types/asset";
 
 const STATUS_OPTIONS = ["All", ...Object.values(AssetStatus)];
 
+const DEFAULT_SORT = "createdAt";
+const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: "createdAt", label: "Recently added" },
+  { value: "name", label: "Name" },
+  { value: "assetTag", label: "Asset ID" },
+  { value: "status", label: "Status" },
+  { value: "purchaseDate", label: "Purchase date" },
+  { value: "purchaseCost", label: "Value" },
+  { value: "warrantyExpiry", label: "Warranty expiry" },
+];
+
+function SortableHeader({
+  label,
+  column,
+  sortBy,
+  sortOrder,
+  onSort,
+}: {
+  label: string;
+  column: string;
+  sortBy: string;
+  sortOrder: "ASC" | "DESC";
+  onSort: (column: string) => void;
+}) {
+  const active = sortBy === column;
+  return (
+    <th
+      className="text-left px-4 py-3 font-medium text-gray-500"
+      aria-sort={active ? (sortOrder === "ASC" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className="inline-flex items-center gap-1 hover:text-gray-900"
+      >
+        {label}
+        <span aria-hidden="true">{active ? (sortOrder === "ASC" ? "▲" : "▼") : ""}</span>
+      </button>
+    </th>
+  );
+}
+
 export default function AssetsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showModal, setShowModal] = useState(false);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [page, setPage] = useState(1);
+  // Filters, sort and page live in the URL so a view survives a refresh and
+  // can be shared.
+  const [search, setSearch] = useState(searchParams.get("q") || "");
+  const [status, setStatus] = useState(searchParams.get("status") || "");
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [locationId, setLocationId] = useState(searchParams.get("locationId") || "");
+  const [sortBy, setSortBy] = useState(searchParams.get("sortBy") || DEFAULT_SORT);
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">(
+    searchParams.get("order") === "ASC" ? "ASC" : "DESC",
+  );
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (status) params.set("status", status);
+    if (locationId) params.set("locationId", locationId);
+    if (page > 1) params.set("page", String(page));
+    if (sortBy !== DEFAULT_SORT || sortOrder !== "DESC") {
+      params.set("sortBy", sortBy);
+      params.set("order", sortOrder);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `/assets?${qs}` : "/assets", { scroll: false });
+  }, [search, status, locationId, page, sortBy, sortOrder, router]);
+
+  const toggleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder((o) => (o === "ASC" ? "DESC" : "ASC"));
+    } else {
+      setSortBy(column);
+      setSortOrder("ASC");
+    }
+    setPage(1);
+  };
 
   const { data: locations = [] } = useLocations();
   const activeLocation = locations.find((l) => l.id === locationId);
@@ -31,6 +103,8 @@ export default function AssetsPage() {
     locationId: locationId || undefined,
     page,
     limit: 20,
+    sortBy,
+    sortOrder,
   });
 
   const assets = data?.data ?? [];
@@ -106,6 +180,24 @@ export default function AssetsPage() {
               </option>
             ))}
           </select>
+          <label htmlFor="asset-sort" className="sr-only">
+            Sort by
+          </label>
+          <select
+            id="asset-sort"
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              setPage(1);
+            }}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-700"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                Sort: {o.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -135,18 +227,12 @@ export default function AssetsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-4 py-3 font-medium text-gray-500">
-                  Asset ID
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">
-                  Name
-                </th>
+                <SortableHeader label="Asset ID" column="assetTag" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} />
+                <SortableHeader label="Name" column="name" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} />
                 <th className="text-left px-4 py-3 font-medium text-gray-500">
                   Category
                 </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">
-                  Status
-                </th>
+                <SortableHeader label="Status" column="status" sortBy={sortBy} sortOrder={sortOrder} onSort={toggleSort} />
                 <th className="text-left px-4 py-3 font-medium text-gray-500">
                   Condition
                 </th>

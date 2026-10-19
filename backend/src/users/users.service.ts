@@ -19,6 +19,7 @@ import { User, UserRole } from './entities/user.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { normalizeEmail } from './utils/normalize-email';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class UsersService {
@@ -140,7 +141,46 @@ export class UsersService {
     return this.sanitize(saved);
   }
 
-  async setActive(id: string, isActive: boolean) {
+  /**
+   * Creates an account for an invited person. They get an unusable random
+   * password and a 7-day password-set token. The raw token is only returned
+   * when EXPOSE_RESET_TOKEN=true (local development), exactly like the
+   * forgot-password flow, until email delivery is wired up.
+   */
+  async invite(
+    dto: { email: string; firstName: string; lastName: string; role?: UserRole },
+    invitedById?: string,
+  ) {
+    const created = await this.create({
+      ...dto,
+      password: crypto.randomBytes(24).toString('base64url'),
+    });
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(inviteToken)
+      .digest('hex');
+    await this.setPasswordResetToken(
+      created.id,
+      tokenHash,
+      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    );
+    await this.auditLogsService?.logAction({
+      action: 'INVITED',
+      entityType: 'user',
+      entityId: created.id,
+      actorId: invitedById,
+      newValue: { email: created.email, role: created.role },
+    });
+    return process.env.EXPOSE_RESET_TOKEN === 'true'
+      ? { ...created, inviteToken }
+      : created;
+  }
+
+  async setActive(id: string, isActive: boolean, requestingUserId?: string) {
+    if (requestingUserId && requestingUserId === id && !isActive) {
+      throw new ForbiddenException('Cannot deactivate your own account');
+    }
     const user = await this.findById(id);
     user.isActive = isActive;
     const saved = await this.userRepository.save(user);

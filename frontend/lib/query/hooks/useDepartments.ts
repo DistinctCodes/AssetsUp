@@ -35,22 +35,52 @@ export function useDepartments() {
   });
 }
 
-export function useDepartmentUsers(departmentId?: string) {
-  return useQuery({
-    queryKey: ['departments', departmentId, 'users'],
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface DepartmentUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  isActive?: boolean;
+}
+
+export interface DepartmentAsset {
+  id: string;
+  name: string;
+  assetTag: string;
+  status: string;
+}
+
+export const DEPARTMENT_PAGE_SIZE = 10;
+
+export function useDepartmentUsers(departmentId?: string, page = 1) {
+  return useQuery<Paginated<DepartmentUser>>({
+    queryKey: ['departments', departmentId, 'users', page],
     queryFn: async () => {
-      const response = await api.get(`/departments/${departmentId}/users`);
+      const response = await api.get(`/departments/${departmentId}/users`, {
+        params: { page, limit: DEPARTMENT_PAGE_SIZE },
+      });
       return response.data;
     },
     enabled: !!departmentId,
   });
 }
 
-export function useDepartmentAssets(departmentId?: string) {
-  return useQuery({
-    queryKey: ['departments', departmentId, 'assets'],
+export function useDepartmentAssets(departmentId?: string, page = 1) {
+  return useQuery<Paginated<DepartmentAsset>>({
+    queryKey: ['departments', departmentId, 'assets', page],
     queryFn: async () => {
-      const response = await api.get(`/departments/${departmentId}/assets`);
+      const response = await api.get(`/departments/${departmentId}/assets`, {
+        params: { page, limit: DEPARTMENT_PAGE_SIZE },
+      });
       return response.data;
     },
     enabled: !!departmentId,

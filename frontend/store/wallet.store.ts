@@ -1,3 +1,4 @@
+import { env } from '@/lib/env';
 import { create } from 'zustand';
 
 export interface WalletState {
@@ -46,7 +47,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       const address = await freighter.getAddress();
       const network = await freighter.getNetwork();
 
-      const appNetwork = process.env.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet';
+      const appNetwork = env.NEXT_PUBLIC_STELLAR_NETWORK;
       if (network !== appNetwork) {
         set({
           error: `Wrong network. Expected ${appNetwork}, got ${network}. Please switch your Freighter wallet to ${appNetwork}.`,

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
   Param,
   Body,
   Query,
@@ -24,6 +25,7 @@ import { GetUser } from '../auth/decorators/get-user.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { InviteUserDto } from './dto/invite-user.dto';
 
 @ApiTags('users')
 @ApiBearerAuth('JWT-auth')
@@ -75,5 +77,33 @@ export class UsersController {
   ) {
     const requestingUserId = req.user?.id || req.user?.sub;
     return this.usersService.updateRole(id, role, requestingUserId);
+  }
+
+  @Post('invite')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Invite a new user (admin only)' })
+  @ApiResponse({ status: 201, description: 'User invited' })
+  @ApiResponse({ status: 403, description: 'Not an admin' })
+  @ApiResponse({ status: 409, description: 'Email already registered' })
+  invite(@Body() dto: InviteUserDto, @Req() req: any) {
+    const requestingUserId = req.user?.id || req.user?.sub;
+    return this.usersService.invite(dto, requestingUserId);
+  }
+
+  @Patch(':id/active')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Activate or deactivate a user (admin only)' })
+  @ApiResponse({ status: 200, description: 'User updated' })
+  @ApiResponse({ status: 403, description: 'Not an admin, or self-deactivation' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  setActive(
+    @Param('id') id: string,
+    @Body('isActive') isActive: boolean,
+    @Req() req: any,
+  ) {
+    const requestingUserId = req.user?.id || req.user?.sub;
+    return this.usersService.setActive(id, isActive === true, requestingUserId);
   }
 }

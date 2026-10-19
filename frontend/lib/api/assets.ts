@@ -33,6 +33,8 @@ export interface AssetListFilters {
   locationId?: string;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: 'ASC' | 'DESC';
 }
 
 export interface AssetListResponse {
