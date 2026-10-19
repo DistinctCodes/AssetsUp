@@ -62,6 +62,14 @@ const PAUSE_EXEMPT: &[(&str, &str)] = &[
         "an upgrade is how you fix the incident that caused the pause",
     ),
     (
+        "approve_wasm_hash",
+        "part of the upgrade control; an incident fix may need an approval before upgrade can run",
+    ),
+    (
+        "revoke_wasm_hash",
+        "part of the upgrade control; revoking a bad approval must work while paused",
+    ),
+    (
         "migrate",
         "must run after upgrade to bring storage up to date",
     ),

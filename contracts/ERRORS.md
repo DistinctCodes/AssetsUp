@@ -75,6 +75,27 @@ code 1 across different contracts.
 | 170–179 | Validation |
 | 180–199 | Leasing and insurance |
 
+The enum is capped at **50 cases** by the contract spec, so narrow
+single-subject variants were folded into generic ones. The following codes are
+retired and must not be reused:
+
+| Retired code | Former variant | Now returns |
+|---:|---|---|
+| 103 | `BranchAlreadyExists` | `AlreadyExists` (101) |
+| 104 | `BranchNotFound` | `NotFound` (5) |
+| 105 | `SubscriptionAlreadyExists` | `AlreadyExists` (101) |
+| 123 | `InvalidTokenDecimals` | `InvalidInput` (4) |
+| 142 | `ProposalNotFound` | `NotFound` (5) |
+| 170 | `InvalidAssetName` | `InvalidInput` (4) |
+| 171 | `InvalidPurchaseValue` | `InvalidInput` (4) |
+| 172 | `InvalidMetadataUri` | `InvalidInput` (4) |
+| 180 | `LeaseNotFound` | `NotFound` (5) |
+| 181 | `LeaseAlreadyExists` | `AlreadyExists` (101) |
+| 194 | `PolicyAlreadyExists` | `AlreadyExists` (101) |
+| 195 | `ClaimAlreadyExists` | `AlreadyExists` (101) |
+
+Code `101` was renamed from `AssetAlreadyExists` to `AlreadyExists`.
+
 ## `contrib` (200–299)
 
 Typed `Error` enum lives in `contrib/src/error.rs` and is wired into the crate.
@@ -114,6 +135,7 @@ Typed `Error` enum lives in `asset-maintenance/src/error.rs`. Failures use
 | Block | Concern |
 |---:|---|
 | 500–509 | Providers, schedules, warranties, alerts |
+| 510–513 | Maintenance records (voiding/amending) and detokenized assets |
 
 ## For backend implementers
 

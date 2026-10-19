@@ -9,11 +9,19 @@
 //!
 //! ## Invariants
 //!
-//! - Maintenance history is append-only — no entrypoint removes or rewrites an
-//!   existing [`MaintenanceRecord`].
+//! - Maintenance history is append-only — no entrypoint removes an existing
+//!   [`MaintenanceRecord`] from the stored [`Vec`]. A record that was filed by
+//!   mistake is *voided* (its `voided` flag is set and it is excluded from the
+//!   [`AssetStats`] rollup) or *amended* (a [`MaintenanceAmendment`] sidecar
+//!   carries the corrected values) but the original entry is never erased, so
+//!   the audit trail remains reconstructable.
 //! - [`AssetStats`] is a derived rollup (total cost, downtime, service count,
-//!   health score) maintained alongside the history.
+//!   health score) recomputed from the live (non-voided, amendment-adjusted)
+//!   history.
 //! - Health scores are expressed on a 1–100 scale.
+//! - The admin can pause the contract, which blocks new maintenance logging.
+//! - The admin can mark an asset detokenized (burned); such an asset accepts
+//!   neither new records nor new schedules until it is reactivated.
 //!
 //! ## Error handling
 //!
@@ -27,10 +35,10 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Ve
 
 pub mod error;
 pub mod events;
-pub mod ttl;
+mod proptests;
 mod test;
 mod tests_coverage;
-mod proptests;
+pub mod ttl;
 
 pub use crate::error::{handle_error, Error};
 
@@ -103,6 +111,41 @@ pub struct MaintenanceRecord {
     pub documents_ipfs: Vec<String>,
     pub quality_rating: u32, // 1-10
     pub timestamp: u64,
+    /// Set once the record has been voided as a mistaken entry. Voided records
+    /// stay in the history but no longer count towards [`AssetStats`].
+    pub voided: bool,
+    /// Set once an amendment sidecar has been filed for this record.
+    pub amended: bool,
+}
+
+/// Audit sidecar describing a correction to an append-only [`MaintenanceRecord`].
+///
+/// The original record is never rewritten: [`AssetMaintenanceContract::amend_maintenance_record`]
+/// stores one of these keyed by `(asset_id, record_id)` and flags the record as
+/// `amended`, so both the originally filed values and the correction are
+/// recoverable. The corrected cost and duration feed the [`AssetStats`] rollup.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaintenanceAmendment {
+    pub asset_id: u64,
+    pub record_id: u64,
+    pub amended_by: Address,
+    pub reason: String,
+    pub corrected_total_cost: i128,
+    pub corrected_duration_hours: u32,
+    pub corrected_description: String,
+    pub timestamp: u64,
+}
+
+/// Audit sidecar describing why and by whom a [`MaintenanceRecord`] was voided.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaintenanceVoidRecord {
+    pub asset_id: u64,
+    pub record_id: u64,
+    pub voided_by: Address,
+    pub reason: String,
+    pub timestamp: u64,
 }
 
 #[contracttype]
@@ -168,15 +211,20 @@ pub struct MaintenanceAlert {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Admin,
     AssetRegistry,
     Provider(Address),
-    MaintenanceHistory(u64),  // asset_id -> Vec<MaintenanceRecord>
-    MaintenanceSchedule(u64), // asset_id -> ScheduledMaintenance
-    Warranty(u64),            // asset_id -> WarrantyInfo
-    Alerts(u64),              // asset_id -> Vec<MaintenanceAlert>
-    AssetStats(u64),          // asset_id -> AssetStats (downtime, total cost, etc.)
+    MaintenanceHistory(u64),   // asset_id -> Vec<MaintenanceRecord>
+    MaintenanceSchedule(u64),  // asset_id -> ScheduledMaintenance
+    Warranty(u64),             // asset_id -> WarrantyInfo
+    Alerts(u64),               // asset_id -> Vec<MaintenanceAlert>
+    AssetStats(u64),           // asset_id -> AssetStats (downtime, total cost, etc.)
+    Paused,                    // bool: emergency pause on new maintenance logging
+    RecordAmendment(u64, u64), // (asset_id, record_id) -> MaintenanceAmendment
+    RecordVoid(u64, u64),      // (asset_id, record_id) -> MaintenanceVoidRecord
+    DetokenizedAsset(u64),     // asset_id -> bool: burned/detokenized asset
 }
 
 #[contracttype]
@@ -200,13 +248,17 @@ impl AssetMaintenanceContract {
     /// authenticate against without an ABI change. A finer-grained model —
     /// letting the asset owner manage their own warranty, for instance — needs
     /// the asset-registry integration this contract does not have yet.
-    fn require_admin(env: &Env) {
-        let admin: Address = env
-            .storage()
+    fn admin(env: &Env) -> Address {
+        env.storage()
             .persistent()
             .get(&DataKey::Admin)
-            .unwrap_or_else(|| handle_error(&env, Error::NotInitialized));
+            .unwrap_or_else(|| handle_error(env, Error::NotInitialized))
+    }
+
+    fn require_admin(env: &Env) -> Address {
+        let admin = Self::admin(env);
         admin.require_auth();
+        admin
     }
 
     pub fn init(env: Env, admin: Address, registry: Address) {
@@ -272,13 +324,33 @@ impl AssetMaintenanceContract {
     pub fn add_maintenance_record(env: Env, record: MaintenanceRecord) {
         // Auth check: provider must be the one adding the record
         record.provider.require_auth();
+        Self::add_record_inner(&env, &record);
+    }
+
+    /// Validates and persists a record whose provider has already been
+    /// authenticated.
+    ///
+    /// Shared by [`Self::add_maintenance_record`] and
+    /// [`Self::add_maintenance_records_batch`] so the latter can authenticate
+    /// each distinct provider exactly once — the host rejects a second
+    /// authorization entry for the same address within a single invocation.
+    fn add_record_inner(env: &Env, record: &MaintenanceRecord) {
+        // Emergency stop: while paused, no new maintenance may be logged.
+        if Self::is_paused(env.clone()) {
+            handle_error(env, Error::ContractPaused);
+        }
+
+        // A detokenized (burned) asset must not accrue new maintenance.
+        if Self::is_asset_detokenized(env.clone(), record.asset_id) {
+            handle_error(env, Error::AssetDetokenized);
+        }
 
         // 1. Verify provider is registered and active
         let provider_data: ProviderProfile = env
             .storage()
             .persistent()
             .get(&DataKey::Provider(record.provider.clone()))
-            .unwrap_or_else(|| handle_error(&env, Error::ProviderNotRegistered));
+            .unwrap_or_else(|| handle_error(env, Error::ProviderNotRegistered));
         if !provider_data.is_active {
             panic!("provider is inactive");
         }
@@ -312,7 +384,7 @@ impl AssetMaintenanceContract {
         }
 
         // 3. Verify asset exists
-        if !Self::verify_asset_exists(&env, record.asset_id) {
+        if !Self::verify_asset_exists(env, record.asset_id) {
             panic!("asset does not exist");
         }
 
@@ -321,38 +393,18 @@ impl AssetMaintenanceContract {
             .storage()
             .persistent()
             .get::<_, Vec<MaintenanceRecord>>(&DataKey::MaintenanceHistory(record.asset_id))
-            .unwrap_or(Vec::new(&env));
+            .unwrap_or(Vec::new(env));
         history.push_back(record.clone());
         env.storage()
             .persistent()
             .set(&DataKey::MaintenanceHistory(record.asset_id), &history);
-        ttl::extend_persistent(&env, &DataKey::MaintenanceHistory(record.asset_id));
+        ttl::extend_persistent(env, &DataKey::MaintenanceHistory(record.asset_id));
 
-        // 5. Update Asset Stats
-        let mut stats = env
-            .storage()
-            .persistent()
-            .get::<_, AssetStats>(&DataKey::AssetStats(record.asset_id))
-            .unwrap_or(AssetStats {
-                total_cost: 0,
-                total_downtime_hours: 0,
-                service_count: 0,
-                health_score: 100, // Start with 100
-            });
-
-        stats.total_cost += record.total_cost;
-        stats.total_downtime_hours += record.duration_hours as u64;
-        stats.service_count += 1;
-        // Recalculate health score (placeholder for now, will implement properly later)
-        stats.health_score = Self::calculate_health_score(&env, record.asset_id);
-
-        env.storage()
-            .persistent()
-            .set(&DataKey::AssetStats(record.asset_id), &stats);
-        ttl::extend_persistent(&env, &DataKey::AssetStats(record.asset_id));
+        // 5. Recompute Asset Stats from the live (non-voided) history.
+        Self::recompute_asset_stats(env, record.asset_id);
 
         // 6. Emit Event
-        events::maintenance_recorded(&env, &record);
+        events::maintenance_recorded(env, record);
     }
 
     /// Adds several maintenance records in a single invocation.
@@ -366,8 +418,27 @@ impl AssetMaintenanceContract {
             handle_error(&env, Error::InvalidArguments);
         }
 
+        // Authenticate each distinct provider once. The host rejects a second
+        // authorization entry for the same address within a single invocation,
+        // so the per-record `require_auth` used by the single-record entrypoint
+        // cannot simply be repeated here.
+        let mut authenticated: Vec<Address> = Vec::new(&env);
         for record in records.iter() {
-            Self::add_maintenance_record(env.clone(), record);
+            let mut seen = false;
+            for address in authenticated.iter() {
+                if address == record.provider {
+                    seen = true;
+                    break;
+                }
+            }
+            if !seen {
+                record.provider.require_auth();
+                authenticated.push_back(record.provider.clone());
+            }
+        }
+
+        for record in records.iter() {
+            Self::add_record_inner(&env, &record);
         }
     }
 
@@ -382,8 +453,18 @@ impl AssetMaintenanceContract {
             .unwrap_or(Vec::new(&env))
     }
 
+    /// Schedules recurring maintenance for an asset.
+    ///
+    /// Rejected if the asset has been marked detokenized/burned: a burned asset
+    /// has no ongoing service obligation, and silently queueing work against it
+    /// wastes provider time and corrupts downstream scheduling.
     pub fn schedule_maintenance(env: Env, owner: Address, schedule: ScheduledMaintenance) {
         owner.require_auth();
+
+        if Self::is_asset_detokenized(env.clone(), schedule.asset_id) {
+            handle_error(&env, Error::AssetDetokenized);
+        }
+
         Self::store_schedule(&env, &schedule);
         events::maintenance_scheduled(&env, &schedule);
     }
@@ -641,22 +722,265 @@ impl AssetMaintenanceContract {
         false
     }
 
-    fn calculate_health_score(env: &Env, asset_id: u64) -> u32 {
+    // -----------------------------------------------------------------------
+    // Emergency pause (#1478)
+    // -----------------------------------------------------------------------
+
+    /// Pauses the contract. New maintenance records then reject with
+    /// [`Error::ContractPaused`] until [`Self::unpause`] is called.
+    pub fn pause(env: Env) {
+        let admin = Self::require_admin(&env);
+
+        env.storage().persistent().set(&DataKey::Paused, &true);
+        ttl::extend_persistent(&env, &DataKey::Paused);
+
+        events::contract_paused(&env, &admin);
+    }
+
+    /// Resumes normal operation after a [`Self::pause`].
+    pub fn unpause(env: Env) {
+        let admin = Self::require_admin(&env);
+
+        env.storage().persistent().set(&DataKey::Paused, &false);
+        ttl::extend_persistent(&env, &DataKey::Paused);
+
+        events::contract_unpaused(&env, &admin);
+    }
+
+    /// Returns whether the contract is currently paused. Absent storage means
+    /// not paused, so an un-initialized-looking contract stays usable.
+    pub fn is_paused(env: Env) -> bool {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
+    }
+
+    // -----------------------------------------------------------------------
+    // Detokenized (burned) assets (#1477)
+    // -----------------------------------------------------------------------
+
+    /// Marks an asset as detokenized/burned. Such an asset accepts neither new
+    /// maintenance records nor new schedules until [`Self::reactivate_asset`].
+    pub fn mark_asset_detokenized(env: Env, asset_id: u64) {
+        let admin = Self::require_admin(&env);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::DetokenizedAsset(asset_id), &true);
+        ttl::extend_persistent(&env, &DataKey::DetokenizedAsset(asset_id));
+
+        events::asset_detokenized(&env, asset_id, &admin);
+    }
+
+    /// Clears the detokenized flag, allowing maintenance again.
+    pub fn reactivate_asset(env: Env, asset_id: u64) {
+        let admin = Self::require_admin(&env);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::DetokenizedAsset(asset_id), &false);
+        ttl::extend_persistent(&env, &DataKey::DetokenizedAsset(asset_id));
+
+        events::asset_reactivated(&env, asset_id, &admin);
+    }
+
+    /// Returns whether an asset has been marked detokenized/burned.
+    pub fn is_asset_detokenized(env: Env, asset_id: u64) -> bool {
+        env.storage()
+            .persistent()
+            .get(&DataKey::DetokenizedAsset(asset_id))
+            .unwrap_or(false)
+    }
+
+    // -----------------------------------------------------------------------
+    // Voiding and amending records (#1479)
+    // -----------------------------------------------------------------------
+
+    /// Voids a maintenance record that was filed by mistake.
+    ///
+    /// The record is *not* removed from the audit history; its `voided` flag is
+    /// set, a [`MaintenanceVoidRecord`] captures the reason and caller, and the
+    /// asset's derived stats are recomputed without it.
+    pub fn void_maintenance_record(env: Env, asset_id: u64, record_id: u64, reason: String) {
+        let admin = Self::require_admin(&env);
+
+        let mut history = env
+            .storage()
+            .persistent()
+            .get::<_, Vec<MaintenanceRecord>>(&DataKey::MaintenanceHistory(asset_id))
+            .unwrap_or_else(|| handle_error(&env, Error::RecordNotFound));
+
+        let index = Self::find_record_index(&history, record_id)
+            .unwrap_or_else(|| handle_error(&env, Error::RecordNotFound));
+
+        let mut record = history.get(index).unwrap();
+        if record.voided {
+            handle_error(&env, Error::RecordAlreadyVoided);
+        }
+        record.voided = true;
+        history.set(index, record);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::MaintenanceHistory(asset_id), &history);
+        ttl::extend_persistent(&env, &DataKey::MaintenanceHistory(asset_id));
+
+        let void_record = MaintenanceVoidRecord {
+            asset_id,
+            record_id,
+            voided_by: admin.clone(),
+            reason,
+            timestamp: env.ledger().timestamp(),
+        };
+        env.storage()
+            .persistent()
+            .set(&DataKey::RecordVoid(asset_id, record_id), &void_record);
+        ttl::extend_persistent(&env, &DataKey::RecordVoid(asset_id, record_id));
+
+        Self::recompute_asset_stats(&env, asset_id);
+
+        events::maintenance_record_voided(&env, asset_id, record_id, &admin);
+    }
+
+    /// Amends a maintenance record's cost, duration, and description.
+    ///
+    /// The original values remain in the history; the correction is stored as a
+    /// [`MaintenanceAmendment`] and the derived stats are recomputed from the
+    /// corrected cost and duration. A voided record cannot be amended.
+    pub fn amend_maintenance_record(
+        env: Env,
+        asset_id: u64,
+        record_id: u64,
+        reason: String,
+        corrected_total_cost: i128,
+        corrected_duration_hours: u32,
+        corrected_description: String,
+    ) {
+        let admin = Self::require_admin(&env);
+
+        if corrected_total_cost < 0 {
+            handle_error(&env, Error::InvalidArguments);
+        }
+
+        let mut history = env
+            .storage()
+            .persistent()
+            .get::<_, Vec<MaintenanceRecord>>(&DataKey::MaintenanceHistory(asset_id))
+            .unwrap_or_else(|| handle_error(&env, Error::RecordNotFound));
+
+        let index = Self::find_record_index(&history, record_id)
+            .unwrap_or_else(|| handle_error(&env, Error::RecordNotFound));
+
+        if history.get(index).unwrap().voided {
+            handle_error(&env, Error::RecordVoided);
+        }
+        let mut record = history.get(index).unwrap();
+        record.amended = true;
+        history.set(index, record);
+        env.storage()
+            .persistent()
+            .set(&DataKey::MaintenanceHistory(asset_id), &history);
+        ttl::extend_persistent(&env, &DataKey::MaintenanceHistory(asset_id));
+
+        let amendment = MaintenanceAmendment {
+            asset_id,
+            record_id,
+            amended_by: admin.clone(),
+            reason,
+            corrected_total_cost,
+            corrected_duration_hours,
+            corrected_description,
+            timestamp: env.ledger().timestamp(),
+        };
+        env.storage()
+            .persistent()
+            .set(&DataKey::RecordAmendment(asset_id, record_id), &amendment);
+        ttl::extend_persistent(&env, &DataKey::RecordAmendment(asset_id, record_id));
+
+        Self::recompute_asset_stats(&env, asset_id);
+
+        events::maintenance_record_amended(&env, asset_id, record_id, &admin);
+    }
+
+    /// Returns the amendment sidecar for a record, if one has been filed.
+    pub fn get_maintenance_amendment(
+        env: Env,
+        asset_id: u64,
+        record_id: u64,
+    ) -> Option<MaintenanceAmendment> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::RecordAmendment(asset_id, record_id))
+    }
+
+    /// Returns the void sidecar for a record, if it has been voided.
+    pub fn get_maintenance_void(
+        env: Env,
+        asset_id: u64,
+        record_id: u64,
+    ) -> Option<MaintenanceVoidRecord> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::RecordVoid(asset_id, record_id))
+    }
+
+    /// Returns whether a specific record has been voided.
+    pub fn is_maintenance_record_voided(env: Env, asset_id: u64, record_id: u64) -> bool {
+        env.storage()
+            .persistent()
+            .get::<_, MaintenanceVoidRecord>(&DataKey::RecordVoid(asset_id, record_id))
+            .is_some()
+    }
+
+    /// Finds the position of `record_id` in `history`, if present.
+    fn find_record_index(history: &Vec<MaintenanceRecord>, record_id: u64) -> Option<u32> {
+        for (index, record) in (0u32..).zip(history.iter()) {
+            if record.record_id == record_id {
+                return Some(index);
+            }
+        }
+        None
+    }
+
+    /// Recomputes the [`AssetStats`] rollup for an asset from its live history.
+    ///
+    /// Voided records are excluded; amended records contribute the corrected
+    /// cost and duration. The health score reuses the historical weighting
+    /// (40% average quality, 30% preventive ratio, improvement bonus, overdue
+    /// penalty) but only over the live records.
+    fn recompute_asset_stats(env: &Env, asset_id: u64) -> AssetStats {
         let history = env
             .storage()
             .persistent()
             .get::<_, Vec<MaintenanceRecord>>(&DataKey::MaintenanceHistory(asset_id))
             .unwrap_or(Vec::new(env));
 
-        if history.is_empty() {
-            return 100;
-        }
-
-        let mut total_quality = 0;
-        let mut improvement_score = 0;
-        let mut preventive_count = 0;
+        let mut total_cost: i128 = 0;
+        let mut total_downtime: u64 = 0;
+        let mut service_count: u32 = 0;
+        let mut total_quality: u32 = 0;
+        let mut improvement_score: u32 = 0;
+        let mut preventive_count: u32 = 0;
 
         for record in history.iter() {
+            if record.voided {
+                continue;
+            }
+
+            let (cost, downtime) = match env.storage().persistent().get::<_, MaintenanceAmendment>(
+                &DataKey::RecordAmendment(asset_id, record.record_id),
+            ) {
+                Some(amendment) => (
+                    amendment.corrected_total_cost,
+                    amendment.corrected_duration_hours as u64,
+                ),
+                None => (record.total_cost, record.duration_hours as u64),
+            };
+
+            total_cost += cost;
+            total_downtime += downtime;
+            service_count += 1;
             total_quality += record.quality_rating;
             if record.condition_after > record.condition_before {
                 improvement_score += 5;
@@ -666,26 +990,47 @@ impl AssetMaintenanceContract {
             }
         }
 
-        let avg_quality = (total_quality * 10) / history.len(); // Scale to 100
-        let preventive_ratio = (preventive_count * 100) / history.len();
+        let health_score = if service_count == 0 {
+            100
+        } else {
+            let avg_quality = (total_quality * 10).checked_div(service_count).unwrap_or(0);
+            let preventive_ratio = (preventive_count * 100)
+                .checked_div(service_count)
+                .unwrap_or(0);
 
-        // Weighted Score: 40% Quality, 30% Preventive Ratio, 30% Improvement/Condition
-        let mut score = (avg_quality * 4 / 10) + (preventive_ratio * 3 / 10) + (improvement_score);
+            // Weighted Score: 40% Quality, 30% Preventive Ratio, 30% Improvement
+            let mut score =
+                (avg_quality * 4 / 10) + (preventive_ratio * 3 / 10) + improvement_score;
 
-        // Penalty for overdue
-        if let Some(schedule) = env
-            .storage()
-            .persistent()
-            .get::<_, ScheduledMaintenance>(&DataKey::MaintenanceSchedule(asset_id))
-        {
-            if env.ledger().timestamp() > schedule.next_service_due {
-                let days_overdue = (env.ledger().timestamp() - schedule.next_service_due) / 86400;
-                let penalty = (days_overdue as u32 * 2).min(30);
-                score = score.saturating_sub(penalty);
+            // Penalty for overdue
+            if let Some(schedule) = env
+                .storage()
+                .persistent()
+                .get::<_, ScheduledMaintenance>(&DataKey::MaintenanceSchedule(asset_id))
+            {
+                if env.ledger().timestamp() > schedule.next_service_due {
+                    let days_overdue =
+                        (env.ledger().timestamp() - schedule.next_service_due) / 86400;
+                    let penalty = (days_overdue as u32 * 2).min(30);
+                    score = score.saturating_sub(penalty);
+                }
             }
-        }
 
-        score.clamp(0, 100)
+            score.clamp(0, 100)
+        };
+
+        let stats = AssetStats {
+            total_cost,
+            total_downtime_hours: total_downtime,
+            service_count,
+            health_score,
+        };
+        env.storage()
+            .persistent()
+            .set(&DataKey::AssetStats(asset_id), &stats);
+        ttl::extend_persistent(env, &DataKey::AssetStats(asset_id));
+
+        stats
     }
 
     fn verify_asset_exists(_env: &Env, _asset_id: u64) -> bool {

@@ -15,7 +15,7 @@ crate is under discussion in [SC-46].
 
 - An asset has exactly one owner at any time.
 - An asset id is unique; re-registering an existing id fails with
-  `AssetAlreadyExists`.
+  `AlreadyExists`.
 - A retired asset cannot be transferred or updated.
 - For a tokenized asset, the sum of all holder balances equals the total token
   supply.
@@ -117,7 +117,7 @@ Reads: `get_asset`, `get_asset_info`, `batch_get_asset_info`,
 | `assign_asset_to_branch` | admin or branch admin |
 | `get_branch`, `get_branch_assets` | — |
 
-`assign_asset_to_branch` rejects an unknown branch (`BranchNotFound`) and an
+`assign_asset_to_branch` rejects an unknown branch (`NotFound`) and an
 unknown asset (`AssetNotFound`), so an asset can never be pointed at a stale or
 misspelled branch id.
 

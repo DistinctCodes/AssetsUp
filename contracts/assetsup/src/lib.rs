@@ -11,7 +11,7 @@
 //! ## Invariants
 //!
 //! - An asset has exactly one owner at any time.
-//! - An asset id is unique; re-registering fails with `Error::AssetAlreadyExists`.
+//! - An asset id is unique; re-registering fails with `Error::AlreadyExists`.
 //! - A retired asset cannot be transferred or updated.
 //! - For a tokenized asset, holder balances sum to the total token supply.
 //!
@@ -75,6 +75,9 @@ pub enum DataKey {
     PendingAdmin,
     ScheduledTransfer(BytesN<32>),
     PendingApproval(BytesN<32>),
+    /// A WASM hash the admin has approved for `upgrade`. Only hashes present
+    /// and set to `true` here may be swapped in. See `contracts/UPGRADE.md`.
+    ApprovedWasmHash(BytesN<32>),
 }
 
 #[contract]
@@ -213,7 +216,7 @@ impl AssetUpContract {
 
         // Check if asset already exists
         if store.has(&key) {
-            return Err(Error::AssetAlreadyExists);
+            return Err(Error::AlreadyExists);
         }
 
         // Store asset
@@ -264,17 +267,17 @@ impl AssetUpContract {
     fn validate_asset(env: &Env, asset: &asset::Asset) -> Result<(), Error> {
         // Validate asset name length (3-100 characters)
         if asset.name.len() < 3 || asset.name.len() > 100 {
-            return Err(Error::InvalidAssetName);
+            return Err(Error::InvalidInput);
         }
 
         // Validate purchase value is non-negative
         if asset.purchase_value < 0 {
-            return Err(Error::InvalidPurchaseValue);
+            return Err(Error::InvalidInput);
         }
 
         // Validate metadata URI format (basic check for IPFS hash format)
         if !asset.metadata_uri.is_empty() && !Self::is_valid_metadata_uri(&asset.metadata_uri) {
-            return Err(Error::InvalidMetadataUri);
+            return Err(Error::InvalidInput);
         }
 
         // Validate owner address is not zero address
@@ -337,7 +340,7 @@ impl AssetUpContract {
 
         if let Some(metadata_uri) = new_metadata_uri {
             if !metadata_uri.is_empty() && !Self::is_valid_metadata_uri(&metadata_uri) {
-                return Err(Error::InvalidMetadataUri);
+                return Err(Error::InvalidInput);
             }
             asset.metadata_uri = metadata_uri;
         }
@@ -563,7 +566,7 @@ impl AssetUpContract {
         let key = branch::DataKey::Branch(branch.id.clone());
         let store = env.storage().persistent();
         if store.has(&key) {
-            return Err(Error::BranchAlreadyExists);
+            return Err(Error::AlreadyExists);
         }
         store.set(&key, &branch);
         ttl::extend_persistent(&env, &key);
@@ -597,7 +600,7 @@ impl AssetUpContract {
         let asset_key = asset::DataKey::Asset(asset_id.clone());
         let store = env.storage().persistent();
 
-        let branch: branch::Branch = store.get(&branch_key).ok_or(Error::BranchNotFound)?;
+        let branch: branch::Branch = store.get(&branch_key).ok_or(Error::NotFound)?;
         if !store.has(&asset_key) {
             return Err(Error::AssetNotFound);
         }
@@ -608,8 +611,7 @@ impl AssetUpContract {
         }
 
         let list_key = branch::DataKey::AssetList(branch_id.clone());
-        let mut assets: Vec<BytesN<32>> =
-            store.get(&list_key).unwrap_or_else(|| Vec::new(&env));
+        let mut assets: Vec<BytesN<32>> = store.get(&list_key).unwrap_or_else(|| Vec::new(&env));
         if !assets.iter().any(|x| x == asset_id) {
             assets.push_back(asset_id.clone());
             store.set(&list_key, &assets);
@@ -630,7 +632,7 @@ impl AssetUpContract {
                 ttl::extend_persistent(&env, &key);
                 Ok(b)
             }
-            None => Err(Error::BranchNotFound),
+            None => Err(Error::NotFound),
         }
     }
 
@@ -786,11 +788,74 @@ impl AssetUpContract {
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
 
+        // Only a hash the admin has explicitly approved may be swapped in. This
+        // turns a single compromised admin key into two separately observable
+        // transactions: the approval (which can be monitored and alarmed on
+        // off-chain) and the swap.
+        Self::require_wasm_hash_approved(&env, &new_wasm_hash)?;
+
         env.deployer()
             .update_current_contract_wasm(new_wasm_hash.clone());
 
         upgrade::emit_upgraded(&env, &admin, &new_wasm_hash, upgrade::CURRENT_VERSION);
         Ok(())
+    }
+
+    /// Adds a WASM hash to the upgrade allowlist.
+    ///
+    /// Admin-gated. Approving is deliberately a separate transaction from
+    /// [`Self::upgrade`] so that the intent to install a given build is
+    /// auditable on its own.
+    pub fn approve_wasm_hash(env: Env, wasm_hash: BytesN<32>) -> Result<(), Error> {
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::ApprovedWasmHash(wasm_hash.clone()), &true);
+        ttl::extend_persistent(&env, &DataKey::ApprovedWasmHash(wasm_hash.clone()));
+
+        events::wasm_hash_approved(&env, &admin, &wasm_hash);
+        Ok(())
+    }
+
+    /// Removes a WASM hash from the upgrade allowlist.
+    ///
+    /// Admin-gated. Revoking is a no-op for a hash that was never approved;
+    /// the flag is simply written `false`.
+    pub fn revoke_wasm_hash(env: Env, wasm_hash: BytesN<32>) -> Result<(), Error> {
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::ApprovedWasmHash(wasm_hash.clone()), &false);
+        ttl::extend_persistent(&env, &DataKey::ApprovedWasmHash(wasm_hash.clone()));
+
+        events::wasm_hash_revoked(&env, &admin, &wasm_hash);
+        Ok(())
+    }
+
+    /// Returns whether a WASM hash is currently approved for `upgrade`.
+    pub fn is_wasm_hash_approved(env: Env, wasm_hash: BytesN<32>) -> bool {
+        env.storage()
+            .persistent()
+            .get(&DataKey::ApprovedWasmHash(wasm_hash))
+            .unwrap_or(false)
+    }
+
+    /// Rejects a WASM hash that is not on the admin-approved allowlist.
+    fn require_wasm_hash_approved(env: &Env, wasm_hash: &BytesN<32>) -> Result<(), Error> {
+        if env
+            .storage()
+            .persistent()
+            .get(&DataKey::ApprovedWasmHash(wasm_hash.clone()))
+            .unwrap_or(false)
+        {
+            Ok(())
+        } else {
+            Err(Error::WasmHashNotApproved)
+        }
     }
 
     /// Brings stored data up to the layout this build expects.
@@ -1306,10 +1371,7 @@ impl AssetUpContract {
 
     /// Emit an on-chain expiry reminder for a policy nearing its end date
     /// (permissionless; only fires inside the reminder window)
-    pub fn emit_insurance_expiry_reminder(
-        env: Env,
-        policy_id: BytesN<32>,
-    ) -> Result<(), Error> {
+    pub fn emit_insurance_expiry_reminder(env: Env, policy_id: BytesN<32>) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
 
         insurance::emit_expiry_reminder(env, policy_id)

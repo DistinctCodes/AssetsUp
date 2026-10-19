@@ -16,6 +16,13 @@ use soroban_sdk::{contracterror, panic_with_error, Env};
 /// A published code is permanent. Retiring a variant leaves its number unused;
 /// it is never reassigned, because a backend built against the old meaning
 /// would silently misinterpret the new one.
+///
+/// ## Size limit
+///
+/// Soroban's contract spec caps a `#[contracterror]` enum at 50 cases. Several
+/// narrow, single-subject variants were therefore folded into generic ones
+/// (`AlreadyExists`, `NotFound`, `InvalidInput`) rather than pushing the enum
+/// over the limit; the retired codes are left as gaps.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
@@ -46,16 +53,14 @@ pub enum Error {
     // ---------------------------------------------------------------
     /// No admin is stored, so the contract is not usable.
     AdminNotFound = 100,
-    /// An asset with this id is already registered.
-    AssetAlreadyExists = 101,
+    /// An entity with this id already exists. Generic across the asset,
+    /// branch, subscription, lease, policy, and claim registries.
+    AlreadyExists = 101,
     /// No asset is registered under this id.
     AssetNotFound = 102,
-    /// A branch with this id already exists.
-    BranchAlreadyExists = 103,
-    /// No branch is registered under this id.
-    BranchNotFound = 104,
-    /// A subscription already exists for this account.
-    SubscriptionAlreadyExists = 105,
+    // 103 `BranchAlreadyExists` retired — folded into `AlreadyExists`.
+    // 104 `BranchNotFound` retired — folded into `NotFound`.
+    // 105 `SubscriptionAlreadyExists` retired — folded into `AlreadyExists`.
     /// The payment supplied is missing or does not cover the amount due.
     InvalidPayment = 106,
     /// The contract has not been initialized with its metadata.
@@ -70,8 +75,7 @@ pub enum Error {
     AssetNotTokenized = 121,
     /// The requested total supply is zero or negative.
     InvalidTokenSupply = 122,
-    /// The requested decimal precision is outside the permitted range.
-    InvalidTokenDecimals = 123,
+    // 123 `InvalidTokenDecimals` retired — folded into `InvalidInput`.
     /// The holder's balance is lower than the amount requested.
     InsufficientBalance = 124,
     /// Fewer tokens are locked than the amount being unlocked.
@@ -100,8 +104,7 @@ pub enum Error {
     InsufficientVotingPower = 140,
     /// This address has already voted on this proposal.
     AlreadyVoted = 141,
-    /// No proposal exists under this id.
-    ProposalNotFound = 142,
+    // 142 `ProposalNotFound` retired — folded into `NotFound`.
     /// The proposal is malformed or in a state that does not allow this action.
     InvalidProposal = 143,
     /// The voting period for this proposal has closed.
@@ -131,22 +134,17 @@ pub enum Error {
     // ---------------------------------------------------------------
     // Validation: 170–179
     // ---------------------------------------------------------------
-    /// The asset name is empty or too long.
-    InvalidAssetName = 170,
-    /// The purchase value is negative.
-    InvalidPurchaseValue = 171,
-    /// The metadata URI is empty or malformed.
-    InvalidMetadataUri = 172,
+    // 170 `InvalidAssetName` retired — folded into `InvalidInput`.
+    // 171 `InvalidPurchaseValue` retired — folded into `InvalidInput`.
+    // 172 `InvalidMetadataUri` retired — folded into `InvalidInput`.
     /// The owner address is the zero address, or otherwise not usable.
     InvalidOwnerAddress = 173,
 
     // ---------------------------------------------------------------
     // Leasing and insurance: 180–199
     // ---------------------------------------------------------------
-    /// No lease exists under this id.
-    LeaseNotFound = 180,
-    /// A lease already exists under this id.
-    LeaseAlreadyExists = 181,
+    // 180 `LeaseNotFound` retired — folded into `NotFound`.
+    // 181 `LeaseAlreadyExists` retired — folded into `AlreadyExists`.
     /// The asset is already out on an active lease.
     AssetAlreadyLeased = 182,
     /// The lease is not in a state that permits this action.
@@ -172,10 +170,15 @@ pub enum Error {
     InvalidPolicyTerms = 192,
     /// The claim amount is zero, negative, or above the policy coverage.
     InvalidClaimAmount = 193,
-    /// A policy with this id already exists.
-    PolicyAlreadyExists = 194,
-    /// A claim with this id already exists.
-    ClaimAlreadyExists = 195,
+    // 194 `PolicyAlreadyExists` retired — folded into `AlreadyExists`.
+    // 195 `ClaimAlreadyExists` retired — folded into `AlreadyExists`.
+
+    // ---------------------------------------------------------------
+    // Upgrade: 196–199
+    // ---------------------------------------------------------------
+    /// The WASM hash passed to `upgrade` is not on the admin-approved allowlist.
+    /// The admin must `approve_wasm_hash` in a separate transaction first.
+    WasmHashNotApproved = 196,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
@@ -185,7 +188,7 @@ pub fn handle_error(env: &Env, error: Error) -> ! {
 #[allow(dead_code)]
 pub fn dummy_function(_env: Env, asset_exists: bool) -> Result<(), Error> {
     if asset_exists {
-        Err(Error::AssetAlreadyExists)
+        Err(Error::AlreadyExists)
     } else {
         Ok(())
     }
@@ -200,7 +203,7 @@ mod tests {
     fn test_dummy_function_asset_exists() {
         let env = Env::default();
         let result = dummy_function(env.clone(), true);
-        assert_eq!(result, Err(Error::AssetAlreadyExists));
+        assert_eq!(result, Err(Error::AlreadyExists));
     }
 
     #[test]
@@ -230,17 +233,13 @@ mod tests {
         // identifies assetsup as its origin.
         let codes = [
             Error::AdminNotFound as u32,
-            Error::AssetAlreadyExists as u32,
+            Error::AlreadyExists as u32,
             Error::AssetNotFound as u32,
-            Error::BranchAlreadyExists as u32,
-            Error::BranchNotFound as u32,
-            Error::SubscriptionAlreadyExists as u32,
             Error::InvalidPayment as u32,
             Error::ContractNotInitialized as u32,
             Error::AssetAlreadyTokenized as u32,
             Error::AssetNotTokenized as u32,
             Error::InvalidTokenSupply as u32,
-            Error::InvalidTokenDecimals as u32,
             Error::InsufficientBalance as u32,
             Error::InsufficientLockedTokens as u32,
             Error::TokensAreLocked as u32,
@@ -252,7 +251,6 @@ mod tests {
             Error::DuplicateTokenSymbol as u32,
             Error::InsufficientVotingPower as u32,
             Error::AlreadyVoted as u32,
-            Error::ProposalNotFound as u32,
             Error::InvalidProposal as u32,
             Error::VotingPeriodEnded as u32,
             Error::NoDividendsToClaim as u32,
@@ -261,26 +259,20 @@ mod tests {
             Error::DetokenizationAlreadyProposed as u32,
             Error::InvalidValuation as u32,
             Error::DetokenizationCooldownActive as u32,
-            Error::InvalidAssetName as u32,
-            Error::InvalidPurchaseValue as u32,
-            Error::InvalidMetadataUri as u32,
             Error::InvalidOwnerAddress as u32,
-            Error::LeaseNotFound as u32,
-            Error::LeaseAlreadyExists as u32,
             Error::AssetAlreadyLeased as u32,
             Error::InvalidLeaseStatus as u32,
             Error::LeaseAlreadyStarted as u32,
             Error::LeaseNotExpired as u32,
             Error::InvalidTimestamps as u32,
+            Error::ExpiryReminderNotDue as u32,
             Error::PolicyNotFound as u32,
             Error::ClaimNotFound as u32,
             Error::InvalidPolicyStatus as u32,
             Error::InvalidClaimStatus as u32,
             Error::InvalidPolicyTerms as u32,
             Error::InvalidClaimAmount as u32,
-            Error::PolicyAlreadyExists as u32,
-            Error::ClaimAlreadyExists as u32,
-            Error::ExpiryReminderNotDue as u32,
+            Error::WasmHashNotApproved as u32,
         ];
 
         for code in codes {
@@ -289,5 +281,67 @@ mod tests {
                 "assetsup error code is outside its allocated 100-199 block"
             );
         }
+    }
+
+    #[test]
+    fn the_error_enum_fits_the_contract_spec_limit() {
+        // The contract spec caps a `#[contracterror]` enum at 50 cases; going
+        // over makes the whole crate fail to compile. Keep this guard so the
+        // limit is caught here instead of in a cryptic macro panic.
+        let cases = [
+            Error::AlreadyInitialized as u32,
+            Error::NotInitialized as u32,
+            Error::Unauthorized as u32,
+            Error::InvalidInput as u32,
+            Error::NotFound as u32,
+            Error::ContractPaused as u32,
+            Error::MathOverflow as u32,
+            Error::MathUnderflow as u32,
+            Error::AdminNotFound as u32,
+            Error::AlreadyExists as u32,
+            Error::AssetNotFound as u32,
+            Error::InvalidPayment as u32,
+            Error::ContractNotInitialized as u32,
+            Error::AssetAlreadyTokenized as u32,
+            Error::AssetNotTokenized as u32,
+            Error::InvalidTokenSupply as u32,
+            Error::InsufficientBalance as u32,
+            Error::InsufficientLockedTokens as u32,
+            Error::TokensAreLocked as u32,
+            Error::TransferRestrictionFailed as u32,
+            Error::NotWhitelisted as u32,
+            Error::AccreditedInvestorRequired as u32,
+            Error::GeographicRestriction as u32,
+            Error::HolderNotFound as u32,
+            Error::DuplicateTokenSymbol as u32,
+            Error::InsufficientVotingPower as u32,
+            Error::AlreadyVoted as u32,
+            Error::InvalidProposal as u32,
+            Error::VotingPeriodEnded as u32,
+            Error::NoDividendsToClaim as u32,
+            Error::InvalidDividendAmount as u32,
+            Error::DetokenizationNotApproved as u32,
+            Error::DetokenizationAlreadyProposed as u32,
+            Error::InvalidValuation as u32,
+            Error::DetokenizationCooldownActive as u32,
+            Error::InvalidOwnerAddress as u32,
+            Error::AssetAlreadyLeased as u32,
+            Error::InvalidLeaseStatus as u32,
+            Error::LeaseAlreadyStarted as u32,
+            Error::LeaseNotExpired as u32,
+            Error::InvalidTimestamps as u32,
+            Error::ExpiryReminderNotDue as u32,
+            Error::PolicyNotFound as u32,
+            Error::ClaimNotFound as u32,
+            Error::InvalidPolicyStatus as u32,
+            Error::InvalidClaimStatus as u32,
+            Error::InvalidPolicyTerms as u32,
+            Error::InvalidClaimAmount as u32,
+            Error::WasmHashNotApproved as u32,
+        ];
+        assert!(
+            cases.len() <= 50,
+            "the assetsup Error enum exceeds the 50-case contract spec limit"
+        );
     }
 }

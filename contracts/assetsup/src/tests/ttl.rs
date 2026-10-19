@@ -142,12 +142,11 @@ fn bump_asset_ttl_keeps_an_inactive_tokenized_asset_alive() {
         advance_ledgers(&env, 70 * LEDGERS_PER_DAY);
     }
 
-    let tokenized = client
-        .get_tokenized_asset(&1u64)
-        .expect("a bumped asset must still be readable");
+    // A bumped asset must still be readable.
+    let tokenized = client.get_tokenized_asset(&1u64);
     assert_eq!(tokenized.total_supply, 1000);
     // The holder balance entry must survive too, not just the asset record.
-    assert_eq!(client.get_token_balance(&1u64, &tokenizer).unwrap(), 1000);
+    assert_eq!(client.get_token_balance(&1u64, &tokenizer), 1000);
 }
 
 #[test]

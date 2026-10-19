@@ -404,6 +404,26 @@ pub struct ContractMigrated {
     pub timestamp: u64,
 }
 
+/// A WASM hash was added to the upgrade allowlist.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WasmHashApproved {
+    #[topic]
+    pub admin: Address,
+    pub wasm_hash: BytesN<32>,
+    pub timestamp: u64,
+}
+
+/// A WASM hash was removed from the upgrade allowlist.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WasmHashRevoked {
+    #[topic]
+    pub admin: Address,
+    pub wasm_hash: BytesN<32>,
+    pub timestamp: u64,
+}
+
 // ---------------------------------------------------------------------------
 // Emission helpers
 // ---------------------------------------------------------------------------
@@ -761,6 +781,24 @@ pub fn contract_migrated(env: &Env, from_version: u32, to_version: u32) {
     ContractMigrated {
         from_version,
         to_version,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn wasm_hash_approved(env: &Env, admin: &Address, wasm_hash: &BytesN<32>) {
+    WasmHashApproved {
+        admin: admin.clone(),
+        wasm_hash: wasm_hash.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn wasm_hash_revoked(env: &Env, admin: &Address, wasm_hash: &BytesN<32>) {
+    WasmHashRevoked {
+        admin: admin.clone(),
+        wasm_hash: wasm_hash.clone(),
         timestamp: env.ledger().timestamp(),
     }
     .publish(env);
