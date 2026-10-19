@@ -94,6 +94,8 @@ fn test_maintenance_lifecycle() {
         documents_ipfs: vec![&env, String::from_str(&env, "ipfs://abc")],
         quality_rating: 10,
         timestamp: env.ledger().timestamp(),
+        voided: false,
+        amended: false,
     };
 
     client.add_maintenance_record(&record);
@@ -251,6 +253,8 @@ fn test_unauthorized_maintenance_logging() {
         documents_ipfs: vec![&env],
         quality_rating: 10,
         timestamp: env.ledger().timestamp(),
+        voided: false,
+        amended: false,
     };
 
     // Attempt to add record with unauthorized provider should fail
@@ -461,6 +465,8 @@ fn test_aggregate_functions_single_record() {
         documents_ipfs: vec![&env, String::from_str(&env, "ipfs://abc")],
         quality_rating: 10,
         timestamp: env.ledger().timestamp(),
+        voided: false,
+        amended: false,
     };
     client.add_maintenance_record(&record);
 

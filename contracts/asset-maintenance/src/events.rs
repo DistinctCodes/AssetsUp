@@ -5,7 +5,7 @@
 //! `lower_snake_case`. `asset_id` is always a `#[topic]` so consumers can index
 //! per asset.
 
-use soroban_sdk::{contractevent, Address, Env};
+use soroban_sdk::{contractevent, Address, Env, String};
 
 use crate::{AlertSeverity, AlertType, MaintenanceAlert, MaintenanceRecord, ScheduledMaintenance};
 
@@ -141,6 +141,66 @@ pub struct AlertAcknowledged {
     pub timestamp: u64,
 }
 
+/// The contract was paused; new maintenance records now reject.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractPaused {
+    #[topic]
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
+/// The contract was unpaused and resumed normal operation.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractUnpaused {
+    #[topic]
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
+/// A previously recorded maintenance entry was voided.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaintenanceRecordVoided {
+    #[topic]
+    pub asset_id: u64,
+    pub record_id: u64,
+    pub voided_by: Address,
+    pub timestamp: u64,
+}
+
+/// A previously recorded maintenance entry was amended.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaintenanceRecordAmended {
+    #[topic]
+    pub asset_id: u64,
+    pub record_id: u64,
+    pub amended_by: Address,
+    pub timestamp: u64,
+}
+
+/// An asset was marked detokenized/burned and accepts no new maintenance.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AssetDetokenized {
+    #[topic]
+    pub asset_id: u64,
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
+/// A detokenized asset was reactivated.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AssetReactivated {
+    #[topic]
+    pub asset_id: u64,
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
 // ---------------------------------------------------------------------------
 // Emission helpers
 // ---------------------------------------------------------------------------
@@ -259,6 +319,60 @@ pub fn alert_acknowledged(env: &Env, asset_id: u64, alert_index: u32, by: &Addre
         asset_id,
         alert_index,
         acknowledged_by: by.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn contract_paused(env: &Env, admin: &Address) {
+    ContractPaused {
+        admin: admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn contract_unpaused(env: &Env, admin: &Address) {
+    ContractUnpaused {
+        admin: admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn maintenance_record_voided(env: &Env, asset_id: u64, record_id: u64, by: &Address) {
+    MaintenanceRecordVoided {
+        asset_id,
+        record_id,
+        voided_by: by.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn maintenance_record_amended(env: &Env, asset_id: u64, record_id: u64, by: &Address) {
+    MaintenanceRecordAmended {
+        asset_id,
+        record_id,
+        amended_by: by.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn asset_detokenized(env: &Env, asset_id: u64, admin: &Address) {
+    AssetDetokenized {
+        asset_id,
+        admin: admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn asset_reactivated(env: &Env, asset_id: u64, admin: &Address) {
+    AssetReactivated {
+        asset_id,
+        admin: admin.clone(),
         timestamp: env.ledger().timestamp(),
     }
     .publish(env);

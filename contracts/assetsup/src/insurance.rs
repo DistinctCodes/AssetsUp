@@ -112,7 +112,7 @@ pub fn create_policy(env: Env, policy: InsurancePolicy) -> Result<(), Error> {
 
     // Check if policy already exists
     if store.has(&key) {
-        return Err(Error::PolicyAlreadyExists);
+        return Err(Error::AlreadyExists);
     }
 
     // Store the policy
@@ -308,7 +308,7 @@ pub fn file_insurance_claim(env: Env, claim: InsuranceClaim) -> Result<(), Error
     // Verify claim doesn't already exist
     let claim_key = DataKey::Claim(claim.claim_id.clone());
     if store.has(&claim_key) {
-        return Err(Error::ClaimAlreadyExists);
+        return Err(Error::AlreadyExists);
     }
 
     // Verify claim status is Submitted

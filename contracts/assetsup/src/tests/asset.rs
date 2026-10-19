@@ -81,7 +81,7 @@ fn test_register_asset_unauthorized() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #170)")]
+#[should_panic(expected = "Error(Contract, #4)")]
 fn test_register_asset_invalid_name_too_short() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -98,7 +98,7 @@ fn test_register_asset_invalid_name_too_short() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #171)")]
+#[should_panic(expected = "Error(Contract, #4)")]
 fn test_register_asset_invalid_purchase_value() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);
@@ -408,7 +408,7 @@ fn test_register_branch_and_assign_asset() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #104)")]
+#[should_panic(expected = "Error(Contract, #5)")]
 fn test_assign_asset_to_unknown_branch_fails() {
     let env = create_env();
     let (admin, user1, _, _) = create_mock_addresses(&env);

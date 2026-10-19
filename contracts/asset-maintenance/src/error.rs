@@ -42,6 +42,14 @@ pub enum Error {
     AssetNotFound = 508,
     /// Invalid date / cost / rating arguments.
     InvalidArguments = 509,
+    /// A record that has already been voided cannot be voided again.
+    RecordAlreadyVoided = 510,
+    /// No maintenance record with that id exists for the asset.
+    RecordNotFound = 511,
+    /// A voided record can no longer be amended.
+    RecordVoided = 512,
+    /// The asset has been detokenized/burned and accepts no new maintenance.
+    AssetDetokenized = 513,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
@@ -67,6 +75,10 @@ mod tests {
             Error::AlertIndexOutOfBounds as u32,
             Error::AssetNotFound as u32,
             Error::InvalidArguments as u32,
+            Error::RecordAlreadyVoided as u32,
+            Error::RecordNotFound as u32,
+            Error::RecordVoided as u32,
+            Error::AssetDetokenized as u32,
         ] {
             assert!((500..600).contains(&code));
         }

@@ -86,6 +86,8 @@ fn record(
         documents_ipfs: vec![env, String::from_str(env, "ipfs://doc")],
         quality_rating: quality,
         timestamp: NOW,
+        voided: false,
+        amended: false,
     }
 }
 

@@ -42,7 +42,7 @@ fn load_lease(env: &Env, lease_id: &BytesN<32>) -> Result<Lease, Error> {
     env.storage()
         .persistent()
         .get(&DataKey::Lease(lease_id.clone()))
-        .ok_or(Error::LeaseNotFound)
+        .ok_or(Error::NotFound)
 }
 
 fn save_lease(env: &Env, lease: &Lease) {
@@ -102,7 +102,7 @@ pub fn create_lease(
         .persistent()
         .has(&DataKey::Lease(lease_id.clone()))
     {
-        return Err(Error::LeaseAlreadyExists);
+        return Err(Error::AlreadyExists);
     }
 
     // Asset must not already have an Active lease

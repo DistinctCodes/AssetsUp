@@ -126,6 +126,80 @@ fn migration_preserves_the_whole_registry() {
     assert!(client.is_authorized_registrar(&admin));
 }
 
+// ---------------------------------------------------------------------------
+// Upgrade allowlist (#1496)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn upgrade_of_an_unapproved_wasm_hash_is_rejected() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    let hash = placeholder_wasm_hash(&env);
+
+    let res = client.try_upgrade(&hash);
+    assert!(
+        res.is_err(),
+        "an unapproved WASM hash must not be installable"
+    );
+}
+
+#[test]
+fn approving_a_hash_puts_it_on_the_allowlist() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    let hash = placeholder_wasm_hash(&env);
+
+    assert!(!client.is_wasm_hash_approved(&hash));
+    client.approve_wasm_hash(&hash);
+    assert!(client.is_wasm_hash_approved(&hash));
+}
+
+#[test]
+fn revoking_a_hash_takes_it_off_the_allowlist() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    let hash = placeholder_wasm_hash(&env);
+
+    client.approve_wasm_hash(&hash);
+    client.revoke_wasm_hash(&hash);
+
+    assert!(!client.is_wasm_hash_approved(&hash));
+}
+
+#[test]
+fn approving_a_wasm_hash_requires_the_admins_authorization() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    let hash = placeholder_wasm_hash(&env);
+
+    env.set_auths(&[]);
+    assert!(client.try_approve_wasm_hash(&hash).is_err());
+    assert!(
+        !client.is_wasm_hash_approved(&hash),
+        "an unauthorized approval must not take effect"
+    );
+}
+
+#[test]
+fn the_allowlist_gate_reports_its_own_error() {
+    // The allowlist is checked before `update_current_contract_wasm`, so the
+    // exact contract error is observable even though the native test
+    // environment cannot run the WASM swap itself.
+    let env = create_env();
+    let contract_id = env.register(AssetUpContract, ());
+    let hash = placeholder_wasm_hash(&env);
+
+    let result = env.as_contract(&contract_id, || {
+        AssetUpContract::require_wasm_hash_approved(&env, &hash)
+    });
+
+    assert_eq!(result, Err(crate::error::Error::WasmHashNotApproved));
+}
+
 #[test]
 fn migrate_requires_the_admins_authorization() {
     let env = create_env();
