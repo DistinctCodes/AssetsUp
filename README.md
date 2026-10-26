@@ -260,3 +260,11 @@ deployment:
 ```bash
 docker build --target production -t assetsup-backend ./backend
 ```
+
+---
+
+## Documentation
+
+- [On-Chain Contract Integration](docs/onchain-integration.md) — comprehensive guide connecting backend services and frontend wallets to Soroban smart contracts, architecture sequence diagrams, environment variable tables, error taxonomy mapping, and testnet registration walkthrough.
+- [Contracts Architecture & Crate Map](contracts/README.md) — overview of `assetsup`, `contrib`, `multisig-wallet`, `multisig-transfer`, and `asset-maintenance` smart contracts.
+- [Contract Error Taxonomy](contracts/ERRORS.md) — numeric error code allocations across all contracts.
