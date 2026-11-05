@@ -248,3 +248,15 @@ cargo test -p contrib
 
 All tests live in [`src/tests/`](src/tests/); nothing outside it is compiled
 into test builds.
+
+## Deployment
+
+Deployment and initialization of `contrib` is handled via the unified workspace script:
+
+```sh
+cd contracts
+./scripts/deploy.sh --network testnet --source alice
+```
+
+See [`contracts/scripts/README.md`](../scripts/README.md) for full usage and configuration details.
+
