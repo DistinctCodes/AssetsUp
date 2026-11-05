@@ -19,6 +19,21 @@ defaults:
     working-directory: contracts # 👈 all cargo commands run in contracts/
 
 jobs:
+  lockfile:
+    name: Lockfile Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read pinned toolchain
+        id: toolchain
+        run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+      - name: Verify Cargo.lock is in sync
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
   format:
     name: Format Check
     runs-on: ubuntu-latest
@@ -59,7 +74,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
   test:
     name: Test Suite
@@ -85,7 +100,7 @@ jobs:
             ${{ runner.os }}-cargo-test-
             ${{ runner.os }}-cargo-
       - name: Run tests
-        run: cargo test --all --verbose
+        run: cargo test --locked --all --verbose
 
   build:
     name: Build Check
@@ -111,7 +126,7 @@ jobs:
             ${{ runner.os }}-cargo-build-
             ${{ runner.os }}-cargo-
       - name: Build all crates
-        run: cargo build --all --verbose
+        run: cargo build --locked --all --verbose
 
   build-wasm:
     name: Build WASM
@@ -140,7 +155,7 @@ jobs:
       # Every crate declares a cdylib crate-type and a #[contract] entrypoint,
       # so all five are deployable and all five must be size-checked.
       - name: Build all contracts to WASM
-        run: cargo build --workspace --target wasm32-unknown-unknown --release --verbose
+        run: cargo build --locked --workspace --target wasm32-unknown-unknown --release --verbose
 
       - name: Check WASM size budgets
         run: ./scripts/check-wasm-size.sh | tee "$GITHUB_STEP_SUMMARY"
@@ -185,7 +200,7 @@ jobs:
 
       - name: Measure this branch
         run: |
-          cargo build --workspace --target wasm32-unknown-unknown --release
+          cargo build --locked --workspace --target wasm32-unknown-unknown --release
           ./scripts/check-wasm-size.sh --json > /tmp/head-sizes.json
           cat /tmp/head-sizes.json
 
@@ -194,7 +209,7 @@ jobs:
           git stash --include-untracked || true
           git fetch origin "${{ github.base_ref }}" --depth=1
           git checkout "origin/${{ github.base_ref }}" -- .
-          cargo build --workspace --target wasm32-unknown-unknown --release
+          cargo build --locked --workspace --target wasm32-unknown-unknown --release
           ./scripts/check-wasm-size.sh --json > /tmp/base-sizes.json || echo '{}' > /tmp/base-sizes.json
           cat /tmp/base-sizes.json
 
