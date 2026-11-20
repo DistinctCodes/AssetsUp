@@ -109,10 +109,10 @@ workspace: every acting address is authenticated.
 | `register_asset` | `registrar` | ✅ |
 | `transfer_asset` | `caller` | ✅ |
 | `retire_asset` | `caller` | ✅ |
-| `add_authorized_registrar` / `add_registrar` | `caller`, must be admin | ✅ |
-| `remove_authorized_registrar` / `remove_registrar` | `caller`, must be admin | ✅ |
+| `add_authorized_registrar` | `caller`, must be admin | ✅ |
+| `remove_authorized_registrar` | `caller`, must be admin | ✅ |
 | `pause_contract`, `unpause_contract` | `caller`, must be admin | ✅ |
-| `get_admin`, `get_asset`, `get_asset_info`, `get_assets_by_owner`, `get_total_count`, `get_total_asset_count`, `is_authorized_registrar`, `get_audit_logs`, `is_paused` | — | 📖 |
+| `get_admin`, `get_asset`, `get_asset_info`, `get_assets_by_owner`, `get_total_count`, `is_authorized_registrar`, `get_audit_logs`, `is_paused` | — | 📖 |
 
 Only `initialize` was unguarded, and it is now authenticated.
 

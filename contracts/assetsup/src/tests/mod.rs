@@ -10,6 +10,7 @@ mod auth;
 mod initialization;
 mod pause;
 mod pause_ttl;
+mod paging;
 
 // Tokenization and ownership tests
 mod detokenization;

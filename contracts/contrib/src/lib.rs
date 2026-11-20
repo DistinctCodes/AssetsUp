@@ -163,23 +163,11 @@ impl ContribContract {
             .unwrap_or(false)
     }
 
-    pub fn add_registrar(env: Env, caller: Address, registrar: Address) {
-        Self::add_authorized_registrar(env, caller, registrar);
-    }
-
-    pub fn remove_registrar(env: Env, caller: Address, registrar: Address) {
-        Self::remove_authorized_registrar(env, caller, registrar);
-    }
-
     pub fn get_total_count(env: Env) -> u64 {
         env.storage()
             .persistent()
             .get(&DataKey::TotalCount)
             .unwrap_or(0)
-    }
-
-    pub fn get_total_asset_count(env: Env) -> u64 {
-        Self::get_total_count(env)
     }
 
     /// Asset Registry Functions
