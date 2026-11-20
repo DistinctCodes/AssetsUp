@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Plus, Search, SlidersHorizontal, MapPin, X, Package, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { CreateAssetModal } from "@/components/assets/create-asset-modal";
+import { useUrlState } from "@/hooks/useUrlState";
 import { useAssets } from "@/lib/query/hooks/useAssets";
 import { useLocations } from "@/lib/query/hooks/useLocations";
 import { AssetStatus, AssetCondition } from "@/lib/query/types/asset";
@@ -57,41 +58,41 @@ function SortableHeader({
 
 export default function AssetsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [showModal, setShowModal] = useState(false);
-  // Filters, sort and page live in the URL so a view survives a refresh and
-  // can be shared.
-  const [search, setSearch] = useState(searchParams.get("q") || "");
-  const [status, setStatus] = useState(searchParams.get("status") || "");
-  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
-  const [locationId, setLocationId] = useState(searchParams.get("locationId") || "");
-  const [sortBy, setSortBy] = useState(searchParams.get("sortBy") || DEFAULT_SORT);
-  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">(
-    searchParams.get("order") === "ASC" ? "ASC" : "DESC",
-  );
+  // Filters, sort and page live in the URL (see useUrlState) so a view
+  // survives a refresh, Back/forward, and can be shared. Changing any filter
+  // resets the page to 1.
+  const [url, setUrl] = useUrlState({
+    q: "",
+    status: "",
+    locationId: "",
+    page: "1",
+    sortBy: DEFAULT_SORT,
+    order: "DESC",
+  });
+  const search = url.q;
+  const status = url.status;
+  const locationId = url.locationId;
+  const page = Number(url.page) || 1;
+  const sortBy = url.sortBy;
+  const sortOrder: "ASC" | "DESC" = url.order === "ASC" ? "ASC" : "DESC";
 
+  // The input is edited locally and written to the URL after a short pause, so
+  // typing does not push a history entry per keystroke.
+  const [searchInput, setSearchInput] = useState(search);
+  useEffect(() => setSearchInput(search), [search]);
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (search) params.set("q", search);
-    if (status) params.set("status", status);
-    if (locationId) params.set("locationId", locationId);
-    if (page > 1) params.set("page", String(page));
-    if (sortBy !== DEFAULT_SORT || sortOrder !== "DESC") {
-      params.set("sortBy", sortBy);
-      params.set("order", sortOrder);
-    }
-    const qs = params.toString();
-    router.replace(qs ? `/assets?${qs}` : "/assets", { scroll: false });
-  }, [search, status, locationId, page, sortBy, sortOrder, router]);
+    if (searchInput === search) return;
+    const t = setTimeout(() => setUrl({ q: searchInput }), 300);
+    return () => clearTimeout(t);
+  }, [searchInput, search, setUrl]);
 
   const toggleSort = (column: string) => {
     if (sortBy === column) {
-      setSortOrder((o) => (o === "ASC" ? "DESC" : "ASC"));
+      setUrl({ order: sortOrder === "ASC" ? "DESC" : "ASC" });
     } else {
-      setSortBy(column);
-      setSortOrder("ASC");
+      setUrl({ sortBy: column, order: "ASC" });
     }
-    setPage(1);
   };
 
   const { data: locations = [] } = useLocations();
@@ -150,11 +151,8 @@ export default function AssetsPage() {
             id="asset-search"
             type="text"
             placeholder="Search by name, ID, serial number..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
           />
         </div>
@@ -167,10 +165,7 @@ export default function AssetsPage() {
           <select
             id="asset-status-filter"
             value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => setUrl({ status: e.target.value })}
             className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-700"
           >
             <option value="">All Statuses</option>
@@ -186,10 +181,7 @@ export default function AssetsPage() {
           <select
             id="asset-sort"
             value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => setUrl({ sortBy: e.target.value })}
             className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-700"
           >
             {SORT_OPTIONS.map((o) => (
@@ -208,9 +200,7 @@ export default function AssetsPage() {
             {activeLocation.name}
             <button
               onClick={() => {
-                setLocationId("");
-                setPage(1);
-                router.replace("/assets");
+                setUrl({ locationId: "" });
               }}
               aria-label="Clear location filter"
               className="p-0.5 hover:bg-gray-200 rounded-full"
@@ -318,7 +308,7 @@ export default function AssetsPage() {
                 variant="outline"
                 size="sm"
                 disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
+                onClick={() => setUrl({ page: String(page - 1) })}
               >
                 Previous
               </Button>
@@ -326,7 +316,7 @@ export default function AssetsPage() {
                 variant="outline"
                 size="sm"
                 disabled={page === totalPages}
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => setUrl({ page: String(page + 1) })}
               >
                 Next
               </Button>

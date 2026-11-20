@@ -9,6 +9,7 @@
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "test": "jest --ci",
+    "test:coverage": "jest --ci --coverage",
     "test:e2e": "playwright test"
   },
   "dependencies": {
