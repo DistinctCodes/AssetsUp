@@ -45,6 +45,8 @@ mod expiry_tests;
 mod integration_tests;
 #[cfg(test)]
 mod pagination_tests;
+#[cfg(test)]
+mod proptests;
 mod registry;
 #[cfg(test)]
 mod revocation_tests;

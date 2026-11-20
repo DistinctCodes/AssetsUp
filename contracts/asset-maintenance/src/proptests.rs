@@ -185,3 +185,124 @@ proptest! {
         prop_assert!(client.try_add_maintenance_record(&r).is_err());
     }
 }
+
+// ---------------------------------------------------------------------------
+// Rollups: cost, downtime and health score (#1654)
+// ---------------------------------------------------------------------------
+
+/// `(labor, parts, duration_hours, maintenance type, condition before, condition after, quality)`.
+type Spec = (i128, i128, u32, u8, u32, u32, u32);
+
+fn spec_record(env: &Env, provider: &Address, spec: &Spec) -> MaintenanceRecord {
+    let (labor, parts, hours, kind, before, after, quality) = *spec;
+    let mut r = record(
+        env,
+        provider,
+        labor,
+        parts,
+        labor + parts,
+        before,
+        after,
+        quality,
+        NOW,
+    );
+    r.duration_hours = hours;
+    r.maintenance_type = match kind % 6 {
+        0 => MaintenanceType::Preventive,
+        1 => MaintenanceType::Corrective,
+        2 => MaintenanceType::Emergency,
+        3 => MaintenanceType::Inspection,
+        4 => MaintenanceType::Upgrade,
+        _ => MaintenanceType::Calibration,
+    };
+    r
+}
+
+fn spec_strategy() -> impl Strategy<Value = Spec> {
+    (
+        0i128..1_000_000,
+        0i128..1_000_000,
+        0u32..10_000,
+        0u8..6,
+        1u32..=10,
+        1u32..=10,
+        1u32..=10,
+    )
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig { cases: 32, ..ProptestConfig::default() })]
+
+    /// The rollups equal the sums over the records, however many there are
+    /// (including none), and the health score stays inside its documented
+    /// `1..=100` range after every record.
+    #[test]
+    fn totals_equal_the_sum_of_records_and_health_stays_in_range(
+        specs in prop::collection::vec(spec_strategy(), 0..8),
+    ) {
+        let env = Env::default();
+        let (client, provider) = ctx(&env);
+
+        let mut expected_cost: i128 = 0;
+        let mut expected_hours: u64 = 0;
+
+        for spec in &specs {
+            client.add_maintenance_record(&spec_record(&env, &provider, spec));
+            expected_cost += spec.0 + spec.1;
+            expected_hours += u64::from(spec.2);
+
+            let score = client.get_asset_health_score(&7);
+            prop_assert!((1..=100).contains(&score), "health score {} out of range", score);
+        }
+
+        prop_assert_eq!(client.calculate_total_maintenance_cost(&7), expected_cost);
+        prop_assert_eq!(client.calculate_asset_downtime(&7), expected_hours);
+
+        let stats = client.get_asset_stats(&7);
+        prop_assert_eq!(stats.service_count as usize, specs.len());
+        prop_assert_eq!(client.get_maintenance_history(&7).len() as usize, specs.len());
+        if specs.is_empty() {
+            // Nothing recorded: a fresh asset is fully healthy.
+            prop_assert_eq!(stats.health_score, 100);
+        }
+    }
+
+    /// Downtime never decreases as records are added; each record adds
+    /// exactly its own duration.
+    #[test]
+    fn downtime_only_grows_by_each_records_duration(
+        specs in prop::collection::vec(spec_strategy(), 1..8),
+    ) {
+        let env = Env::default();
+        let (client, provider) = ctx(&env);
+
+        let mut previous = client.calculate_asset_downtime(&7);
+        for spec in &specs {
+            client.add_maintenance_record(&spec_record(&env, &provider, spec));
+            let now = client.calculate_asset_downtime(&7);
+            prop_assert!(now >= previous, "downtime went from {} to {}", previous, now);
+            prop_assert_eq!(now - previous, u64::from(spec.2));
+            previous = now;
+        }
+    }
+
+    /// The rollups do not depend on the order the records arrive in.
+    #[test]
+    fn results_are_independent_of_record_order(
+        specs in prop::collection::vec(spec_strategy(), 1..8),
+    ) {
+        let forward_env = Env::default();
+        let (forward, forward_provider) = ctx(&forward_env);
+        for spec in &specs {
+            forward.add_maintenance_record(&spec_record(&forward_env, &forward_provider, spec));
+        }
+
+        let reversed_env = Env::default();
+        let (reversed, reversed_provider) = ctx(&reversed_env);
+        for spec in specs.iter().rev() {
+            reversed.add_maintenance_record(&spec_record(&reversed_env, &reversed_provider, spec));
+        }
+
+        prop_assert_eq!(forward.get_asset_stats(&7), reversed.get_asset_stats(&7));
+    }
+}
