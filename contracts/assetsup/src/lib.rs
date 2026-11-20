@@ -434,6 +434,11 @@ impl AssetUpContract {
             return Err(Error::Unauthorized);
         }
 
+        // A tokenized asset's ownership is represented by its tokens.
+        if tokenization::is_registry_asset_tokenized(&env, &asset_id) {
+            return Err(Error::AssetIsTokenized);
+        }
+
         let old_owner = asset.owner.clone();
 
         // Remove asset from old owner's registry
@@ -513,6 +518,11 @@ impl AssetUpContract {
         let admin = Self::get_admin(env.clone())?;
         if caller != asset.owner && caller != admin {
             return Err(Error::Unauthorized);
+        }
+
+        // Retiring would leave tokens pointing at a dead asset; detokenize first.
+        if tokenization::is_registry_asset_tokenized(&env, &asset_id) {
+            return Err(Error::AssetIsTokenized);
         }
 
         asset.status = AssetStatus::Retired;
@@ -968,10 +978,24 @@ impl AssetUpContract {
     // Tokenization Functions
     // =====================
 
-    /// Tokenize an asset with full supply to tokenizer
+    /// Tokenize a registered asset with full supply to its owner.
+    ///
+    /// `asset_id` is the token id (the `u64` every other tokenization
+    /// entrypoint uses); `registry_asset_id` is the asset in the registry that
+    /// the token represents. The call fails unless that asset exists
+    /// (`AssetNotFound`), is not retired (`AssetRetired`), is owned by
+    /// `tokenizer` (`Unauthorized`) and is not already tokenized
+    /// (`AssetAlreadyTokenized`), so a token can only ever be claimed by the
+    /// real owner of a real, active asset and cannot be front-run by a third
+    /// party that picks the same `u64`.
+    ///
+    /// While tokenized, the registry asset cannot be transferred or retired
+    /// directly (`AssetIsTokenized`); detokenization releases it.
+    #[allow(clippy::too_many_arguments)]
     pub fn tokenize_asset(
         env: Env,
         asset_id: u64,
+        registry_asset_id: BytesN<32>,
         symbol: String,
         total_supply: i128,
         decimals: u32,
@@ -985,6 +1009,22 @@ impl AssetUpContract {
 
         tokenizer.require_auth();
 
+        // The token must stand for a real, active asset owned by the tokenizer.
+        let registered: asset::Asset = env
+            .storage()
+            .persistent()
+            .get(&asset::DataKey::Asset(registry_asset_id.clone()))
+            .ok_or(Error::AssetNotFound)?;
+        if registered.status == AssetStatus::Retired {
+            return Err(Error::AssetRetired);
+        }
+        if registered.owner != tokenizer {
+            return Err(Error::Unauthorized);
+        }
+        if tokenization::is_registry_asset_tokenized(&env, &registry_asset_id) {
+            return Err(Error::AssetAlreadyTokenized);
+        }
+
         let metadata = TokenMetadata {
             name,
             description,
@@ -996,7 +1036,7 @@ impl AssetUpContract {
             geographic_restrictions: Vec::new(&env),
         };
 
-        tokenization::tokenize_asset(
+        let tokenized = tokenization::tokenize_asset(
             &env,
             asset_id,
             symbol,
@@ -1005,7 +1045,18 @@ impl AssetUpContract {
             min_voting_threshold,
             tokenizer,
             metadata,
-        )
+        )?;
+
+        // Tie the token to its registry asset so transfers and retirement can
+        // respect it.
+        tokenization::link_registry_asset(&env, asset_id, &registry_asset_id)?;
+
+        Ok(tokenized)
+    }
+
+    /// The registry asset a token id represents, if any.
+    pub fn get_registry_asset_of_token(env: Env, asset_id: u64) -> Option<BytesN<32>> {
+        tokenization::registry_asset_of(&env, asset_id)
     }
 
     /// Mint additional tokens (only tokenizer can call)
@@ -1078,7 +1129,12 @@ impl AssetUpContract {
         ))
     }
 
-    /// Lock tokens until timestamp (only the asset tokenizer can call this)
+    /// Lock tokens until timestamp.
+    ///
+    /// Only the asset's tokenizer can call this, the lock may last at most
+    /// [`Self::get_max_lock_duration`] seconds (`LockDurationTooLong`), and the
+    /// holder must authorize it as well (unless the tokenizer is the holder):
+    /// a tokenizer cannot freeze somebody else's balance without their consent.
     pub fn lock_tokens(
         env: Env,
         asset_id: u64,
@@ -1089,7 +1145,25 @@ impl AssetUpContract {
         Self::require_not_paused(&env)?;
 
         caller.require_auth();
+        if holder != caller {
+            holder.require_auth();
+        }
         tokenization::lock_tokens(&env, asset_id, holder, until_timestamp, caller)
+    }
+
+    /// Sets the maximum token lock duration in seconds. Admin only. Zero is
+    /// rejected (`InvalidInput`).
+    pub fn set_max_lock_duration(env: Env, seconds: u64) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+        tokenization::set_max_lock_duration(&env, seconds)
+    }
+
+    /// The maximum token lock duration in seconds (one year unless configured).
+    pub fn get_max_lock_duration(env: Env) -> u64 {
+        tokenization::get_max_lock_duration(&env)
     }
 
     /// Unlock tokens

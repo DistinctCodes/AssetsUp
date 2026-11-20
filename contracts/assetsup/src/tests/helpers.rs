@@ -155,3 +155,21 @@ pub fn create_test_claim(
         approved_amount: 0,
     }
 }
+
+/// Registers an asset owned by `owner` in the registry and returns its id.
+///
+/// Tokenization is tied to a registered, active asset owned by the tokenizer, so
+/// tests that tokenize through the contract client register one first. Requires
+/// `env.mock_all_auths()` to be in effect.
+#[allow(dead_code)]
+pub fn register_asset_for(
+    env: &Env,
+    client: &AssetUpContractClient<'_>,
+    admin: &Address,
+    owner: &Address,
+    seed: u32,
+) -> BytesN<32> {
+    let id = generate_asset_id(env, seed);
+    client.register_asset(&create_test_asset(env, owner, id.clone()), admin);
+    id
+}

@@ -138,6 +138,10 @@ pub fn execute_detokenization(env: &Env, asset_id: u64, proposal_id: u64) -> Res
         store.remove(&key);
     }
 
+    // The registry asset is no longer represented by tokens, so it can be
+    // transferred and retired again.
+    crate::tokenization::unlink_registry_asset(env, asset_id);
+
     // Update proposal to executed
     let timestamp = env.ledger().timestamp();
     let executed_proposal = DetokenizationProposal::Executed(ExecutedProposal {

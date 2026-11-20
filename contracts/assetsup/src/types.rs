@@ -108,6 +108,15 @@ pub enum TokenDataKey {
     /// Maps a token symbol to the asset_id that claimed it, so the same
     /// underlying asset cannot be tokenized twice under a reused symbol.
     SymbolRegistry(String),
+    /// Maps a token id (`u64`) to the registry asset (`BytesN<32>`) it
+    /// represents, set when the asset is tokenized.
+    RegistryLink(u64),
+    /// Maps a registry asset to the token id that represents it. Present exactly
+    /// while the asset is tokenized; the registry refuses to transfer or retire
+    /// such an asset, and a registry asset can back at most one token id.
+    RegistryTokenized(BytesN<32>),
+    /// Admin-configured maximum token lock duration, in seconds (`u64`).
+    MaxLockDuration,
 }
 
 /// Represents a tokenized asset on-chain

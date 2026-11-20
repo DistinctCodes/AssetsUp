@@ -42,6 +42,10 @@ pub enum Error {
     AssetNotFound = 508,
     /// Invalid date / cost / rating arguments.
     InvalidArguments = 509,
+    /// There is no admin proposal in flight to accept or cancel.
+    NoPendingAdminProposal = 510,
+    /// The proposed admin is not a valid nominee (it is the current admin).
+    InvalidAdmin = 511,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
@@ -67,6 +71,8 @@ mod tests {
             Error::AlertIndexOutOfBounds as u32,
             Error::AssetNotFound as u32,
             Error::InvalidArguments as u32,
+            Error::NoPendingAdminProposal as u32,
+            Error::InvalidAdmin as u32,
         ] {
             assert!((500..600).contains(&code));
         }

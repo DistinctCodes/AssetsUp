@@ -19,6 +19,37 @@ pub struct ContractInitialized {
     pub timestamp: u64,
 }
 
+/// An admin transfer was nominated. The role does **not** move until the
+/// proposed address accepts.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminProposed {
+    #[topic]
+    pub proposed_admin: Address,
+    pub current_admin: Address,
+    pub timestamp: u64,
+}
+
+/// A pending admin nomination was withdrawn by the current admin.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminProposalCancelled {
+    #[topic]
+    pub proposed_admin: Address,
+    pub current_admin: Address,
+    pub timestamp: u64,
+}
+
+/// The admin was changed, after the incoming address accepted.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminChanged {
+    #[topic]
+    pub new_admin: Address,
+    pub old_admin: Address,
+    pub timestamp: u64,
+}
+
 /// A maintenance provider was registered.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -149,6 +180,33 @@ pub fn contract_initialized(env: &Env, admin: &Address, registry: &Address) {
     ContractInitialized {
         admin: admin.clone(),
         registry: registry.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn admin_proposed(env: &Env, current_admin: &Address, proposed_admin: &Address) {
+    AdminProposed {
+        proposed_admin: proposed_admin.clone(),
+        current_admin: current_admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn admin_proposal_cancelled(env: &Env, current_admin: &Address, proposed_admin: &Address) {
+    AdminProposalCancelled {
+        proposed_admin: proposed_admin.clone(),
+        current_admin: current_admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn admin_changed(env: &Env, old_admin: &Address, new_admin: &Address) {
+    AdminChanged {
+        new_admin: new_admin.clone(),
+        old_admin: old_admin.clone(),
         timestamp: env.ledger().timestamp(),
     }
     .publish(env);

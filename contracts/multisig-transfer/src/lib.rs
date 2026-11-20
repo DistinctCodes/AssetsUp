@@ -35,6 +35,7 @@
 
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
 
+mod admin_transfer_tests;
 mod approvals;
 mod auth_tests;
 mod errors;
@@ -87,6 +88,83 @@ impl MultiSigTransferContract {
             .set(&storage::DataKey::NextRequestId, &1u64);
 
         events::contract_initialized(&e, &admin, &asset_registry, utils::now(&e));
+    }
+
+    // ----------------------------
+    // Admin rotation (two-step)
+    // ----------------------------
+    /// Step one of a two-step admin transfer: nominate `new_admin`.
+    ///
+    /// Does **not** change the admin. The role only moves when the nominee
+    /// calls [`Self::accept_admin`], which proves the address is reachable and
+    /// controlled; a one-step transfer would let a single typo lock the admin
+    /// functions (`configure_approval_rule`, admin cancel) forever.
+    ///
+    /// Authorized by the current admin. Calling it again replaces a proposal
+    /// already in flight. Errors: `NotInitialized`, `InvalidAdmin` (nominee is
+    /// the current admin). Emits `admin_proposed`.
+    pub fn propose_admin(e: Env, new_admin: Address) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
+        let current = storage::get_admin(&e).ok_or(MultiSigError::NotInitialized)?;
+        current.require_auth();
+
+        if new_admin == current {
+            return Err(MultiSigError::InvalidAdmin);
+        }
+
+        storage::set_pending_admin(&e, &new_admin);
+        events::admin_proposed(&e, &current, &new_admin, utils::now(&e));
+        Ok(())
+    }
+
+    /// Step two: the nominee accepts, and only then does the role move.
+    ///
+    /// Authorized by the *incoming* address. The previous admin loses every
+    /// admin right immediately, because each check reads the stored admin.
+    /// Errors: `NoPendingAdminProposal`, `NotInitialized`. Emits `admin_changed`.
+    pub fn accept_admin(e: Env) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
+        let pending =
+            storage::get_pending_admin(&e).ok_or(MultiSigError::NoPendingAdminProposal)?;
+        pending.require_auth();
+
+        let old = storage::get_admin(&e).ok_or(MultiSigError::NotInitialized)?;
+        storage::set_admin(&e, &pending);
+        storage::clear_pending_admin(&e);
+
+        events::admin_changed(&e, &old, &pending, utils::now(&e));
+        Ok(())
+    }
+
+    /// Withdraws a pending proposal. Only the current admin may cancel.
+    /// Errors: `NotInitialized`, `NoPendingAdminProposal`. Emits
+    /// `admin_proposal_cancelled`.
+    pub fn cancel_admin_proposal(e: Env) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+
+        let current = storage::get_admin(&e).ok_or(MultiSigError::NotInitialized)?;
+        current.require_auth();
+
+        let pending =
+            storage::get_pending_admin(&e).ok_or(MultiSigError::NoPendingAdminProposal)?;
+        storage::clear_pending_admin(&e);
+
+        events::admin_proposal_cancelled(&e, &current, &pending, utils::now(&e));
+        Ok(())
+    }
+
+    /// The address currently nominated to become admin, if any.
+    pub fn get_pending_admin(e: Env) -> Option<Address> {
+        ttl::extend_all(&e);
+        storage::get_pending_admin(&e)
+    }
+
+    /// The current admin.
+    pub fn get_admin(e: Env) -> Result<Address, MultiSigError> {
+        ttl::extend_all(&e);
+        storage::get_admin(&e).ok_or(MultiSigError::NotInitialized)
     }
 
     // ----------------------------

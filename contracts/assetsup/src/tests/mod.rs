@@ -39,3 +39,6 @@ mod proptests;
 
 // Payload assertions for every event helper
 mod event_payloads;
+
+// Tokenization linked to the registry; lock caps and consent
+mod tokenization_linkage;

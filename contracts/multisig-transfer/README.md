@@ -112,14 +112,26 @@ archive the record *without* releasing the lock, which is strictly worse.
 | `execute_transfer` | `caller, request_id` | `Result<()>` | `caller` | `RequestNotFound`, `RequestNotPending`, `NotEnoughApprovals`, `ExecuteTooEarly`, `RequestExpired`, `RegistryCallFailed` |
 | `cancel_transfer_request` | `caller, request_id` | `Result<()>` | requester or admin | `RequestNotFound`, `RequestNotPending`, `Unauthorized` |
 | `expire_transfer_request` | `caller, request_id` | `Result<()>` | — (none, permissionless) | `NotInitialized`, `RequestNotFound`, `RequestNotPending`, `ApprovalWindowStillOpen` |
+| `propose_admin` | `new_admin` | `Result<()>` | current admin | `NotInitialized`, `InvalidAdmin` |
+| `accept_admin` | — | `Result<()>` | the proposed address | `NoPendingAdminProposal`, `NotInitialized` |
+| `cancel_admin_proposal` | — | `Result<()>` | current admin | `NotInitialized`, `NoPendingAdminProposal` |
 
 `initialize` performs **no** authorization and can be front-run on a freshly
 deployed contract — see [SC-42].
 
+### Admin rotation
+
+The admin is rotated in two steps, as in `assetsup`: the current admin calls
+`propose_admin(new_admin)`, and the role only moves when `new_admin` calls
+`accept_admin()` (authorized by the nominee, so a mistyped address can never
+take over or brick the contract). The previous admin loses its rights as soon as
+the nominee accepts. `cancel_admin_proposal()` withdraws a pending nomination,
+and proposing again replaces one in flight. Each step emits an event.
+
 ### Reads
 
 `get_request`, `get_asset_history`, `get_pending_transfers_approver`,
-`get_required_approvers_category`. None require auth and none mutate state.
+`get_required_approvers_category`, `get_admin`, `get_pending_admin`. None require auth and none mutate state.
 
 ## Events
 
@@ -137,6 +149,9 @@ crate in the workspace that does this.
 | `("ApprovalRuleUpdated",)` | `(category, required_approvals, timestamp)` |
 | `("ApproverAdded",)` | `(approver, added_by, timestamp)` |
 | `("ApproverRemoved",)` | `(approver, removed_by, timestamp)` |
+| `("AdminProposed",)` | topic `proposed_admin`; data `current_admin, timestamp` |
+| `("AdminProposalCancelled",)` | topic `proposed_admin`; data `current_admin, timestamp` |
+| `("AdminChanged",)` | topic `new_admin`; data `old_admin, timestamp` |
 
 Topics here are string literals in `PascalCase`, while the rest of the workspace
 uses `symbol_short!` in `snake_case`.
@@ -163,6 +178,7 @@ to this contract alone.
 | 400–406 | `RequestNotFound` … `PendingRequestExists` | Request lifecycle. |
 | 420–426 | `RuleNotFound` … `ApprovalWindowStillOpen` | Approval rules and approvers. |
 | 440–444 | `AssetNotFound` … `RegistryCallFailed` | Registry interaction. |
+| 450–451 | `NoPendingAdminProposal`, `InvalidAdmin` | Admin rotation. |
 
 Note the collision risk with sibling contracts: code `1` is `NotInitialized`
 here but `AlreadyInitialized` in `assetsup`, `contrib`, and `multisig-wallet`.

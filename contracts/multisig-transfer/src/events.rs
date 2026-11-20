@@ -263,3 +263,66 @@ pub fn approver_removed(e: &Env, approver: &Address, removed_by: &Address, times
     }
     .publish(e);
 }
+
+/// An admin transfer was nominated. The role does **not** move until the
+/// proposed address accepts.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminProposed {
+    #[topic]
+    pub proposed_admin: Address,
+    pub current_admin: Address,
+    pub timestamp: u64,
+}
+
+/// A pending admin nomination was withdrawn by the current admin.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminProposalCancelled {
+    #[topic]
+    pub proposed_admin: Address,
+    pub current_admin: Address,
+    pub timestamp: u64,
+}
+
+/// The admin was changed, after the incoming address accepted.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminChanged {
+    #[topic]
+    pub new_admin: Address,
+    pub old_admin: Address,
+    pub timestamp: u64,
+}
+
+pub fn admin_proposed(e: &Env, current_admin: &Address, proposed_admin: &Address, timestamp: u64) {
+    AdminProposed {
+        proposed_admin: proposed_admin.clone(),
+        current_admin: current_admin.clone(),
+        timestamp,
+    }
+    .publish(e);
+}
+
+pub fn admin_proposal_cancelled(
+    e: &Env,
+    current_admin: &Address,
+    proposed_admin: &Address,
+    timestamp: u64,
+) {
+    AdminProposalCancelled {
+        proposed_admin: proposed_admin.clone(),
+        current_admin: current_admin.clone(),
+        timestamp,
+    }
+    .publish(e);
+}
+
+pub fn admin_changed(e: &Env, old_admin: &Address, new_admin: &Address, timestamp: u64) {
+    AdminChanged {
+        new_admin: new_admin.clone(),
+        old_admin: old_admin.clone(),
+        timestamp,
+    }
+    .publish(e);
+}

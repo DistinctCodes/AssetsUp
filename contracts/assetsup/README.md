@@ -135,12 +135,25 @@ service are documented in [`src/audit.rs`](src/audit.rs).
 | `tokenize_asset` | owner |
 | `mint_tokens`, `burn_tokens` | issuer |
 | `transfer_tokens` | `from` |
-| `lock_tokens` | owner |
+| `lock_tokens` | tokenizer **and** holder (unless they are the same address) |
+| `set_max_lock_duration` | admin |
 | `unlock_tokens` | — |
 | `update_valuation` | — |
 | `bump_asset_ttl` | — (permissionless keeper) |
 
+`tokenize_asset(asset_id, registry_asset_id, ...)` takes the registry asset the
+token represents. It fails unless that asset exists (`AssetNotFound`), is not
+retired (`AssetRetired`), is owned by the tokenizer (`Unauthorized`) and is not
+already tokenized (`AssetAlreadyTokenized`). While tokenized, the registry asset
+cannot be transferred or retired directly (`AssetIsTokenized`, `135`); executing
+a detokenization releases it. `lock_tokens` is capped at
+`get_max_lock_duration` seconds (one year unless the admin changes it with
+`set_max_lock_duration`), otherwise `LockDurationTooLong` (`133`); the holder
+must authorize the lock as well, so a tokenizer cannot freeze a balance without
+consent.
+
 Reads: `get_token_balance`, `get_token_holders`, `is_tokens_locked`,
+`get_registry_asset_of_token`, `get_max_lock_duration`,
 `get_ownership_percentage`, `get_tokenized_asset`.
 
 `bump_asset_ttl` extends the storage TTL of an asset's persistent entries so a

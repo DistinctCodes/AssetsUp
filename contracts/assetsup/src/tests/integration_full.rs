@@ -20,6 +20,7 @@ fn test_full_asset_tokenization_workflow() {
     let asset_id = 1u64;
     client.tokenize_asset(
         &asset_id,
+        &asset_id_bytes,
         &String::from_str(&env, "PROP"),
         &1000000i128,
         &6u32,
@@ -64,8 +65,10 @@ fn test_governance_and_detokenization_workflow() {
 
     // Setup: Tokenize asset
     let asset_id = 1u64;
+    let registry_id = register_asset_for(&env, &client, &admin, &owner, 1);
     client.tokenize_asset(
         &asset_id,
+        &registry_id,
         &String::from_str(&env, "GOV"),
         &1000000i128,
         &6u32,
@@ -111,8 +114,10 @@ fn test_transfer_restrictions_workflow() {
 
     // Setup: Tokenize asset
     let asset_id = 1u64;
+    let registry_id = register_asset_for(&env, &client, &admin, &owner, 1);
     client.tokenize_asset(
         &asset_id,
+        &registry_id,
         &String::from_str(&env, "REST"),
         &1000000i128,
         &6u32,
@@ -171,8 +176,10 @@ fn test_token_locking_workflow() {
 
     // Setup: Tokenize and transfer
     let asset_id = 1u64;
+    let registry_id = register_asset_for(&env, &client, &admin, &owner, 1);
     client.tokenize_asset(
         &asset_id,
+        &registry_id,
         &String::from_str(&env, "LOCK"),
         &1000000i128,
         &6u32,

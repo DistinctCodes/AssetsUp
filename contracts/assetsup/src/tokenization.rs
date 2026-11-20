@@ -13,6 +13,76 @@ fn asset_id_to_bytes(env: &Env, asset_id: u64) -> BytesN<32> {
     BytesN::from_array(env, &bytes)
 }
 
+/// Default cap on how far in the future a lock may extend: one year.
+pub const DEFAULT_MAX_LOCK_DURATION_SECS: u64 = 365 * 24 * 60 * 60;
+
+/// The configured maximum lock duration in seconds (see
+/// [`set_max_lock_duration`]), or [`DEFAULT_MAX_LOCK_DURATION_SECS`].
+pub fn get_max_lock_duration(env: &Env) -> u64 {
+    env.storage()
+        .persistent()
+        .get(&TokenDataKey::MaxLockDuration)
+        .unwrap_or(DEFAULT_MAX_LOCK_DURATION_SECS)
+}
+
+/// Sets the maximum lock duration. Zero is rejected: it would make every lock
+/// fail, which is a disable switch, not a duration.
+pub fn set_max_lock_duration(env: &Env, seconds: u64) -> Result<(), Error> {
+    if seconds == 0 {
+        return Err(Error::InvalidInput);
+    }
+    env.storage()
+        .persistent()
+        .set(&TokenDataKey::MaxLockDuration, &seconds);
+    Ok(())
+}
+
+/// Records that `token_id` represents the registry asset `registry_id`.
+///
+/// Fails with `AssetAlreadyTokenized` if the registry asset is already backing
+/// a token, so one registry asset can never be tokenized twice under different
+/// token ids.
+pub fn link_registry_asset(
+    env: &Env,
+    token_id: u64,
+    registry_id: &BytesN<32>,
+) -> Result<(), Error> {
+    let store = env.storage().persistent();
+    let tokenized_key = TokenDataKey::RegistryTokenized(registry_id.clone());
+    if store.has(&tokenized_key) {
+        return Err(Error::AssetAlreadyTokenized);
+    }
+    store.set(&tokenized_key, &token_id);
+    store.set(&TokenDataKey::RegistryLink(token_id), registry_id);
+    Ok(())
+}
+
+/// Clears the registry link for `token_id` (used by detokenization), making the
+/// registry asset transferable and retirable again.
+pub fn unlink_registry_asset(env: &Env, token_id: u64) {
+    let store = env.storage().persistent();
+    let link_key = TokenDataKey::RegistryLink(token_id);
+    if let Some(registry_id) = store.get::<_, BytesN<32>>(&link_key) {
+        store.remove(&TokenDataKey::RegistryTokenized(registry_id));
+        store.remove(&link_key);
+    }
+}
+
+/// Whether the registry asset currently backs a token.
+pub fn is_registry_asset_tokenized(env: &Env, registry_id: &BytesN<32>) -> bool {
+    env.storage()
+        .persistent()
+        .has(&TokenDataKey::RegistryTokenized(registry_id.clone()))
+}
+
+/// The registry asset a token id represents, if it was tokenized through the
+/// registry-linked entrypoint.
+pub fn registry_asset_of(env: &Env, token_id: u64) -> Option<BytesN<32>> {
+    env.storage()
+        .persistent()
+        .get(&TokenDataKey::RegistryLink(token_id))
+}
+
 /// Initialize tokenization by creating tokenized asset
 /// Only contract admin or asset owner can tokenize
 #[allow(clippy::too_many_arguments)]
@@ -357,7 +427,9 @@ pub fn get_token_holders(env: &Env, asset_id: u64) -> Result<Vec<Address>, Error
 }
 
 /// Lock tokens until a specific timestamp.
-/// Only the tokenizer of the asset can lock a holder's tokens.
+/// Only the tokenizer of the asset can lock a holder's tokens, for at most
+/// [`get_max_lock_duration`] seconds (the entrypoint also needs the holder's
+/// consent).
 pub fn lock_tokens(
     env: &Env,
     asset_id: u64,
@@ -375,6 +447,15 @@ pub fn lock_tokens(
 
     if tokenized_asset.tokenizer != caller {
         return Err(Error::Unauthorized);
+    }
+
+    // A lock may not reach further into the future than the maximum duration.
+    // Without a cap a tokenizer could lock a holder's balance until `u64::MAX`,
+    // i.e. permanently. The entrypoint additionally requires the holder's own
+    // authorization.
+    let now = env.ledger().timestamp();
+    if until_timestamp.saturating_sub(now) > get_max_lock_duration(env) {
+        return Err(Error::LockDurationTooLong);
     }
 
     let lock_key = TokenDataKey::TokenLockedUntil(asset_id, holder.clone());
