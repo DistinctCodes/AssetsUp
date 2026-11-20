@@ -17,6 +17,7 @@ import { USER_SORT_COLUMNS } from './dto/list-users-query.dto';
 import { PasswordService } from '../common/security/password.service';
 import { User, UserRole } from './entities/user.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { toUserResponse, UserResponseDto } from './dto/user-response.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { normalizeEmail } from './utils/normalize-email';
 import * as crypto from 'crypto';
@@ -187,10 +188,9 @@ export class UsersService {
     return this.sanitize(saved);
   }
 
-  sanitize(user: User): User {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash, refreshTokenHash, ...safe } = user;
-    return safe as User;
+  /** The public, allow-listed view of a user. Use it wherever a user is returned. */
+  sanitize(user: User): UserResponseDto {
+    return toUserResponse(user);
   }
 
   async updateMe(userId: string, dto: UpdateProfileDto) {

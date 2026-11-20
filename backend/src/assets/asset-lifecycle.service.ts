@@ -67,8 +67,6 @@ const ALLOWED_TRANSITIONS: Record<AssetStatus, AssetStatus[]> = {
 
 @Injectable()
 export class AssetLifecycleService {
-  private history = new Map<string, any[]>();
-
   /**
    * Resolve a wire status value to its canonical AssetStatus, rejecting anything
    * outside the enum with a 400.
@@ -96,30 +94,5 @@ export class AssetLifecycleService {
       );
     }
     return true;
-  }
-
-  recordHistory(
-    assetId: string,
-    event: {
-      eventType: string;
-      actorUserId: string;
-      note?: string;
-      fieldChanges?: any;
-    },
-  ) {
-    const list = this.history.get(assetId) || [];
-    const entry = {
-      id: `h_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      assetId,
-      ...event,
-      timestamp: new Date(),
-    };
-    list.unshift(entry);
-    this.history.set(assetId, list);
-    return entry;
-  }
-
-  getHistory(assetId: string) {
-    return this.history.get(assetId) || [];
   }
 }
