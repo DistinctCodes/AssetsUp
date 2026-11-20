@@ -62,6 +62,14 @@ const PAUSE_EXEMPT: &[(&str, &str)] = &[
         "an upgrade is how you fix the incident that caused the pause",
     ),
     (
+        "allow_wasm_hash",
+        "upgrade allowlist control; must work while paused to ship the fix",
+    ),
+    (
+        "remove_wasm_hash",
+        "upgrade allowlist control; must work while paused to ship the fix",
+    ),
+    (
         "migrate",
         "must run after upgrade to bring storage up to date",
     ),

@@ -25,13 +25,14 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec};
 
+mod admin_transfer_tests;
 pub mod error;
 pub mod events;
-pub mod ttl;
-mod admin_transfer_tests;
+pub mod pause;
+mod proptests;
 mod test;
 mod tests_coverage;
-mod proptests;
+pub mod ttl;
 
 pub use crate::error::{handle_error, Error};
 
@@ -108,6 +109,23 @@ pub struct MaintenanceRecord {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RecordStatus {
+    Void,
+    Amended,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RecordAnnotation {
+    pub status: RecordStatus,
+    pub reason: String,
+    pub actor: Address,
+    pub timestamp: u64,
+    pub correction_index: Option<u32>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ScheduledMaintenance {
     pub asset_id: u64,
     pub maintenance_type: MaintenanceType,
@@ -169,18 +187,23 @@ pub struct MaintenanceAlert {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Admin,
     /// Address nominated as the next admin but not yet accepted. Absent when
     /// no transfer is in flight.
     PendingAdmin,
     AssetRegistry,
+    Paused,
+    BurnedAsset(u64),
     Provider(Address),
     MaintenanceHistory(u64),  // asset_id -> Vec<MaintenanceRecord>
     MaintenanceSchedule(u64), // asset_id -> ScheduledMaintenance
     Warranty(u64),            // asset_id -> WarrantyInfo
     Alerts(u64),              // asset_id -> Vec<MaintenanceAlert>
     AssetStats(u64),          // asset_id -> AssetStats (downtime, total cost, etc.)
+    RecordAnnotation(u64, u32),
+    AnnotatedIndices(u64),
 }
 
 #[contracttype]
@@ -231,8 +254,12 @@ impl AssetMaintenanceContract {
             .storage()
             .persistent()
             .get(&DataKey::Admin)
-            .unwrap_or_else(|| handle_error(&env, Error::NotInitialized));
+            .unwrap_or_else(|| handle_error(env, Error::NotInitialized));
         admin.require_auth();
+    }
+
+    fn require_not_paused(env: &Env) {
+        pause::require_not_paused(env);
     }
 
     /// Initializes the contract with `admin` and the asset `registry` address.
@@ -352,10 +379,45 @@ impl AssetMaintenanceContract {
         Self::load_admin(&env)
     }
 
+    /// Pauses maintenance writes. Authorized by the admin; works while paused.
+    pub fn pause_contract(env: Env, caller: Address) {
+        pause::pause(&env, &caller);
+    }
+
+    /// Lifts the emergency pause. Authorized by the admin.
+    pub fn unpause_contract(env: Env, caller: Address) {
+        pause::unpause(&env, &caller);
+    }
+
+    /// Whether maintenance writes are currently paused.
+    pub fn is_paused(env: Env) -> bool {
+        pause::is_paused(&env)
+    }
+
+    /// Marks an asset as burned or detokenized. Authorized by the admin.
+    pub fn mark_asset_burned(env: Env, asset_id: u64) {
+        Self::require_not_paused(&env);
+        let admin = Self::load_admin(&env);
+        admin.require_auth();
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::BurnedAsset(asset_id), &true);
+        ttl::extend_persistent(&env, &DataKey::BurnedAsset(asset_id));
+
+        events::asset_marked_burned(&env, asset_id, &admin);
+    }
+
+    /// Whether `asset_id` was marked as burned.
+    pub fn is_asset_burned(env: Env, asset_id: u64) -> bool {
+        Self::is_burned(&env, asset_id)
+    }
+
     /// Registers a maintenance service provider.
     ///
     /// Auth: the stored admin. Traps with `NotInitialized` before `init`. Emits `provider_registered`.
     pub fn register_provider(env: Env, provider: ProviderProfile) {
+        Self::require_not_paused(&env);
         let admin: Address = env
             .storage()
             .persistent()
@@ -374,6 +436,7 @@ impl AssetMaintenanceContract {
     ///
     /// Auth: the stored admin. Traps with `NotInitialized` before `init`. Emits `provider_deactivated` when a registered provider was deactivated.
     pub fn deactivate_provider(env: Env, provider_address: Address) {
+        Self::require_not_paused(&env);
         let admin: Address = env
             .storage()
             .persistent()
@@ -399,65 +462,74 @@ impl AssetMaintenanceContract {
     ///
     /// Auth: `record.provider` must authorize. Traps unless the provider is registered (`ProviderNotRegistered`) and active, the service date is not in the future, costs are non-negative, at most 999,999,999,999 each and `labor_cost + parts_cost == total_cost`, and the condition and quality ratings are 1-10. Emits `maintenance_recorded`.
     pub fn add_maintenance_record(env: Env, record: MaintenanceRecord) {
-        // Auth check: provider must be the one adding the record
+        Self::require_not_paused(&env);
         record.provider.require_auth();
+        Self::append_authorized_record(&env, &record);
+        events::maintenance_recorded(&env, &record);
+    }
 
-        // 1. Verify provider is registered and active
+    fn append_authorized_record(env: &Env, record: &MaintenanceRecord) {
         let provider_data: ProviderProfile = env
             .storage()
             .persistent()
             .get(&DataKey::Provider(record.provider.clone()))
-            .unwrap_or_else(|| handle_error(&env, Error::ProviderNotRegistered));
+            .unwrap_or_else(|| handle_error(env, Error::ProviderNotRegistered));
         if !provider_data.is_active {
-            handle_error(&env, Error::ProviderInactive);
+            handle_error(env, Error::ProviderInactive);
         }
 
-        // 2. Validation Rules
+        Self::validate_record(env, record);
+        Self::append_record(env, record);
+    }
+
+    fn validate_record(env: &Env, record: &MaintenanceRecord) {
         if record.service_date > env.ledger().timestamp() {
-            handle_error(&env, Error::InvalidArguments);
+            handle_error(env, Error::InvalidArguments);
         }
         if record.labor_cost < 0 || record.parts_cost < 0 || record.total_cost < 0 {
-            handle_error(&env, Error::InvalidArguments);
+            handle_error(env, Error::InvalidArguments);
         }
-        let max_cost: i128 = 999_999_999_999; // Upper bound on individual cost
+        let max_cost: i128 = 999_999_999_999;
         if record.labor_cost > max_cost
             || record.parts_cost > max_cost
             || record.total_cost > max_cost
         {
-            handle_error(&env, Error::InvalidArguments);
+            handle_error(env, Error::InvalidArguments);
         }
         if record.labor_cost + record.parts_cost != record.total_cost {
-            handle_error(&env, Error::InvalidArguments);
+            handle_error(env, Error::InvalidArguments);
         }
         if record.condition_before < 1
             || record.condition_before > 10
             || record.condition_after < 1
             || record.condition_after > 10
         {
-            handle_error(&env, Error::InvalidArguments);
+            handle_error(env, Error::InvalidArguments);
         }
         if record.quality_rating < 1 || record.quality_rating > 10 {
-            handle_error(&env, Error::InvalidArguments);
+            handle_error(env, Error::InvalidArguments);
         }
 
-        // 3. Verify asset exists
-        if !Self::verify_asset_exists(&env, record.asset_id) {
-            handle_error(&env, Error::AssetNotFound);
+        if Self::is_burned(env, record.asset_id) {
+            handle_error(env, Error::AssetBurned);
         }
+        if !Self::verify_asset_exists(env, record.asset_id) {
+            handle_error(env, Error::AssetNotFound);
+        }
+    }
 
-        // 4. Update Maintenance History
+    fn append_record(env: &Env, record: &MaintenanceRecord) {
         let mut history = env
             .storage()
             .persistent()
             .get::<_, Vec<MaintenanceRecord>>(&DataKey::MaintenanceHistory(record.asset_id))
-            .unwrap_or(Vec::new(&env));
+            .unwrap_or(Vec::new(env));
         history.push_back(record.clone());
         env.storage()
             .persistent()
             .set(&DataKey::MaintenanceHistory(record.asset_id), &history);
-        ttl::extend_persistent(&env, &DataKey::MaintenanceHistory(record.asset_id));
+        ttl::extend_persistent(env, &DataKey::MaintenanceHistory(record.asset_id));
 
-        // 5. Update Asset Stats
         let mut stats = env
             .storage()
             .persistent()
@@ -466,22 +538,18 @@ impl AssetMaintenanceContract {
                 total_cost: 0,
                 total_downtime_hours: 0,
                 service_count: 0,
-                health_score: 100, // Start with 100
+                health_score: 100,
             });
 
         stats.total_cost += record.total_cost;
         stats.total_downtime_hours += record.duration_hours as u64;
         stats.service_count += 1;
-        // Recalculate health score (placeholder for now, will implement properly later)
-        stats.health_score = Self::calculate_health_score(&env, record.asset_id);
+        stats.health_score = Self::calculate_health_score(env, record.asset_id);
 
         env.storage()
             .persistent()
             .set(&DataKey::AssetStats(record.asset_id), &stats);
-        ttl::extend_persistent(&env, &DataKey::AssetStats(record.asset_id));
-
-        // 6. Emit Event
-        events::maintenance_recorded(&env, &record);
+        ttl::extend_persistent(env, &DataKey::AssetStats(record.asset_id));
     }
 
     /// Adds several maintenance records in a single invocation.
@@ -491,13 +559,132 @@ impl AssetMaintenanceContract {
     /// record is invalid the whole invocation reverts and none are persisted.
     /// An empty batch is rejected rather than accepted as a silent no-op.
     pub fn add_maintenance_records_batch(env: Env, records: Vec<MaintenanceRecord>) {
+        Self::require_not_paused(&env);
         if records.is_empty() {
             handle_error(&env, Error::InvalidArguments);
         }
 
+        let mut authorized_providers: Vec<Address> = Vec::new(&env);
         for record in records.iter() {
-            Self::add_maintenance_record(env.clone(), record);
+            if !authorized_providers.contains(&record.provider) {
+                record.provider.require_auth();
+                authorized_providers.push_back(record.provider.clone());
+            }
+            Self::append_authorized_record(&env, &record);
+            events::maintenance_recorded(&env, &record);
         }
+    }
+
+    /// Voids record `index` without rewriting or removing it. Authorized by the admin.
+    pub fn void_maintenance_record(env: Env, asset_id: u64, index: u32, reason: String) {
+        Self::require_not_paused(&env);
+        let admin = Self::load_admin(&env);
+        admin.require_auth();
+
+        let history = Self::history(&env, asset_id);
+        let record = history
+            .get(index)
+            .unwrap_or_else(|| handle_error(&env, Error::RecordNotFound));
+        if reason.is_empty() {
+            handle_error(&env, Error::InvalidArguments);
+        }
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::RecordAnnotation(asset_id, index))
+        {
+            handle_error(&env, Error::RecordAlreadyResolved);
+        }
+
+        let annotation = RecordAnnotation {
+            status: RecordStatus::Void,
+            reason: reason.clone(),
+            actor: admin.clone(),
+            timestamp: env.ledger().timestamp(),
+            correction_index: None,
+        };
+        Self::store_annotation(&env, asset_id, index, &annotation);
+
+        events::maintenance_record_voided(&env, asset_id, index, record.record_id, &admin, &reason);
+    }
+
+    /// Appends a corrected record for `index` without rewriting the original. Authorized by the admin.
+    pub fn amend_maintenance_record(
+        env: Env,
+        asset_id: u64,
+        index: u32,
+        correction: MaintenanceRecord,
+        reason: String,
+    ) {
+        Self::require_not_paused(&env);
+        let admin = Self::load_admin(&env);
+        admin.require_auth();
+
+        let history = Self::history(&env, asset_id);
+        let original = history
+            .get(index)
+            .unwrap_or_else(|| handle_error(&env, Error::RecordNotFound));
+        if correction.asset_id != asset_id
+            || correction.record_id != original.record_id
+            || correction.provider != original.provider
+            || reason.is_empty()
+        {
+            handle_error(&env, Error::InvalidArguments);
+        }
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::RecordAnnotation(asset_id, index))
+        {
+            handle_error(&env, Error::RecordAlreadyResolved);
+        }
+
+        Self::validate_record(&env, &correction);
+        Self::append_record(&env, &correction);
+        let correction_index = Self::history(&env, asset_id).len() - 1;
+
+        let annotation = RecordAnnotation {
+            status: RecordStatus::Amended,
+            reason: reason.clone(),
+            actor: admin.clone(),
+            timestamp: env.ledger().timestamp(),
+            correction_index: Some(correction_index),
+        };
+        Self::store_annotation(&env, asset_id, index, &annotation);
+
+        events::maintenance_record_amended(
+            &env,
+            asset_id,
+            index,
+            original.record_id,
+            correction_index,
+            &admin,
+            &reason,
+        );
+    }
+
+    /// The annotation attached to record `index`, if any. Read-only.
+    pub fn get_record_annotation(env: Env, asset_id: u64, index: u32) -> Option<RecordAnnotation> {
+        ttl::extend_persistent(&env, &DataKey::RecordAnnotation(asset_id, index));
+        env.storage()
+            .persistent()
+            .get(&DataKey::RecordAnnotation(asset_id, index))
+    }
+
+    /// Whether record `index` was voided. Read-only.
+    pub fn is_record_void(env: Env, asset_id: u64, index: u32) -> bool {
+        Self::get_record_annotation(env, asset_id, index)
+            .map(|annotation| annotation.status == RecordStatus::Void)
+            .unwrap_or(false)
+    }
+
+    /// The indices of every record that carries an annotation, oldest first. Read-only.
+    pub fn get_annotated_record_indices(env: Env, asset_id: u64) -> Vec<u32> {
+        ttl::extend_persistent(&env, &DataKey::AnnotatedIndices(asset_id));
+        env.storage()
+            .persistent()
+            .get(&DataKey::AnnotatedIndices(asset_id))
+            .unwrap_or(Vec::new(&env))
     }
 
     /// The asset's maintenance records, oldest first. Extends the history's TTL. Read-only.
@@ -547,6 +734,7 @@ impl AssetMaintenanceContract {
     ///
     /// Auth: `owner` must authorize. Traps if the schedule's frequency is not positive. Emits `maintenance_scheduled`.
     pub fn schedule_maintenance(env: Env, owner: Address, schedule: ScheduledMaintenance) {
+        Self::require_not_paused(&env);
         owner.require_auth();
         Self::store_schedule(&env, &schedule);
         events::maintenance_scheduled(&env, &schedule);
@@ -556,6 +744,7 @@ impl AssetMaintenanceContract {
     ///
     /// Auth: `owner` must authorize. Traps if no schedule exists or the frequency is not positive. Emits `maintenance_schedule_updated`.
     pub fn update_maintenance_schedule(env: Env, owner: Address, schedule: ScheduledMaintenance) {
+        Self::require_not_paused(&env);
         owner.require_auth();
 
         // Update existing schedule
@@ -574,10 +763,14 @@ impl AssetMaintenanceContract {
     /// Validates and persists a schedule without emitting an event, so that
     /// the create and update entrypoints each emit their own.
     fn store_schedule(env: &Env, schedule: &ScheduledMaintenance) {
-        // Asset owner check (placeholder - assuming caller is owner or admin)
-        // In a real system, we'd check if owner is truly the owner via Registry
         if schedule.frequency_days == 0 {
-            handle_error(&env, Error::InvalidArguments);
+            handle_error(env, Error::InvalidArguments);
+        }
+        if Self::is_burned(env, schedule.asset_id) {
+            handle_error(env, Error::AssetBurned);
+        }
+        if !Self::verify_asset_exists(env, schedule.asset_id) {
+            handle_error(env, Error::AssetNotFound);
         }
 
         env.storage()
@@ -596,6 +789,7 @@ impl AssetMaintenanceContract {
     /// evidence — and it is surfaced off-chain through the
     /// [`events::MaintenanceScheduleCancelled`] event.
     pub fn cancel_scheduled_maintenance(env: Env, owner: Address, asset_id: u64) {
+        Self::require_not_paused(&env);
         owner.require_auth();
 
         if !env
@@ -623,6 +817,7 @@ impl AssetMaintenanceContract {
 
     /// Completes the scheduled service for `asset_id` by recording `record` and advancing the schedule. Emits `maintenance_completed`; see [`Self::add_maintenance_record`] for the checks applied to `record`.
     pub fn complete_scheduled_maintenance(env: Env, asset_id: u64, record: MaintenanceRecord) {
+        Self::require_not_paused(&env);
         // 1. Add record
         Self::add_maintenance_record(env.clone(), record.clone());
 
@@ -649,6 +844,7 @@ impl AssetMaintenanceContract {
     ///
     /// Auth: the stored admin. Traps if the warranty dates are invalid. Emits `warranty_added`.
     pub fn add_warranty_information(env: Env, warranty: WarrantyInfo) {
+        Self::require_not_paused(&env);
         Self::require_admin(&env);
 
         Self::store_warranty(&env, &warranty);
@@ -659,6 +855,7 @@ impl AssetMaintenanceContract {
     ///
     /// Auth: the stored admin. Traps if no warranty exists or the dates are invalid. Emits `warranty_updated`.
     pub fn update_warranty_information(env: Env, warranty: WarrantyInfo) {
+        Self::require_not_paused(&env);
         Self::require_admin(&env);
 
         if !env
@@ -677,7 +874,7 @@ impl AssetMaintenanceContract {
     /// that the add and update entrypoints each emit their own.
     fn store_warranty(env: &Env, warranty: &WarrantyInfo) {
         if warranty.end_date <= warranty.start_date {
-            handle_error(&env, Error::InvalidArguments);
+            handle_error(env, Error::InvalidArguments);
         }
         env.storage()
             .persistent()
@@ -700,6 +897,7 @@ impl AssetMaintenanceContract {
     ///
     /// Auth: the stored admin. Traps with `WarrantyNotFound` if there is no warranty, and if the amount is not positive, the warranty is inactive or expired, or the maximum number of claims was reached. Emits `warranty_claim_filed`.
     pub fn file_warranty_claim(env: Env, asset_id: u64, claim_amount: i128) {
+        Self::require_not_paused(&env);
         Self::require_admin(&env);
 
         if claim_amount <= 0 {
@@ -734,6 +932,7 @@ impl AssetMaintenanceContract {
     ///
     /// Auth: the stored admin. Emits `alert_created`.
     pub fn create_maintenance_alert(env: Env, alert: MaintenanceAlert) {
+        Self::require_not_paused(&env);
         Self::require_admin(&env);
 
         let mut alerts = env
@@ -753,6 +952,7 @@ impl AssetMaintenanceContract {
     ///
     /// Auth: `by` must authorize. Traps with `NotFound` / `AlertIndexOutOfBounds` for an unknown asset or index. Emits `alert_acknowledged`.
     pub fn acknowledge_maintenance_alert(env: Env, asset_id: u64, alert_index: u32, by: Address) {
+        Self::require_not_paused(&env);
         by.require_auth();
         let mut alerts: Vec<MaintenanceAlert> = env
             .storage()
@@ -908,7 +1108,39 @@ impl AssetMaintenanceContract {
         score.clamp(0, 100)
     }
 
-    fn verify_asset_exists(_env: &Env, _asset_id: u64) -> bool {
-        true
+    fn history(env: &Env, asset_id: u64) -> Vec<MaintenanceRecord> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::MaintenanceHistory(asset_id))
+            .unwrap_or(Vec::new(env))
+    }
+
+    fn is_burned(env: &Env, asset_id: u64) -> bool {
+        env.storage()
+            .persistent()
+            .get(&DataKey::BurnedAsset(asset_id))
+            .unwrap_or(false)
+    }
+
+    fn store_annotation(env: &Env, asset_id: u64, index: u32, annotation: &RecordAnnotation) {
+        env.storage()
+            .persistent()
+            .set(&DataKey::RecordAnnotation(asset_id, index), annotation);
+        ttl::extend_persistent(env, &DataKey::RecordAnnotation(asset_id, index));
+
+        let mut indices: Vec<u32> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::AnnotatedIndices(asset_id))
+            .unwrap_or(Vec::new(env));
+        indices.push_back(index);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AnnotatedIndices(asset_id), &indices);
+        ttl::extend_persistent(env, &DataKey::AnnotatedIndices(asset_id));
+    }
+
+    fn verify_asset_exists(env: &Env, asset_id: u64) -> bool {
+        !Self::is_burned(env, asset_id)
     }
 }

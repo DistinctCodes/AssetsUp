@@ -96,6 +96,8 @@ pub enum DataKey {
     AuthorizedRegistrar(Address),
     /// Layout version the stored data conforms to. See `upgrade`.
     StorageVersion,
+    /// WASM hashes that `upgrade` is permitted to install.
+    AllowedWasmHashes,
     /// Address that has been proposed as the next admin but has not yet
     /// accepted. Absent when no transfer is in flight.
     PendingAdmin,
@@ -148,6 +150,9 @@ impl AssetUpContract {
         // Stamp the layout version so a later upgrade knows what it is
         // migrating from.
         upgrade::set_version(&env, upgrade::CURRENT_VERSION);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AllowedWasmHashes, &Vec::<BytesN<32>>::new(&env));
 
         // Extend on write, not only on read. A freshly written entry gets the
         // network's minimum lifetime, which is short; without this the whole
@@ -158,6 +163,7 @@ impl AssetUpContract {
         ttl::extend_persistent(&env, &DataKey::TotalAssetCount);
         ttl::extend_persistent(&env, &DataKey::ContractMetadata);
         ttl::extend_persistent(&env, &DataKey::StorageVersion);
+        ttl::extend_persistent(&env, &DataKey::AllowedWasmHashes);
         ttl::extend_persistent(&env, &DataKey::AuthorizedRegistrar(admin.clone()));
 
         events::contract_initialized(&env, &admin);
@@ -612,7 +618,6 @@ impl AssetUpContract {
             .unwrap_or_else(|| Vec::new(&env));
         Ok(page_of(&assets, start, limit))
     }
-    }
 
     /// The asset's full transfer history, oldest first.
     ///
@@ -694,8 +699,7 @@ impl AssetUpContract {
         }
 
         let list_key = branch::DataKey::AssetList(branch_id.clone());
-        let mut assets: Vec<BytesN<32>> =
-            store.get(&list_key).unwrap_or_else(|| Vec::new(&env));
+        let mut assets: Vec<BytesN<32>> = store.get(&list_key).unwrap_or_else(|| Vec::new(&env));
         if !assets.iter().any(|x| x == asset_id) {
             assets.push_back(asset_id.clone());
             store.set(&list_key, &assets);
@@ -870,8 +874,9 @@ impl AssetUpContract {
     /// Replaces this contract's WASM in place, keeping the contract id and all
     /// storage.
     ///
-    /// Admin-gated and emits an event. Deliberately **not** blocked by the
-    /// pause: an upgrade is how you fix the incident that caused the pause.
+    /// Admin-gated and limited to hashes on the allowlist; emits an event.
+    /// Deliberately **not** blocked by the pause: an upgrade is how you fix the
+    /// incident that caused the pause.
     ///
     /// This does not migrate storage. If the new build changes a stored
     /// layout, call [`Self::migrate`] immediately afterwards — see
@@ -880,11 +885,77 @@ impl AssetUpContract {
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
 
+        upgrade::require_hash_allowed(&env, &new_wasm_hash);
+
         env.deployer()
             .update_current_contract_wasm(new_wasm_hash.clone());
 
         upgrade::emit_upgraded(&env, &admin, &new_wasm_hash, upgrade::CURRENT_VERSION);
         Ok(())
+    }
+
+    /// Adds `wasm_hash` to the upgrade allowlist. Admin-gated.
+    pub fn allow_wasm_hash(env: Env, wasm_hash: BytesN<32>) -> Result<(), Error> {
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+
+        let mut hashes: Vec<BytesN<32>> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::AllowedWasmHashes)
+            .unwrap_or_else(|| Vec::new(&env));
+        upgrade::require_hash_unlisted(&env, &wasm_hash);
+        hashes.push_back(wasm_hash.clone());
+        env.storage()
+            .persistent()
+            .set(&DataKey::AllowedWasmHashes, &hashes);
+        ttl::extend_persistent(&env, &DataKey::AllowedWasmHashes);
+
+        events::wasm_hash_allowed(&env, &admin, &wasm_hash);
+        Ok(())
+    }
+
+    /// Removes `wasm_hash` from the upgrade allowlist. Admin-gated.
+    pub fn remove_wasm_hash(env: Env, wasm_hash: BytesN<32>) -> Result<(), Error> {
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+
+        let mut hashes: Vec<BytesN<32>> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::AllowedWasmHashes)
+            .unwrap_or_else(|| Vec::new(&env));
+        upgrade::require_hash_listed(&env, &wasm_hash);
+        let index = hashes
+            .iter()
+            .position(|allowed| allowed == wasm_hash)
+            .unwrap_or_else(|| {
+                soroban_sdk::panic_with_error!(
+                    env,
+                    crate::upgrade::UpgradeError::WasmHashNotAllowed
+                )
+            });
+        hashes.remove(index as u32);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AllowedWasmHashes, &hashes);
+        ttl::extend_persistent(&env, &DataKey::AllowedWasmHashes);
+
+        events::wasm_hash_removed(&env, &admin, &wasm_hash);
+        Ok(())
+    }
+
+    /// Whether `wasm_hash` may be installed by `upgrade`.
+    pub fn is_wasm_hash_allowed(env: Env, wasm_hash: BytesN<32>) -> bool {
+        upgrade::is_hash_allowed(&env, &wasm_hash)
+    }
+
+    /// The WASM hashes currently permitted by `upgrade`.
+    pub fn get_allowed_wasm_hashes(env: Env) -> Vec<BytesN<32>> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::AllowedWasmHashes)
+            .unwrap_or_else(|| Vec::new(&env))
     }
 
     /// Brings stored data up to the layout this build expects.
@@ -1005,7 +1076,11 @@ impl AssetUpContract {
         start: u32,
         limit: u32,
     ) -> Result<Vec<audit::AuditEntry>, Error> {
-        Ok(page_of(&audit::get_asset_log(&env, &asset_id), start, limit))
+        Ok(page_of(
+            &audit::get_asset_log(&env, &asset_id),
+            start,
+            limit,
+        ))
     }
 
     // =====================
@@ -1513,13 +1588,13 @@ impl AssetUpContract {
 
     /// Get all policies for an asset
     pub fn get_asset_insurance_policies(env: Env, asset_id: BytesN<32>) -> Vec<BytesN<32>> {
-        Self::get_asset_insurance_policies_page(env, asset_id, 0, MAX_PAGE_SIZE)
+        Self::get_asset_insurance_policy_page(env, asset_id, 0, MAX_PAGE_SIZE)
     }
 
     /// A page of the asset's insurance policy ids (`[start, start + limit)`,
     /// `limit` capped at [`MAX_PAGE_SIZE`]). The un-paged
     /// [`Self::get_asset_insurance_policies`] returns only the first page.
-    pub fn get_asset_insurance_policies_page(
+    pub fn get_asset_insurance_policy_page(
         env: Env,
         asset_id: BytesN<32>,
         start: u32,
@@ -1530,10 +1605,7 @@ impl AssetUpContract {
 
     /// Emit an on-chain expiry reminder for a policy nearing its end date
     /// (permissionless; only fires inside the reminder window)
-    pub fn emit_insurance_expiry_reminder(
-        env: Env,
-        policy_id: BytesN<32>,
-    ) -> Result<(), Error> {
+    pub fn emit_insurance_expiry_reminder(env: Env, policy_id: BytesN<32>) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
 
         insurance::emit_expiry_reminder(env, policy_id)

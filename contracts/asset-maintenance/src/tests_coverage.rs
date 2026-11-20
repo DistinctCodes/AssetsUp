@@ -9,8 +9,8 @@
 
 extern crate std;
 
-use soroban_sdk::testutils::{Address as _, Ledger as _, LedgerInfo};
-use soroban_sdk::{vec, Address, Env, String, Vec};
+use soroban_sdk::testutils::{Address as _, Events as _, Ledger as _, LedgerInfo};
+use soroban_sdk::{vec, Address, Env, String, Symbol, TryIntoVal, Vec};
 
 use super::*;
 
@@ -278,7 +278,10 @@ fn an_empty_maintenance_batch_is_rejected() {
     let ctx = setup(&env);
     let records: Vec<MaintenanceRecord> = Vec::new(&env);
 
-    assert!(ctx.client.try_add_maintenance_records_batch(&records).is_err());
+    assert!(ctx
+        .client
+        .try_add_maintenance_records_batch(&records)
+        .is_err());
 }
 
 #[test]
@@ -1184,4 +1187,333 @@ fn alert_pages_are_capped_and_counted() {
     );
     assert_eq!(ctx.client.get_alerts_page(&asset_id, &1_000, &10).len(), 0);
     assert_eq!(ctx.client.get_alerts_count(&999), 0);
+}
+
+// ---------------------------------------------------------------------------
+// Burned assets (#1477)
+// ---------------------------------------------------------------------------
+
+fn last_event_name(env: &Env) -> Symbol {
+    let events = env.events().all();
+    let (_contract, topics, _data) = events.last().expect("an event was published");
+    topics
+        .get(0)
+        .expect("every contractevent carries a name topic")
+        .try_into_val(env)
+        .expect("topic 0 must decode as a Symbol")
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #514)")]
+fn scheduling_maintenance_for_a_burned_asset_is_rejected() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    ctx.client.mark_asset_burned(&7);
+
+    ctx.client
+        .schedule_maintenance(&ctx.admin, &schedule(&env, &ctx.provider, 7, NOW + 500));
+}
+
+#[test]
+fn a_burned_asset_has_no_schedule_and_emits_a_marker_event() {
+    let env = Env::default();
+    let ctx = setup(&env);
+
+    ctx.client.mark_asset_burned(&7);
+    assert_eq!(
+        last_event_name(&env),
+        Symbol::new(&env, "asset_marked_burned")
+    );
+
+    assert!(ctx.client.is_asset_burned(&7));
+    assert!(ctx.client.get_upcoming_maintenance(&7).is_none());
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #514)")]
+fn updating_a_schedule_for_a_burned_asset_is_rejected() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    ctx.client
+        .schedule_maintenance(&ctx.admin, &schedule(&env, &ctx.provider, 7, NOW + 500));
+    ctx.client.mark_asset_burned(&7);
+
+    ctx.client
+        .update_maintenance_schedule(&ctx.admin, &schedule(&env, &ctx.provider, 7, NOW + 9_000));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #514)")]
+fn logging_maintenance_for_a_burned_asset_is_rejected() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    ctx.client.mark_asset_burned(&7);
+
+    ctx.client
+        .add_maintenance_record(&record(&env, &ctx.provider, 1, 7));
+}
+
+#[test]
+fn marking_an_asset_burned_requires_the_admins_authorization() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    env.set_auths(&[]);
+
+    assert!(ctx.client.try_mark_asset_burned(&7).is_err());
+    assert!(!ctx.client.is_asset_burned(&7));
+}
+
+// ---------------------------------------------------------------------------
+// Emergency pause (#1478)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn pausing_blocks_maintenance_logging_and_unpausing_restores_it() {
+    let env = Env::default();
+    let ctx = setup(&env);
+
+    ctx.client.pause_contract(&ctx.admin);
+    assert!(ctx.client.is_paused());
+
+    assert!(ctx
+        .client
+        .try_add_maintenance_record(&record(&env, &ctx.provider, 1, 7))
+        .is_err());
+    let batch = vec![&env, record(&env, &ctx.provider, 2, 7)];
+    assert!(ctx
+        .client
+        .try_add_maintenance_records_batch(&batch)
+        .is_err());
+    assert!(ctx
+        .client
+        .try_complete_scheduled_maintenance(&7, &record(&env, &ctx.provider, 3, 7))
+        .is_err());
+    assert!(ctx
+        .client
+        .try_schedule_maintenance(&ctx.admin, &schedule(&env, &ctx.provider, 7, NOW + 500))
+        .is_err());
+    assert_eq!(ctx.client.get_maintenance_history(&7).len(), 0);
+
+    ctx.client.unpause_contract(&ctx.admin);
+    assert!(!ctx.client.is_paused());
+    ctx.client
+        .add_maintenance_record(&record(&env, &ctx.provider, 1, 7));
+    assert_eq!(ctx.client.get_maintenance_history(&7).len(), 1);
+}
+
+#[test]
+fn pause_and_unpause_emit_events() {
+    let env = Env::default();
+    let ctx = setup(&env);
+
+    ctx.client.pause_contract(&ctx.admin);
+    assert_eq!(last_event_name(&env), Symbol::new(&env, "contract_paused"));
+
+    ctx.client.unpause_contract(&ctx.admin);
+    assert_eq!(
+        last_event_name(&env),
+        Symbol::new(&env, "contract_unpaused")
+    );
+}
+
+#[test]
+fn pausing_requires_the_admins_authorization() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    let stranger = Address::generate(&env);
+    env.set_auths(&[]);
+
+    assert!(ctx.client.try_pause_contract(&stranger).is_err());
+    assert!(!ctx.client.is_paused());
+}
+
+#[test]
+fn reads_still_work_while_paused() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    ctx.client
+        .add_maintenance_record(&record(&env, &ctx.provider, 1, 7));
+    ctx.client.pause_contract(&ctx.admin);
+
+    assert_eq!(ctx.client.get_maintenance_history(&7).len(), 1);
+    assert_eq!(ctx.client.get_asset_stats(&7).service_count, 1);
+    assert_eq!(ctx.client.get_admin(), ctx.admin);
+}
+
+#[test]
+fn every_mutating_entrypoint_is_covered_by_the_pause_guard() {
+    let source = include_str!("lib.rs");
+    let exempt = [
+        "initialize",
+        "pause_contract",
+        "unpause_contract",
+        "propose_admin",
+        "accept_admin",
+        "cancel_admin_proposal",
+    ];
+    let is_read = |name: &str| {
+        name.starts_with("get_")
+            || name.starts_with("is_")
+            || name.starts_with("calculate_")
+            || name == "storage_version"
+    };
+
+    let mut unguarded: std::vec::Vec<&str> = std::vec::Vec::new();
+    for part in source.split("\n    pub fn ").skip(1) {
+        let name = part.split('(').next().unwrap_or("").trim();
+        if name.is_empty() || is_read(name) || exempt.contains(&name) {
+            continue;
+        }
+        if !part.contains("require_not_paused") {
+            unguarded.push(name);
+        }
+    }
+
+    assert!(
+        unguarded.is_empty(),
+        "mutating entrypoints without a pause guard: {unguarded:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Voiding and amending records (#1479)
+// ---------------------------------------------------------------------------
+
+fn reason(env: &Env) -> String {
+    String::from_str(env, "mistaken cost")
+}
+
+#[test]
+fn voiding_a_record_keeps_the_history_and_marks_the_annotation() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    let original = record(&env, &ctx.provider, 1, 7);
+    ctx.client.add_maintenance_record(&original);
+    ctx.client
+        .add_maintenance_record(&record(&env, &ctx.provider, 2, 7));
+
+    ctx.client.void_maintenance_record(&7, &0, &reason(&env));
+    assert_eq!(
+        last_event_name(&env),
+        Symbol::new(&env, "maintenance_record_voided")
+    );
+
+    let history = ctx.client.get_maintenance_history(&7);
+    assert_eq!(history.len(), 2);
+    assert_eq!(history.get(0).unwrap(), original);
+    assert_eq!(history.get(1).unwrap().record_id, 2);
+
+    assert!(ctx.client.is_record_void(&7, &0));
+    assert!(!ctx.client.is_record_void(&7, &1));
+    let annotation = ctx.client.get_record_annotation(&7, &0).unwrap();
+    assert_eq!(annotation.status, RecordStatus::Void);
+    assert_eq!(annotation.reason, reason(&env));
+    assert_eq!(annotation.actor, ctx.admin);
+    assert_eq!(annotation.correction_index, None);
+    assert_eq!(ctx.client.get_annotated_record_indices(&7), vec![&env, 0]);
+}
+
+#[test]
+fn amending_a_record_appends_a_linked_correction() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    let original = record(&env, &ctx.provider, 1, 7);
+    ctx.client.add_maintenance_record(&original);
+
+    let mut correction = original.clone();
+    correction.total_cost = 120;
+    correction.labor_cost = 80;
+    correction.parts_cost = 40;
+    correction.description = String::from_str(&env, "Corrected service");
+    ctx.client
+        .amend_maintenance_record(&7, &0, &correction, &reason(&env));
+    assert_eq!(
+        last_event_name(&env),
+        Symbol::new(&env, "maintenance_record_amended")
+    );
+
+    let history = ctx.client.get_maintenance_history(&7);
+    assert_eq!(history.len(), 2);
+    assert_eq!(history.get(0).unwrap(), original);
+    assert_eq!(history.get(1).unwrap(), correction);
+
+    let annotation = ctx.client.get_record_annotation(&7, &0).unwrap();
+    assert_eq!(annotation.status, RecordStatus::Amended);
+    assert_eq!(annotation.correction_index, Some(1));
+    assert!(!ctx.client.is_record_void(&7, &0));
+    assert_eq!(ctx.client.get_annotated_record_indices(&7), vec![&env, 0]);
+    assert_eq!(ctx.client.calculate_total_maintenance_cost(&7), 220);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #512)")]
+fn voiding_a_missing_record_is_rejected() {
+    let env = Env::default();
+    let ctx = setup(&env);
+
+    ctx.client.void_maintenance_record(&7, &0, &reason(&env));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #513)")]
+fn a_record_cannot_be_resolved_twice() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    ctx.client
+        .add_maintenance_record(&record(&env, &ctx.provider, 1, 7));
+
+    ctx.client.void_maintenance_record(&7, &0, &reason(&env));
+    ctx.client
+        .amend_maintenance_record(&7, &0, &record(&env, &ctx.provider, 1, 7), &reason(&env));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #509)")]
+fn amending_a_record_with_a_different_provider_is_rejected() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    ctx.client
+        .add_maintenance_record(&record(&env, &ctx.provider, 1, 7));
+    let stranger = Address::generate(&env);
+
+    ctx.client
+        .amend_maintenance_record(&7, &0, &record(&env, &stranger, 1, 7), &reason(&env));
+}
+
+#[test]
+fn voiding_and_amending_require_the_admins_authorization() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    let r = record(&env, &ctx.provider, 1, 7);
+    ctx.client.add_maintenance_record(&r);
+    env.set_auths(&[]);
+
+    assert!(ctx
+        .client
+        .try_void_maintenance_record(&7, &0, &reason(&env))
+        .is_err());
+    assert!(ctx
+        .client
+        .try_amend_maintenance_record(&7, &0, &r, &reason(&env))
+        .is_err());
+    assert!(ctx.client.get_record_annotation(&7, &0).is_none());
+}
+
+#[test]
+fn void_and_amend_are_blocked_while_paused() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    let r = record(&env, &ctx.provider, 1, 7);
+    ctx.client.add_maintenance_record(&r);
+    ctx.client.pause_contract(&ctx.admin);
+
+    assert!(ctx
+        .client
+        .try_void_maintenance_record(&7, &0, &reason(&env))
+        .is_err());
+    assert!(ctx
+        .client
+        .try_amend_maintenance_record(&7, &0, &r, &reason(&env))
+        .is_err());
+    assert_eq!(ctx.client.get_maintenance_history(&7).len(), 1);
 }
