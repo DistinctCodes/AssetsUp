@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 import { env } from './env';
+import { redirectToLogin } from './auth-redirect';
 
 const API_BASE = env.NEXT_PUBLIC_API_URL;
 
@@ -35,7 +36,7 @@ api.interceptors.response.use(
       if (!refreshToken) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
+        redirectToLogin();
         return Promise.reject(error);
       }
 
@@ -54,18 +55,23 @@ api.interceptors.response.use(
       isRefreshing = true;
       refreshPromise = new Promise(async (resolve, reject) => {
         try {
-          const { data } = await axios.post(
-            `${API_BASE}/auth/refresh`,
-            {},
-            { headers: { Authorization: `Bearer ${refreshToken}` } },
-          );
-          localStorage.setItem('accessToken', data.accessToken);
-          localStorage.setItem('refreshToken', data.refreshToken);
-          resolve({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+          // The backend reads the refresh token from the body (not a Bearer
+          // header) and wraps the answer in a { success, data } envelope. This
+          // call bypasses the `api` instance, so unwrap it here.
+          const { data: body } = await axios.post(`${API_BASE}/auth/refresh`, {
+            refreshToken,
+          });
+          const tokens = body && body.success === true && body.data ? body.data : body;
+          localStorage.setItem('accessToken', tokens.accessToken);
+          localStorage.setItem('refreshToken', tokens.refreshToken);
+          resolve({
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+          });
         } catch (refreshError) {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
-          window.location.href = '/login';
+          redirectToLogin();
           reject(refreshError);
         } finally {
           isRefreshing = false;

@@ -33,7 +33,10 @@ export default function ResetPasswordPage() {
     setError('');
     setLoading(true);
     try {
-      await api.post('/auth/reset-password', { token, password: values.password });
+      await api.post('/auth/reset-password', {
+        token,
+        newPassword: values.password,
+      });
       setSuccess(true);
       setTimeout(() => router.push('/login'), 3000);
     } catch (err: any) {

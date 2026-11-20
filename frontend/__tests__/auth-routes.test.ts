@@ -35,7 +35,7 @@ describe("auth route decisions", () => {
     },
   );
 
-  it.each(["/login", "/register", "/forgot-password"])(
+  it.each(["/login", "/register", "/forgot-password", "/reset-password"])(
     "sends a signed-in user on %s to /dashboard",
     (path) => {
       expect(decideAuth(path, true)).toEqual({
@@ -45,7 +45,14 @@ describe("auth route decisions", () => {
     },
   );
 
-  it.each(["/login", "/register", "/forgot-password", "/scan/abc", "/"])(
+  it.each([
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+    "/scan/abc",
+    "/",
+  ])(
     "leaves public path %s alone when signed out",
     (path) => {
       expect(decideAuth(path, false)).toEqual({ action: "next" });
@@ -61,5 +68,20 @@ describe("auth route decisions", () => {
   it("no longer references the non-existent /signin and /signup", () => {
     expect(isAuthPage("/signin")).toBe(false);
     expect(isAuthPage("/signup")).toBe(false);
+  });
+});
+
+describe("password reset links", () => {
+  it("renders the reset form for a signed-out visit with a token", () => {
+    expect(isAuthPage("/reset-password")).toBe(true);
+    expect(decideAuth("/reset-password", false)).toEqual({ action: "next" });
+  });
+
+  it("does not redirect the emailed link to /login", () => {
+    expect(decideAuth("/reset-password", false).action).not.toBe("redirect");
+  });
+
+  it("does not treat look-alike paths as the reset page", () => {
+    expect(isAuthPage("/reset-passwords")).toBe(false);
   });
 });
