@@ -10,18 +10,24 @@ export function useAssetQr(assetId: string) {
 
   useEffect(() => {
     let cancelled = false;
+    let objectUrl: string | null = null;
     setLoading(true);
+    setError(false);
+    setQrUrl(null);
     api
       .get(`/assets/${assetId}/qr`, { responseType: 'blob' })
       .then((r) => {
         if (cancelled) return;
-        const url = URL.createObjectURL(r.data);
-        setQrUrl(url);
+        objectUrl = URL.createObjectURL(r.data);
+        setQrUrl(objectUrl);
       })
       .catch(() => { if (!cancelled) setError(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [assetId]);
 
   return { qrUrl, loading, error };
