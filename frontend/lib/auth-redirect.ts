@@ -9,7 +9,8 @@ import { isAuthPage, isPublicPath } from './auth-routes';
 export function redirectToLogin(
   location: Pick<Location, 'pathname' | 'href'> = window.location,
 ): boolean {
-  if (isAuthPage(location.pathname) || isPublicPath(location.pathname)) {
+  const pathname = location.pathname ?? '';
+  if (isAuthPage(pathname) || isPublicPath(pathname)) {
     return false;
   }
   location.href = '/login';
