@@ -19,16 +19,34 @@ defaults:
     working-directory: contracts # 👈 all cargo commands run in contracts/
 
 jobs:
-  format:
-    name: Format Check
+  # A manifest change without a matching Cargo.lock change would make every
+  # other job quietly resolve (and test) different dependency versions than the
+  # ones committed and audited. `--locked` turns that into a hard failure here.
+  lockfile:
+    name: Cargo.lock is up to date
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Read pinned toolchain
         id: toolchain
         run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc  # master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+      - name: Fail if the lockfile would change
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
+  format:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - name: Read pinned toolchain
+        id: toolchain
+        run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc  # master
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           components: rustfmt
@@ -39,17 +57,17 @@ jobs:
     name: Clippy Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Read pinned toolchain
         id: toolchain
         run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc  # master
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           components: clippy
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ~/.cargo/registry
@@ -59,22 +77,22 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
   test:
     name: Test Suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Read pinned toolchain
         id: toolchain
         run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc  # master
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ~/.cargo/registry
@@ -85,22 +103,22 @@ jobs:
             ${{ runner.os }}-cargo-test-
             ${{ runner.os }}-cargo-
       - name: Run tests
-        run: cargo test --all --verbose
+        run: cargo test --locked --all --verbose
 
   build:
     name: Build Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Read pinned toolchain
         id: toolchain
         run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc  # master
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ~/.cargo/registry
@@ -111,23 +129,23 @@ jobs:
             ${{ runner.os }}-cargo-build-
             ${{ runner.os }}-cargo-
       - name: Build all crates
-        run: cargo build --all --verbose
+        run: cargo build --locked --all --verbose
 
   build-wasm:
     name: Build WASM
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Read pinned toolchain
         id: toolchain
         run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc  # master
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           targets: wasm32-unknown-unknown
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ~/.cargo/registry
@@ -140,17 +158,68 @@ jobs:
       # Every crate declares a cdylib crate-type and a #[contract] entrypoint,
       # so all five are deployable and all five must be size-checked.
       - name: Build all contracts to WASM
-        run: cargo build --workspace --target wasm32-unknown-unknown --release --verbose
+        run: cargo build --locked --workspace --target wasm32-unknown-unknown --release --verbose
 
       - name: Check WASM size budgets
         run: ./scripts/check-wasm-size.sh | tee "$GITHUB_STEP_SUMMARY"
 
       - name: Upload WASM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: contract-wasm
           path: contracts/target/wasm32-unknown-unknown/release/*.wasm
           if-no-files-found: error
+          retention-days: 14
+
+  # The public interface of every contract (names, signatures, types) is what
+  # the backend, scripts and off-chain integrations depend on. This job dumps
+  # each contract's spec from the freshly built WASM, compares it with the
+  # committed contracts/<crate>/spec.json snapshot, and generates TypeScript
+  # bindings so a signature change is caught by type-checking as well.
+  # See contracts/BUILD.md ("Interface snapshots and TypeScript bindings").
+  interface:
+    name: Contract interface (spec snapshot + bindings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - name: Read pinned toolchain
+        id: toolchain
+        run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc  # master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          targets: wasm32-unknown-unknown
+      - name: Cache cargo registry and tools
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/target
+          key: ${{ runner.os }}-cargo-interface-${{ hashFiles('contracts/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-interface-
+      - name: Build all contracts to WASM
+        run: cargo build --locked --workspace --target wasm32-unknown-unknown --release
+      # NOTE: the CLI version range and subcommands below have not been verified
+      # in CI yet; adjust here if the first run reports a different interface.
+      - name: Install Stellar CLI
+        run: command -v stellar >/dev/null || cargo install --locked stellar-cli --version "^23"
+      - name: Check spec snapshots
+        run: ./scripts/check-spec.sh
+      - name: Generate TypeScript bindings
+        run: ./scripts/generate-bindings.sh
+      - name: Upload generated specs and bindings
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: contract-interface
+          path: |
+            contracts/target/spec-generated/
+            packages/contracts-ts/
+          if-no-files-found: ignore
           retention-days: 14
 
   wasm-size-delta:
@@ -162,17 +231,17 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Read pinned toolchain
         id: toolchain
         run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc  # master
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           targets: wasm32-unknown-unknown
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ~/.cargo/registry
@@ -185,7 +254,7 @@ jobs:
 
       - name: Measure this branch
         run: |
-          cargo build --workspace --target wasm32-unknown-unknown --release
+          cargo build --locked --workspace --target wasm32-unknown-unknown --release
           ./scripts/check-wasm-size.sh --json > /tmp/head-sizes.json
           cat /tmp/head-sizes.json
 
@@ -194,7 +263,7 @@ jobs:
           git stash --include-untracked || true
           git fetch origin "${{ github.base_ref }}" --depth=1
           git checkout "origin/${{ github.base_ref }}" -- .
-          cargo build --workspace --target wasm32-unknown-unknown --release
+          cargo build --locked --workspace --target wasm32-unknown-unknown --release
           ./scripts/check-wasm-size.sh --json > /tmp/base-sizes.json || echo '{}' > /tmp/base-sizes.json
           cat /tmp/base-sizes.json
 
@@ -244,7 +313,7 @@ jobs:
       - name: Comment the per-contract delta
         if: github.event.pull_request.head.repo.full_name == github.repository
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7
         with:
           script: |
             const fs = require('fs');
@@ -288,10 +357,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: "20"
           cache: "npm"
@@ -322,10 +391,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: "20"
           cache: "npm"

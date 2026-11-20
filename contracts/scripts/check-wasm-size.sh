@@ -8,7 +8,7 @@
 # which is the worst possible moment to discover it.
 #
 # Usage:
-#   cargo build --workspace --target wasm32-unknown-unknown --release
+#   cargo build --locked --workspace --target wasm32-unknown-unknown --release
 #   ./scripts/check-wasm-size.sh
 #
 #   ./scripts/check-wasm-size.sh --json      # machine-readable, for PR diffing
@@ -52,7 +52,7 @@ budget_for() {
 
 if [[ ! -d "$WASM_DIR" ]]; then
   echo "error: $WASM_DIR not found." >&2
-  echo "       Run: cargo build --workspace --target wasm32-unknown-unknown --release" >&2
+  echo "       Run: cargo build --locked --workspace --target wasm32-unknown-unknown --release" >&2
   exit 1
 fi
 

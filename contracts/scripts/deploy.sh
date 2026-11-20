@@ -103,7 +103,7 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
   log "Building ${#CONTRACTS[@]} contracts for wasm32-unknown-unknown (release)"
   for c in "${CONTRACTS[@]}"; do
     log "  building $c"
-    cargo build --package "$c" --target wasm32-unknown-unknown --release
+    cargo build --locked --package "$c" --target wasm32-unknown-unknown --release
   done
 else
   log "Skipping build (--skip-build)"
