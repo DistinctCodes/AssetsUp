@@ -14,7 +14,7 @@ members = [
 ]
 
 [workspace.dependencies]
-soroban-sdk = "23"
+soroban-sdk = "29"
 
 # Deployable WASM is charged for by size and subject to a ledger size limit, so
 # the release profile is tuned for the smallest artifact that is still safe.
