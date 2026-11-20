@@ -28,4 +28,10 @@ export class ListAssetsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() departmentId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() locationId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() status?: string;
+  @ApiPropertyOptional({
+    description: 'Only assets assigned to this user id; `me` means the caller',
+  })
+  @IsOptional()
+  @IsString()
+  assignedToId?: string;
 }

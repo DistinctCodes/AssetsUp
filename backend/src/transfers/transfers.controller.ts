@@ -16,7 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { TransfersService } from './transfers.service';
 import { CreateTransferDto } from './dto/create-transfer.dto';
-import { PaginationQueryDto } from '../common/dto/pagination.dto';
+import { ListTransfersQueryDto } from './dto/list-transfers-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('transfers')
@@ -29,8 +29,14 @@ export class TransfersController {
   @Get()
   @ApiOperation({ summary: 'List all asset transfers' })
   @ApiResponse({ status: 200, description: 'Paginated list of transfers' })
-  findAll(@Query() query: PaginationQueryDto) {
-    return this.transfersService.findAll(query);
+  findAll(@Query() query: ListTransfersQueryDto, @Req() req: any) {
+    // `requestedByUserId=me` means "the caller's own requests".
+    const callerId = req.user?.id;
+    const resolved =
+      query.requestedByUserId === 'me'
+        ? { ...query, requestedByUserId: callerId }
+        : query;
+    return this.transfersService.findAll(resolved);
   }
 
   @Post()

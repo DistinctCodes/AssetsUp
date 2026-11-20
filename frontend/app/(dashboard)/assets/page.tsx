@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search, SlidersHorizontal, MapPin, X, Package, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/assets/status-badge";
+import { StatusBadge, assetStatusLabel } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
 import { CreateAssetModal } from "@/components/assets/create-asset-modal";
 import { useUrlState } from "@/hooks/useUrlState";
@@ -171,7 +171,7 @@ export default function AssetsPage() {
             <option value="">All Statuses</option>
             {Object.values(AssetStatus).map((s) => (
               <option key={s} value={s}>
-                {s.charAt(0) + s.slice(1).toLowerCase()}
+                {assetStatusLabel(s)}
               </option>
             ))}
           </select>

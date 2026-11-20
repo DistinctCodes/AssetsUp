@@ -43,9 +43,9 @@ describe("AssetsPage", () => {
   it("writes the status filter to the URL", () => {
     render(<AssetsPage />);
     fireEvent.change(screen.getByLabelText("Filter by status"), {
-      target: { value: "ACTIVE" },
+      target: { value: "AVAILABLE" },
     });
-    expect(replace).toHaveBeenCalledWith("/assets?status=ACTIVE", { scroll: false });
+    expect(replace).toHaveBeenCalledWith("/assets?status=AVAILABLE", { scroll: false });
   });
 
   it("opens the bulk import page", () => {

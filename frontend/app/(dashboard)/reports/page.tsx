@@ -10,10 +10,13 @@ import { StatusBadge } from "@/components/assets/status-badge";
 import { DateRangeSelector } from "@/features/Dashboard/DateRangeSelector";
 
 const STATUS_COLORS: Partial<Record<AssetStatus, string>> = {
-  [AssetStatus.ACTIVE]: "bg-green-500",
+  [AssetStatus.AVAILABLE]: "bg-green-500",
   [AssetStatus.ASSIGNED]: "bg-blue-500",
-  [AssetStatus.MAINTENANCE]: "bg-yellow-500",
+  [AssetStatus.IN_MAINTENANCE]: "bg-yellow-500",
+  [AssetStatus.IN_TRANSIT]: "bg-indigo-500",
   [AssetStatus.RETIRED]: "bg-gray-400",
+  [AssetStatus.DISPOSED]: "bg-slate-500",
+  [AssetStatus.LOST]: "bg-red-500",
 };
 
 export default function ReportsPage() {

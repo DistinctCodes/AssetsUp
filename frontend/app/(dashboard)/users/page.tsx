@@ -8,18 +8,18 @@ import { useUsersList, useUpdateUserRole, useToggleUserActive, useInviteUser } f
 import { useAuthStore } from '@/store/auth.store';
 import { getUserActionErrorMessage } from '@/lib/api/users';
 import { toast } from '@/components/ui/toast';
-import { AppUser, UserRole } from '@/lib/api/users';
+import { AppUser, UserRole, USER_ROLES, USER_ROLE_LABELS, isAdminRole } from '@/lib/api/users';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/pagination';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
-const ROLES: UserRole[] = ['admin', 'manager', 'staff'];
+const ROLES = USER_ROLES;
 
 const roleConfig: Record<UserRole, { label: string; className: string }> = {
-  admin:   { label: 'Admin',   className: 'bg-purple-100 text-purple-700' },
-  manager: { label: 'Manager', className: 'bg-blue-100   text-blue-700'   },
-  staff:   { label: 'Staff',   className: 'bg-gray-100   text-gray-600'   },
+  ADMIN:    { label: USER_ROLE_LABELS.ADMIN,    className: 'bg-purple-100 text-purple-700' },
+  MANAGER:  { label: USER_ROLE_LABELS.MANAGER,  className: 'bg-blue-100   text-blue-700'   },
+  EMPLOYEE: { label: USER_ROLE_LABELS.EMPLOYEE, className: 'bg-gray-100   text-gray-600'   },
 };
 
 export default function UsersPage() {
@@ -60,7 +60,7 @@ export default function UsersPage() {
             {data?.total ?? 0} member{(data?.total ?? 0) !== 1 ? 's' : ''} in your organisation
           </p>
         </div>
-        {currentUser?.role === 'admin' && (
+        {isAdminRole(currentUser?.role) && (
           <Button onClick={() => setShowInvite(true)}>
             <Plus className="w-4 h-4 mr-1.5" /> Invite User
           </Button>
@@ -105,7 +105,7 @@ export default function UsersPage() {
               <th className="text-left px-4 py-3 font-medium text-gray-500">Role</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Joined</th>
-              {currentUser?.role === 'admin' && <th className="text-right px-4 py-3 font-medium text-gray-500">Actions</th>}
+              {isAdminRole(currentUser?.role) && <th className="text-right px-4 py-3 font-medium text-gray-500">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -184,7 +184,7 @@ export default function UsersPage() {
                     </td>
 
                     {/* Actions */}
-                    {currentUser?.role === 'admin' && (
+                    {isAdminRole(currentUser?.role) && (
                       <td className="px-4 py-3 text-right">
                         {!isCurrentUser && (
                           <button
@@ -257,7 +257,7 @@ export default function UsersPage() {
             </ul>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-medium text-gray-900 mb-2">Staff</h3>
+            <h3 className="font-medium text-gray-900 mb-2">Employee</h3>
             <ul className="text-xs text-gray-600 space-y-1">
               <li>View assigned assets</li>
               <li>Report issues</li>
@@ -340,7 +340,7 @@ function RoleDropdown({
 
 function InviteUserModal({ onClose }: { onClose: () => void }) {
   const inviteUser = useInviteUser();
-  const [form, setForm] = useState({ email: "", firstName: "", lastName: "", role: "staff" as UserRole });
+  const [form, setForm] = useState({ email: "", firstName: "", lastName: "", role: "EMPLOYEE" as UserRole });
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -368,9 +368,9 @@ function InviteUserModal({ onClose }: { onClose: () => void }) {
           <Input placeholder="Last name" required value={form.lastName} onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))} />
           <select value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value as UserRole }))}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <option value="staff">Staff</option>
-            <option value="manager">Manager</option>
-            <option value="admin">Admin</option>
+            {ROLES.map((r) => (
+              <option key={r} value={r}>{USER_ROLE_LABELS[r]}</option>
+            ))}
           </select>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>

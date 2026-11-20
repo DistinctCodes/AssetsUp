@@ -32,6 +32,8 @@ export interface AssetListFilters {
   categoryId?: string;
   departmentId?: string;
   locationId?: string;
+  /** Only assets assigned to this user id; `me` means the signed-in user. */
+  assignedToId?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -43,6 +45,22 @@ export interface AssetListResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+/** What GET /assets actually returns: the rows are called `items`, not `data`. */
+interface BackendAssetPage {
+  items: Asset[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** Maps the backend's `{ items }` page onto the `{ data }` shape the pages read. */
+export function normalizeAssetPage(body: AssetListResponse | BackendAssetPage): AssetListResponse {
+  if ('items' in body) {
+    return { data: body.items, total: body.total, page: body.page, limit: body.limit };
+  }
+  return body;
 }
 
 export interface CreateAssetInput {
@@ -68,7 +86,9 @@ export interface CreateAssetInput {
 
 export const assetApiClient = {
   getAssets: (filters?: AssetListFilters): Promise<AssetListResponse> =>
-    api.get<AssetListResponse>('/assets', { params: filters }).then((r) => r.data),
+    api
+      .get<AssetListResponse | BackendAssetPage>('/assets', { params: filters })
+      .then((r) => normalizeAssetPage(r.data)),
 
   getAsset: (id: string): Promise<Asset> =>
     api.get<Asset>(`/assets/${id}`).then((r) => r.data),

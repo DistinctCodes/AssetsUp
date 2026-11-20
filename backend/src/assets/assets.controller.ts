@@ -52,8 +52,11 @@ export class AssetsController {
   @Get()
   @ApiOperation({ summary: 'List all assets (paginated, filterable)' })
   @ApiResponse({ status: 200, description: 'Paginated list of assets' })
-  findAll(@Query() query: ListAssetsQueryDto) {
-    return this.assetsService.findAll(query);
+  findAll(@Query() query: ListAssetsQueryDto, @GetUser('id') userId?: string) {
+    // `assignedToId=me` means "the caller's assets".
+    const resolved =
+      query.assignedToId === 'me' ? { ...query, assignedToId: userId } : query;
+    return this.assetsService.findAll(resolved);
   }
 
   @Post()

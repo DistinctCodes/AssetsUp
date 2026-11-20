@@ -1,7 +1,19 @@
 import { api } from '../api';
 import type { PageParams, Paginated } from './paginated';
 
-export type UserRole = 'admin' | 'manager' | 'staff';
+/** The backend's role values (backend/src/users/entities/user.entity.ts). */
+export type UserRole = 'ADMIN' | 'MANAGER' | 'EMPLOYEE';
+
+export const USER_ROLES: readonly UserRole[] = ['ADMIN', 'MANAGER', 'EMPLOYEE'];
+
+/** Friendly labels for the UI; never compare these, compare the role value. */
+export const USER_ROLE_LABELS: Record<UserRole, string> = {
+  ADMIN: 'Admin',
+  MANAGER: 'Manager',
+  EMPLOYEE: 'Employee',
+};
+
+export const isAdminRole = (role: string | undefined | null): boolean => role === 'ADMIN';
 
 export interface AppUser {
   id: string;

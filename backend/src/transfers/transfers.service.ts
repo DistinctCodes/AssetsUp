@@ -24,9 +24,18 @@ export class TransfersService {
     @Optional() private readonly events?: EventEmitter2,
   ) {}
 
-  async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<AssetTransfer>> {
-    const { page = 1, limit = 20 } = query;
+  async findAll(
+    query: PaginationQueryDto & {
+      requestedByUserId?: string;
+      status?: TransferStatus;
+    },
+  ): Promise<PaginatedResponse<AssetTransfer>> {
+    const { page = 1, limit = 20, requestedByUserId, status } = query;
+    const where: Record<string, unknown> = {};
+    if (requestedByUserId) where.requestedByUserId = requestedByUserId;
+    if (status) where.status = status;
     const [items, total] = await this.transferRepo.findAndCount({
+      where,
       skip: (page - 1) * limit,
       take: limit,
       order: { createdAt: 'DESC' },
