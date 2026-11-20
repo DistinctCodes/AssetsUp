@@ -3,7 +3,9 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
 import { License } from './entities/license.entity';
@@ -21,6 +23,7 @@ export class LicensesService {
     @InjectRepository(LicenseSeatAssignment)
     private readonly seatRepo: Repository<LicenseSeatAssignment>,
     private readonly dataSource: DataSource,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   private withRenewalFlag(license: License) {
@@ -91,7 +94,7 @@ export class LicensesService {
   }
 
   async assign(licenseId: string, dto: { userId: string }) {
-    return this.dataSource.transaction(async (manager) => {
+    const license = await this.dataSource.transaction(async (manager) => {
       // Pessimistic write lock prevents concurrent over-allocation
       const lic = await manager.findOne(License, {
         where: { id: licenseId },
@@ -122,6 +125,12 @@ export class LicensesService {
       lic.seatsUsed += 1;
       await manager.save(lic);
     }).then(() => this.findById(licenseId));
+    this.events?.emit('license.seat_assigned', {
+      licenseId,
+      licenseName: license?.name,
+      userId: dto.userId,
+    });
+    return license;
   }
 
   async unassign(licenseId: string, assignmentId: string) {

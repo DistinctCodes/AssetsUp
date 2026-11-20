@@ -4,7 +4,9 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Reservation } from './entities/reservation.entity';
@@ -19,6 +21,7 @@ export class ReservationsService {
     @InjectRepository(Asset)
     private readonly assetRepo: Repository<Asset>,
     private readonly dataSource: DataSource,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   async create(
@@ -172,7 +175,12 @@ export class ReservationsService {
 
     reservation.status = 'CANCELLED';
     reservation.cancellationReason = reason || null;
-    return this.reservationRepo.save(reservation);
+    const saved = await this.reservationRepo.save(reservation);
+    this.events?.emit('reservation.cancelled', {
+      reservation: saved,
+      actorId: userId,
+    });
+    return saved;
   }
 
   async confirm(id: string, role: string): Promise<Reservation> {
@@ -192,6 +200,8 @@ export class ReservationsService {
     }
 
     reservation.status = 'CONFIRMED';
-    return this.reservationRepo.save(reservation);
+    const saved = await this.reservationRepo.save(reservation);
+    this.events?.emit('reservation.confirmed', { reservation: saved });
+    return saved;
   }
 }

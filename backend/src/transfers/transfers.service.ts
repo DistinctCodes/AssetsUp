@@ -2,7 +2,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -19,6 +21,7 @@ export class TransfersService {
     private readonly transferRepo: Repository<AssetTransfer>,
     @InjectRepository(Asset)
     private readonly assetRepo: Repository<Asset>,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   async findAll(query: PaginationQueryDto): Promise<PaginatedResponse<AssetTransfer>> {
@@ -42,7 +45,9 @@ export class TransfersService {
       ...dto,
       status: TransferStatus.PENDING,
     });
-    return this.transferRepo.save(tr);
+    const saved = await this.transferRepo.save(tr);
+    this.events?.emit('transfer.requested', { transfer: saved });
+    return saved;
   }
 
   async approve(id: string, approverUserId: string) {
@@ -63,7 +68,9 @@ export class TransfersService {
       }
     });
 
-    return this.findById(id);
+    const approved = await this.findById(id);
+    this.events?.emit('transfer.approved', { transfer: approved });
+    return approved;
   }
 
   async reject(id: string, reason: string) {
@@ -73,7 +80,9 @@ export class TransfersService {
     }
     tr.status = TransferStatus.REJECTED;
     tr.rejectionReason = reason;
-    return this.transferRepo.save(tr);
+    const saved = await this.transferRepo.save(tr);
+    this.events?.emit('transfer.rejected', { transfer: saved });
+    return saved;
   }
 
   async cancel(id: string) {

@@ -4,7 +4,14 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   WsException,
+  SubscribeMessage,
+  ConnectedSocket,
+  MessageBody,
 } from '@nestjs/websockets';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User, UserRole } from '../users/entities/user.entity';
+import { Asset } from '../assets/entities/asset.entity';
 import { Server, Socket } from 'socket.io';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -109,6 +116,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(Asset)
+    private readonly assetRepo: Repository<Asset>,
   ) {
     EventsGateway.configService = configService;
   }
@@ -128,6 +139,18 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.data.userId = payload.sub;
       client.join(`user:${payload.sub}`);
       this.logger.debug(`Client ${client.id} joined user:${payload.sub}`);
+
+      // Department events (asset.status_changed, maintenance.due) go to
+      // `department:<id>`, so every connection joins its own department room.
+      const user = await this.userRepo.findOne({ where: { id: payload.sub } });
+      client.data.role = user?.role;
+      client.data.departmentId = user?.departmentId;
+      if (user?.departmentId) {
+        client.join(`department:${user.departmentId}`);
+        this.logger.debug(
+          `Client ${client.id} joined department:${user.departmentId}`,
+        );
+      }
     } catch (err) {
       this.logger.warn(`WS connection rejected: ${err.message}`);
       client.disconnect(true);
@@ -137,6 +160,51 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket) {
     this.logger.debug(`Client ${client.id} disconnected`);
+  }
+
+  /**
+   * Watch one asset's events. Allowed for admins and managers, for people in
+   * the asset's department and for whoever the asset is assigned to; anyone
+   * else is refused so asset rooms cannot be used to snoop on other teams.
+   */
+  @SubscribeMessage('subscribe:asset')
+  async subscribeAsset(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { assetId?: string },
+  ) {
+    const assetId = body?.assetId;
+    if (!assetId || typeof assetId !== 'string') {
+      throw new WsException('assetId is required');
+    }
+    const asset = await this.assetRepo.findOne({ where: { id: assetId } });
+    if (!asset) throw new WsException('Asset not found');
+
+    const userId = client.data?.userId as string | undefined;
+    const privileged =
+      client.data?.role === UserRole.ADMIN ||
+      client.data?.role === UserRole.MANAGER;
+    const sameDepartment =
+      !!asset.departmentId && asset.departmentId === client.data?.departmentId;
+    const assignedToCaller = !!userId && asset.assignedToUserId === userId;
+    if (!privileged && !sameDepartment && !assignedToCaller) {
+      throw new WsException('Not allowed to watch this asset');
+    }
+
+    client.join(`asset:${assetId}`);
+    return { event: 'subscribed', data: { assetId } };
+  }
+
+  @SubscribeMessage('unsubscribe:asset')
+  unsubscribeAsset(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { assetId?: string },
+  ) {
+    const assetId = body?.assetId;
+    if (!assetId || typeof assetId !== 'string') {
+      throw new WsException('assetId is required');
+    }
+    client.leave(`asset:${assetId}`);
+    return { event: 'unsubscribed', data: { assetId } };
   }
 
   @OnEvent('notification.new')
