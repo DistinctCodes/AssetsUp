@@ -1,12 +1,21 @@
 import type { NextConfig } from "next";
 
+// Comma-separated list of hostnames allowed for next/image optimisation,
+// e.g. NEXT_PUBLIC_IMAGE_HOSTS="cdn.example.com,assets.example.com".
+// When unset, no remote host is allowed.
+const imageHosts = (process.env.NEXT_PUBLIC_IMAGE_HOSTS ?? "")
+  .split(",")
+  .map((h) => h.trim())
+  .filter(Boolean);
+
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "**" },
-    ],
+    remotePatterns: imageHosts.map((hostname) => ({
+      protocol: "https" as const,
+      hostname,
+    })),
   },
   async headers() {
     return [
