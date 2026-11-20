@@ -81,7 +81,11 @@ pub enum DataKey {
 pub struct AssetUpContract;
 
 #[contractimpl]
+#[warn(missing_docs)]
 impl AssetUpContract {
+    /// Initializes the registry with `admin`, who is also its first authorized registrar.
+    ///
+    /// Auth: `admin` must authorize. Errors: `AlreadyInitialized`. Emits `contract_initialized`.
     pub fn initialize(env: Env, admin: Address) -> Result<(), Error> {
         admin.require_auth();
         ttl::extend_instance(&env);
@@ -135,6 +139,7 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// The current admin. Errors: `AdminNotFound` if the contract was never initialized.
     pub fn get_admin(env: Env) -> Result<Address, Error> {
         ttl::extend_instance(&env);
 
@@ -152,6 +157,7 @@ impl AssetUpContract {
         Ok(admin)
     }
 
+    /// Whether the contract is paused. Read-only.
     pub fn is_paused(env: Env) -> Result<bool, Error> {
         ttl::extend_persistent(&env, &DataKey::Paused);
         Ok(env
@@ -161,6 +167,7 @@ impl AssetUpContract {
             .unwrap_or(false))
     }
 
+    /// The number of assets registered so far. Read-only.
     pub fn get_total_asset_count(env: Env) -> Result<u64, Error> {
         ttl::extend_persistent(&env, &DataKey::TotalAssetCount);
         Ok(env
@@ -170,6 +177,7 @@ impl AssetUpContract {
             .unwrap_or(0u64))
     }
 
+    /// The contract's name, version and creation time. Errors: `ContractNotInitialized`.
     pub fn get_contract_metadata(env: Env) -> Result<ContractMetadata, Error> {
         ttl::extend_persistent(&env, &DataKey::ContractMetadata);
         let metadata = env.storage().persistent().get(&DataKey::ContractMetadata);
@@ -179,6 +187,7 @@ impl AssetUpContract {
         }
     }
 
+    /// Whether `address` may register assets (the admin always can). Read-only.
     pub fn is_authorized_registrar(env: Env, address: Address) -> Result<bool, Error> {
         let key = DataKey::AuthorizedRegistrar(address);
         ttl::extend_persistent(&env, &key);
@@ -186,6 +195,9 @@ impl AssetUpContract {
     }
 
     // Asset functions
+    /// Registers `asset` in the registry.
+    ///
+    /// Auth: `caller` must authorize and be the admin or an authorized registrar. Errors: `ContractPaused`, `Unauthorized`, `AssetAlreadyExists`, and the asset validation errors (`InvalidAssetName`, `InvalidPurchaseValue`, `InvalidMetadataUri`, `InvalidOwnerAddress`). Appends an audit entry and emits `asset_registered`.
     pub fn register_asset(env: Env, asset: asset::Asset, caller: Address) -> Result<(), Error> {
         ttl::extend_instance(&env);
 
@@ -297,6 +309,9 @@ impl AssetUpContract {
         uri_len > 10 && (uri_len < 500)
     }
 
+    /// Updates an asset's description, metadata URI and/or custom attributes (each only when provided).
+    ///
+    /// Auth: `caller` must authorize and be the asset owner or the admin. Errors: `ContractPaused`, `AssetNotFound`, `Unauthorized`, `InvalidMetadataUri`. Emits `asset_updated`.
     pub fn update_asset_metadata(
         env: Env,
         asset_id: BytesN<32>,
@@ -364,6 +379,9 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// Moves an asset to `new_owner`.
+    ///
+    /// Auth: `caller` must authorize and be the current owner. Errors: `ContractPaused`, `InvalidOwnerAddress` (zero address), `AssetNotFound`, `Unauthorized`. Updates both owners' registries and the transfer history, and emits `asset_transferred`.
     pub fn transfer_asset_ownership(
         env: Env,
         asset_id: BytesN<32>,
@@ -458,6 +476,9 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// Retires an asset so it can no longer be transferred or updated.
+    ///
+    /// Auth: `caller` must authorize and be the asset owner or the admin. Errors: `ContractPaused`, `AssetNotFound`, `Unauthorized`. Appends an audit entry and emits `asset_retired`.
     pub fn retire_asset(env: Env, asset_id: BytesN<32>, caller: Address) -> Result<(), Error> {
         ttl::extend_instance(&env);
 
@@ -502,6 +523,7 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// The full record for `asset_id`. Errors: `AssetNotFound`. Read-only.
     pub fn get_asset(env: Env, asset_id: BytesN<32>) -> Result<asset::Asset, Error> {
         ttl::extend_instance(&env);
 
@@ -519,6 +541,7 @@ impl AssetUpContract {
         }
     }
 
+    /// The ids of the assets currently owned by `owner`. Read-only.
     pub fn get_assets_by_owner(env: Env, owner: Address) -> Result<Vec<BytesN<32>>, Error> {
         let key = asset::DataKey::OwnerRegistry(owner);
         let store = env.storage().persistent();
@@ -642,6 +665,7 @@ impl AssetUpContract {
         Ok(store.get(&key).unwrap_or_else(|| Vec::new(&env)))
     }
 
+    /// Whether an asset with this id is registered. Read-only.
     pub fn check_asset_exists(env: Env, asset_id: BytesN<32>) -> Result<bool, Error> {
         ttl::extend_instance(&env);
 
@@ -650,6 +674,7 @@ impl AssetUpContract {
         Ok(store.has(&key))
     }
 
+    /// The summary (id, name, category, owner, status) for `asset_id`. Errors: `AssetNotFound`. Read-only.
     pub fn get_asset_info(env: Env, asset_id: BytesN<32>) -> Result<asset::AssetInfo, Error> {
         let asset = Self::get_asset(env.clone(), asset_id.clone())?;
         Ok(asset::AssetInfo {
@@ -661,6 +686,7 @@ impl AssetUpContract {
         })
     }
 
+    /// Summaries for several assets. Ids that are not registered are silently skipped, so the result can be shorter than the input. Read-only.
     pub fn batch_get_asset_info(
         env: Env,
         asset_ids: Vec<BytesN<32>>,
@@ -816,6 +842,9 @@ impl AssetUpContract {
         upgrade::stored_version(&env)
     }
 
+    /// Grants registrar rights to `registrar`.
+    ///
+    /// Auth: the admin. Errors: `ContractPaused`. Emits `registrar_added`.
     pub fn add_authorized_registrar(env: Env, registrar: Address) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
 
@@ -830,6 +859,9 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// Revokes registrar rights from `registrar`.
+    ///
+    /// Auth: the admin. Errors: `ContractPaused`, `Unauthorized` (the admin's own registrar right cannot be removed). Emits `registrar_removed`.
     pub fn remove_authorized_registrar(env: Env, registrar: Address) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
 
@@ -849,6 +881,9 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// Pauses the contract; most mutating entrypoints then fail with `ContractPaused`.
+    ///
+    /// Auth: the admin. Emits `contract_paused`.
     pub fn pause_contract(env: Env) -> Result<(), Error> {
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
@@ -885,6 +920,7 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// The on-chain audit entries recorded for `asset_id`, oldest first. Read-only.
     pub fn get_asset_audit_logs(
         env: Env,
         asset_id: BytesN<32>,

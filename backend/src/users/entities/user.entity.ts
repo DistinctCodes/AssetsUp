@@ -66,6 +66,7 @@ export class User {
   passwordResetToken?: string;
 
   @Column({ type: 'timestamp', nullable: true })
+  @Exclude({ toPlainOnly: true })
   passwordResetExpires?: Date;
 
   @CreateDateColumn()

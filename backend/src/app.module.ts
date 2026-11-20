@@ -29,6 +29,16 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { StellarModule } from './stellar/stellar.module';
 import { DepreciationModule } from './depreciation/depreciation.module';
 import { ReservationsModule } from './reservations/reservations.module';
+import { ReportsModule } from './reports/reports.module';
+import { SearchModule } from './search/search.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { ImportModule } from './import/import.module';
+import { MailModule } from './mail/mail.module';
+import { QueueModule } from './queue/queue.module';
+import { AlertsModule } from './alerts/alerts.module';
+import { StorageModule } from './storage/storage.module';
+import { RedisCacheModule } from './cache/redis-cache.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
@@ -60,6 +70,21 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
     StellarModule,
     DepreciationModule,
     ReservationsModule,
+    // Feature modules that exist under src/ and must be mounted: without them
+    // /reports and /search return 404 and the mail queue processor, expiry-alert
+    // cron, webhook delivery and API-key guard never run. Queue and cache need
+    // Redis (REDIS_HOST / REDIS_PORT). app.module.wiring.spec.ts fails if a
+    // module or controller is left unwired again.
+    ReportsModule,
+    SearchModule,
+    WebhooksModule,
+    ApiKeysModule,
+    ImportModule,
+    MailModule,
+    QueueModule,
+    AlertsModule,
+    StorageModule,
+    RedisCacheModule,
     // Rate limiting. Configure with THROTTLE_TTL (ms) and THROTTLE_LIMIT.
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],

@@ -140,3 +140,14 @@ Any crate at zero coverage **fails**, unless it is named in the
 `multisig_transfer` is the only entry, pending [SC-32]. That keeps the build
 green for a known, tracked hole while still failing for any new crate that
 arrives without tests — removing the entry is how the gate gets tightened.
+
+## Rustdoc on public entrypoints
+
+The `#[contractimpl]` blocks of `assetsup`, `contrib` and `asset-maintenance`
+carry `#[warn(missing_docs)]`, so every public entrypoint needs a doc comment
+saying what it does and, where it applies, who must authorize, which errors it
+returns and which event it emits. The `docs` CI job runs
+`cargo check ... --lib` with `RUSTFLAGS="-D warnings"` (so a missing doc fails
+the build) and `cargo doc --no-deps` with `RUSTDOCFLAGS="-D warnings"` (so a
+broken intra-doc link fails it too). Try it locally with the same two commands.
+

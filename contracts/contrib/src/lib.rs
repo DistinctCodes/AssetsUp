@@ -95,6 +95,7 @@ pub enum DataKey {
 pub struct ContribContract;
 
 #[contractimpl]
+#[warn(missing_docs)]
 impl ContribContract {
     /// Initialize the contract with an admin.
     pub fn initialize(env: Env, admin: Address) {
@@ -115,6 +116,7 @@ impl ContribContract {
         events::contract_initialized(&env, &admin);
     }
 
+    /// The current admin. Traps with `NotInitialized` before `initialize`. Read-only.
     pub fn get_admin(env: Env) -> Address {
         env.storage()
             .persistent()
@@ -122,6 +124,9 @@ impl ContribContract {
             .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized))
     }
 
+    /// Grants registrar rights to `registrar`.
+    ///
+    /// Auth: `caller` must authorize and be the admin (otherwise the call traps with "Unauthorized"). Emits `registrar_added`.
     pub fn add_authorized_registrar(env: Env, caller: Address, registrar: Address) {
         caller.require_auth();
         let admin = env
@@ -139,6 +144,9 @@ impl ContribContract {
         events::registrar_added(&env, &registrar, &caller);
     }
 
+    /// Revokes registrar rights from `registrar`.
+    ///
+    /// Auth: `caller` must authorize and be the admin (otherwise the call traps with "Unauthorized"). Emits `registrar_removed`.
     pub fn remove_authorized_registrar(env: Env, caller: Address, registrar: Address) {
         caller.require_auth();
         let admin = env
@@ -156,6 +164,7 @@ impl ContribContract {
         events::registrar_removed(&env, &registrar, &caller);
     }
 
+    /// Whether `address` may register assets. Read-only.
     pub fn is_authorized_registrar(env: Env, address: Address) -> bool {
         env.storage()
             .persistent()
@@ -163,14 +172,17 @@ impl ContribContract {
             .unwrap_or(false)
     }
 
+    /// Alias of [`Self::add_authorized_registrar`], kept for compatibility.
     pub fn add_registrar(env: Env, caller: Address, registrar: Address) {
         Self::add_authorized_registrar(env, caller, registrar);
     }
 
+    /// Alias of [`Self::remove_authorized_registrar`], kept for compatibility.
     pub fn remove_registrar(env: Env, caller: Address, registrar: Address) {
         Self::remove_authorized_registrar(env, caller, registrar);
     }
 
+    /// The number of assets registered so far. Read-only.
     pub fn get_total_count(env: Env) -> u64 {
         env.storage()
             .persistent()
@@ -178,6 +190,7 @@ impl ContribContract {
             .unwrap_or(0)
     }
 
+    /// Alias of [`Self::get_total_count`], kept for compatibility.
     pub fn get_total_asset_count(env: Env) -> u64 {
         Self::get_total_count(env)
     }
@@ -221,6 +234,9 @@ impl ContribContract {
         events::asset_registered(&env, &asset.id, &asset.owner);
     }
 
+    /// Moves an asset to `new_owner`.
+    ///
+    /// Auth: `caller` must authorize and be the current owner. Traps if the contract is paused, the asset is unknown (`AssetNotFound`), the caller is not the owner ("Unauthorized") or the asset is retired. Records an audit entry and emits `asset_transferred`.
     pub fn transfer_asset(env: Env, asset_id: BytesN<32>, new_owner: Address, caller: Address) {
         Self::check_not_paused(&env);
         caller.require_auth();
@@ -261,6 +277,9 @@ impl ContribContract {
         events::asset_transferred(&env, &asset_id, &old_owner, &new_owner);
     }
 
+    /// Retires an asset.
+    ///
+    /// Auth: `caller` must authorize and be the owner. Traps if the contract is paused, the asset is unknown (`AssetNotFound`), the caller is not the owner ("Unauthorized") or it is already retired. Records an audit entry and emits `asset_retired`.
     pub fn retire_asset(env: Env, asset_id: BytesN<32>, caller: Address) {
         Self::check_not_paused(&env);
         caller.require_auth();
@@ -294,10 +313,12 @@ impl ContribContract {
         events::asset_retired(&env, &asset_id, &caller);
     }
 
+    /// The asset record, or `None` if it is not registered. Read-only.
     pub fn get_asset(env: Env, asset_id: BytesN<32>) -> Option<Asset> {
         env.storage().persistent().get(&DataKey::Asset(asset_id))
     }
 
+    /// The asset record. Traps with `AssetNotFound` if it is not registered. Read-only.
     pub fn get_asset_info(env: Env, asset_id: BytesN<32>) -> Asset {
         env.storage()
             .persistent()
@@ -305,6 +326,7 @@ impl ContribContract {
             .unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound))
     }
 
+    /// The ids of the assets currently owned by `owner`. Read-only.
     pub fn get_assets_by_owner(env: Env, owner: Address) -> Vec<BytesN<32>> {
         env.storage()
             .persistent()
@@ -312,10 +334,14 @@ impl ContribContract {
             .unwrap_or_else(|| Vec::new(&env))
     }
 
+    /// The audit entries recorded for `asset_id`. Read-only.
     pub fn get_audit_logs(env: Env, asset_id: BytesN<32>) -> Vec<audit::AuditLog> {
         audit::get_audit_logs(&env, asset_id)
     }
 
+    /// Pauses the whole contract.
+    ///
+    /// Auth: `caller` must authorize and be the admin (otherwise "Unauthorized").
     pub fn pause_contract(env: Env, caller: Address) {
         caller.require_auth();
         let admin: Address = env
@@ -329,6 +355,9 @@ impl ContribContract {
         env.storage().persistent().set(&DataKey::Paused, &true);
     }
 
+    /// Unpauses the whole contract.
+    ///
+    /// Auth: `caller` must authorize and be the admin (otherwise "Unauthorized").
     pub fn unpause_contract(env: Env, caller: Address) {
         caller.require_auth();
         let admin: Address = env
@@ -342,6 +371,7 @@ impl ContribContract {
         env.storage().persistent().set(&DataKey::Paused, &false);
     }
 
+    /// Whether the whole contract is paused. Read-only.
     pub fn is_paused(env: Env) -> bool {
         env.storage()
             .persistent()
@@ -354,10 +384,12 @@ impl ContribContract {
         pause::pause_subsystem(&env, caller, subsystem);
     }
 
+    /// Resumes one paused subsystem. Delegates to `pause::unpause_subsystem`; see it for authorization and errors.
     pub fn unpause_subsystem(env: Env, caller: Address, subsystem: pause::Subsystem) {
         pause::unpause_subsystem(&env, caller, subsystem);
     }
 
+    /// Whether `subsystem` is paused. Read-only.
     pub fn is_subsystem_paused(env: Env, subsystem: pause::Subsystem) -> bool {
         pause::is_subsystem_paused(&env, subsystem)
     }
@@ -397,22 +429,27 @@ impl ContribContract {
 
     // --- Insurance Functions ---
 
+    /// Creates an insurance policy for `asset_id`. Delegates to `insurance::create_policy`; see it for authorization, validation and events.
     pub fn create_policy(env: Env, asset_id: BytesN<32>, policy_data: insurance::InsurancePolicy) {
         insurance::create_policy(env, asset_id, policy_data);
     }
 
+    /// The insurance policy with this id. Delegates to `insurance::get_policy`. Read-only.
     pub fn get_policy(env: Env, policy_id: BytesN<32>) -> insurance::InsurancePolicy {
         insurance::get_policy(env, policy_id)
     }
 
+    /// Cancels a policy on behalf of `caller`. Delegates to `insurance::cancel_policy`; see it for authorization and errors.
     pub fn cancel_policy(env: Env, policy_id: BytesN<32>, caller: Address) {
         insurance::cancel_policy(env, policy_id, caller);
     }
 
+    /// Whether the policy is currently active. Delegates to `insurance::is_policy_active`. Read-only.
     pub fn is_policy_active(env: Env, policy_id: BytesN<32>) -> bool {
         insurance::is_policy_active(env, policy_id)
     }
 
+    /// Files an insurance claim against a policy. Delegates to `insurance::submit_claim`; see it for authorization and validation.
     pub fn submit_claim(
         env: Env,
         policy_id: BytesN<32>,
@@ -423,6 +460,7 @@ impl ContribContract {
         insurance::submit_claim(env, policy_id, amount, description, claimant);
     }
 
+    /// Moves a claim to `new_status` on behalf of the insurer. Delegates to `insurance::update_claim_status`; see it for authorization and errors.
     pub fn update_claim_status(
         env: Env,
         claim_id: BytesN<32>,
@@ -432,16 +470,19 @@ impl ContribContract {
         insurance::update_claim_status(env, claim_id, new_status, insurer);
     }
 
+    /// The claim with this id. Delegates to `insurance::get_claim`. Read-only.
     pub fn get_claim(env: Env, claim_id: BytesN<32>) -> insurance::InsuranceClaim {
         insurance::get_claim(env, claim_id)
     }
 
+    /// The ids of the claims filed against a policy. Delegates to `insurance::get_claims_for_policy`. Read-only.
     pub fn get_claims_for_policy(env: Env, policy_id: BytesN<32>) -> Vec<BytesN<32>> {
         insurance::get_claims_for_policy(env, policy_id)
     }
 
     // --- Lease Functions ---
 
+    /// Creates a lease for an asset. Delegates to `lease::create_lease`; see it for authorization, validation and events.
     #[allow(clippy::too_many_arguments)]
     pub fn create_lease(
         env: Env,
@@ -456,50 +497,61 @@ impl ContribContract {
         lease::create_lease(env, asset_id, lessee, start, end, rent, deposit, lessor)
     }
 
+    /// Records the return of a leased asset on behalf of `caller`. Delegates to `lease::check_in_lease`; see it for authorization and errors.
     pub fn check_in_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
         lease::check_in_lease(env, lease_id, caller);
     }
 
+    /// Cancels a lease on behalf of `caller`. Delegates to `lease::cancel_lease`; see it for authorization and errors.
     pub fn cancel_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
         lease::cancel_lease(env, lease_id, caller);
     }
 
+    /// The ids of the active leases on an asset. Delegates to `lease::get_active_leases`. Read-only.
     pub fn get_active_leases(env: Env, asset_id: BytesN<32>) -> Vec<BytesN<32>> {
         lease::get_active_leases(env, asset_id)
     }
 
     // --- KYC Functions ---
 
+    /// Submits a KYC application for `address`. Delegates to `kyc::submit_kyc`; see it for authorization and errors.
     pub fn submit_kyc(env: Env, address: Address) {
         kyc::submit_kyc(env, address);
     }
 
+    /// Approves `address` at `tier` until `expires_at`. Delegates to `kyc::approve_kyc`; see it for authorization and errors.
     pub fn approve_kyc(env: Env, caller: Address, address: Address, tier: u32, expires_at: u64) {
         kyc::approve_kyc(env, caller, address, tier, expires_at);
     }
 
+    /// Revokes an address's KYC approval. Delegates to `kyc::revoke_kyc`; see it for authorization, errors and events.
     pub fn revoke_kyc(env: Env, caller: Address, address: Address) {
         kyc::revoke_kyc(env, caller, address);
     }
 
+    /// Whether `address` currently has an approved, unexpired KYC record. Delegates to `kyc::is_kyc_approved`. Read-only.
     pub fn is_kyc_approved(env: Env, address: Address) -> bool {
         kyc::is_kyc_approved(env, address)
     }
 
+    /// The KYC record for `address`. Delegates to `kyc::get_kyc_record`. Read-only.
     pub fn get_kyc_record(env: Env, address: Address) -> kyc::KycRecord {
         kyc::get_kyc_record(env, address)
     }
 
     // --- Oracle Functions ---
 
+    /// Authorizes `oracle` to publish valuations. Delegates to `oracle::add_oracle`; see it for authorization and errors.
     pub fn add_oracle(env: Env, caller: Address, oracle: Address) {
         oracle::add_oracle(env, caller, oracle);
     }
 
+    /// Revokes `oracle`'s right to publish valuations. Delegates to `oracle::remove_oracle`; see it for authorization and errors.
     pub fn remove_oracle(env: Env, caller: Address, oracle: Address) {
         oracle::remove_oracle(env, caller, oracle);
     }
 
+    /// Publishes a new valuation for `asset_id` from an authorized `source`. Delegates to `oracle::update_valuation`; see it for authorization and validation.
     pub fn update_valuation(
         env: Env,
         source: Address,
@@ -510,42 +562,51 @@ impl ContribContract {
         oracle::update_valuation(env, source, asset_id, value, currency);
     }
 
+    /// The most recent valuation for `asset_id`. Delegates to `oracle::get_latest_valuation`. Read-only.
     pub fn get_latest_valuation(env: Env, asset_id: u64) -> oracle::ValuationEntry {
         oracle::get_latest_valuation(env, asset_id)
     }
 
+    /// The valuation history for `asset_id`. Delegates to `oracle::get_valuation_history`. Read-only.
     pub fn get_valuation_history(env: Env, asset_id: u64) -> Vec<oracle::ValuationEntry> {
         oracle::get_valuation_history(env, asset_id)
     }
 
     // --- Staking Functions ---
 
+    /// Stakes `amount` of `asset_id` tokens for `lock_period`. Delegates to `staking::stake_tokens`; see it for authorization and errors.
     pub fn stake_tokens(env: Env, asset_id: u64, staker: Address, amount: i128, lock_period: u64) {
         staking::stake_tokens(env, asset_id, staker, amount, lock_period);
     }
 
+    /// Releases `staker`'s stake once its lock period has passed. Delegates to `staking::unstake_tokens`; see it for authorization and errors.
     pub fn unstake_tokens(env: Env, asset_id: u64, staker: Address) {
         staking::unstake_tokens(env, asset_id, staker);
     }
 
+    /// The voting power `staker` has from staking `asset_id` tokens. Delegates to `staking::get_staking_power`. Read-only.
     pub fn get_staking_power(env: Env, asset_id: u64, staker: Address) -> i128 {
         staking::get_staking_power(env, asset_id, staker)
     }
 
+    /// Accrues staking rewards for `asset_id` on behalf of `caller`. Delegates to `staking::accrue_staking_rewards`; see it for authorization and errors.
     pub fn accrue_staking_rewards(env: Env, caller: Address, asset_id: u64) {
         staking::accrue_staking_rewards(env, caller, asset_id);
     }
 
+    /// The stake record for `staker` on `asset_id`. Delegates to `staking::get_stake`. Read-only.
     pub fn get_stake(env: Env, asset_id: u64, staker: Address) -> staking::Stake {
         staking::get_stake(env, asset_id, staker)
     }
 
+    /// Sets the reward period length for `asset_id`. Delegates to `staking::set_reward_period_length`; see it for authorization and errors.
     pub fn set_reward_period_length(env: Env, caller: Address, asset_id: u64, length_secs: u64) {
         staking::set_reward_period_length(env, caller, asset_id, length_secs);
     }
 
     // --- Escrow Functions ---
 
+    /// Opens an escrow. Delegates to `escrow::create_escrow`; see it for authorization, validation and events.
     #[allow(clippy::too_many_arguments)]
     pub fn create_escrow(
         env: Env,
@@ -567,14 +628,17 @@ impl ContribContract {
         )
     }
 
+    /// Confirms release of an escrow on behalf of `caller`. Delegates to `escrow::confirm_release`; see it for authorization and errors.
     pub fn confirm_release(env: Env, escrow_id: u64, caller: Address) {
         escrow::confirm_release(env, escrow_id, caller);
     }
 
+    /// Cancels an escrow on behalf of `caller`. Delegates to `escrow::cancel_escrow`; see it for authorization and errors.
     pub fn cancel_escrow(env: Env, escrow_id: u64, caller: Address) {
         escrow::cancel_escrow(env, escrow_id, caller);
     }
 
+    /// The escrow with this id. Delegates to `escrow::get_escrow`. Read-only.
     pub fn get_escrow(env: Env, escrow_id: u64) -> escrow::Escrow {
         escrow::get_escrow(env, escrow_id)
     }

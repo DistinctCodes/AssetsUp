@@ -192,6 +192,7 @@ pub struct AssetStats {
 pub struct AssetMaintenanceContract;
 
 #[contractimpl]
+#[warn(missing_docs)]
 impl AssetMaintenanceContract {
     /// Loads the stored admin and requires its authorization.
     ///
@@ -209,6 +210,9 @@ impl AssetMaintenanceContract {
         admin.require_auth();
     }
 
+    /// Initializes the contract with `admin` and the asset `registry` address.
+    ///
+    /// Auth: `admin` must authorize. Traps if already initialized. Emits `contract_initialized`.
     pub fn init(env: Env, admin: Address, registry: Address) {
         // Without this, whoever calls init first becomes admin of a freshly
         // deployed contract, regardless of who deployed it.
@@ -232,6 +236,9 @@ impl AssetMaintenanceContract {
         events::contract_initialized(&env, &admin, &registry);
     }
 
+    /// Registers a maintenance service provider.
+    ///
+    /// Auth: the stored admin. Traps with `NotInitialized` before `init`. Emits `provider_registered`.
     pub fn register_provider(env: Env, provider: ProviderProfile) {
         let admin: Address = env
             .storage()
@@ -247,6 +254,9 @@ impl AssetMaintenanceContract {
         events::provider_registered(&env, &provider.address);
     }
 
+    /// Deactivates a provider so it can no longer file records.
+    ///
+    /// Auth: the stored admin. Traps with `NotInitialized` before `init`. Emits `provider_deactivated` when a registered provider was deactivated.
     pub fn deactivate_provider(env: Env, provider_address: Address) {
         let admin: Address = env
             .storage()
@@ -269,6 +279,9 @@ impl AssetMaintenanceContract {
         }
     }
 
+    /// Appends a maintenance record to the asset's history and updates its rollup stats.
+    ///
+    /// Auth: `record.provider` must authorize. Traps unless the provider is registered (`ProviderNotRegistered`) and active, the service date is not in the future, costs are non-negative, at most 999,999,999,999 each and `labor_cost + parts_cost == total_cost`, and the condition and quality ratings are 1-10. Emits `maintenance_recorded`.
     pub fn add_maintenance_record(env: Env, record: MaintenanceRecord) {
         // Auth check: provider must be the one adding the record
         record.provider.require_auth();
@@ -371,6 +384,7 @@ impl AssetMaintenanceContract {
         }
     }
 
+    /// The asset's maintenance records, oldest first. Extends the history's TTL. Read-only.
     pub fn get_maintenance_history(env: Env, asset_id: u64) -> Vec<MaintenanceRecord> {
         // Extend on read too. An asset that is only ever queried and never
         // serviced again would otherwise be archived despite still being
@@ -382,12 +396,18 @@ impl AssetMaintenanceContract {
             .unwrap_or(Vec::new(&env))
     }
 
+    /// Creates a recurring maintenance schedule for an asset.
+    ///
+    /// Auth: `owner` must authorize. Traps if the schedule's frequency is not positive. Emits `maintenance_scheduled`.
     pub fn schedule_maintenance(env: Env, owner: Address, schedule: ScheduledMaintenance) {
         owner.require_auth();
         Self::store_schedule(&env, &schedule);
         events::maintenance_scheduled(&env, &schedule);
     }
 
+    /// Replaces an existing maintenance schedule.
+    ///
+    /// Auth: `owner` must authorize. Traps if no schedule exists or the frequency is not positive. Emits `maintenance_schedule_updated`.
     pub fn update_maintenance_schedule(env: Env, owner: Address, schedule: ScheduledMaintenance) {
         owner.require_auth();
 
@@ -446,6 +466,7 @@ impl AssetMaintenanceContract {
         events::maintenance_schedule_cancelled(&env, asset_id);
     }
 
+    /// The asset's scheduled maintenance, or `None` if there is none. Read-only.
     pub fn get_upcoming_maintenance(env: Env, asset_id: u64) -> Option<ScheduledMaintenance> {
         ttl::extend_persistent(&env, &DataKey::MaintenanceSchedule(asset_id));
         env.storage()
@@ -453,6 +474,7 @@ impl AssetMaintenanceContract {
             .get(&DataKey::MaintenanceSchedule(asset_id))
     }
 
+    /// Completes the scheduled service for `asset_id` by recording `record` and advancing the schedule. Emits `maintenance_completed`; see [`Self::add_maintenance_record`] for the checks applied to `record`.
     pub fn complete_scheduled_maintenance(env: Env, asset_id: u64, record: MaintenanceRecord) {
         // 1. Add record
         Self::add_maintenance_record(env.clone(), record.clone());
@@ -476,6 +498,9 @@ impl AssetMaintenanceContract {
         events::maintenance_completed(&env, asset_id, &record);
     }
 
+    /// Stores warranty terms for an asset.
+    ///
+    /// Auth: the stored admin. Traps if the warranty dates are invalid. Emits `warranty_added`.
     pub fn add_warranty_information(env: Env, warranty: WarrantyInfo) {
         Self::require_admin(&env);
 
@@ -483,6 +508,9 @@ impl AssetMaintenanceContract {
         events::warranty_added(&env, warranty.asset_id, warranty.end_date);
     }
 
+    /// Replaces an asset's warranty terms.
+    ///
+    /// Auth: the stored admin. Traps if no warranty exists or the dates are invalid. Emits `warranty_updated`.
     pub fn update_warranty_information(env: Env, warranty: WarrantyInfo) {
         Self::require_admin(&env);
 
@@ -509,16 +537,21 @@ impl AssetMaintenanceContract {
             .set(&DataKey::Warranty(warranty.asset_id), warranty);
     }
 
+    /// The provider's profile, or `None` if it is not registered. Read-only.
     pub fn get_provider_details(env: Env, provider_address: Address) -> Option<ProviderProfile> {
         env.storage()
             .persistent()
             .get(&DataKey::Provider(provider_address))
     }
 
+    /// The asset's warranty, or `None`. Read-only.
     pub fn get_warranty(env: Env, asset_id: u64) -> Option<WarrantyInfo> {
         env.storage().persistent().get(&DataKey::Warranty(asset_id))
     }
 
+    /// Files a claim of `claim_amount` against the asset's warranty.
+    ///
+    /// Auth: the stored admin. Traps with `WarrantyNotFound` if there is no warranty, and if the amount is not positive, the warranty is inactive or expired, or the maximum number of claims was reached. Emits `warranty_claim_filed`.
     pub fn file_warranty_claim(env: Env, asset_id: u64, claim_amount: i128) {
         Self::require_admin(&env);
 
@@ -550,6 +583,9 @@ impl AssetMaintenanceContract {
         events::warranty_claim_filed(&env, asset_id, claim_amount);
     }
 
+    /// Creates a maintenance alert for an asset.
+    ///
+    /// Auth: the stored admin. Emits `alert_created`.
     pub fn create_maintenance_alert(env: Env, alert: MaintenanceAlert) {
         Self::require_admin(&env);
 
@@ -566,6 +602,9 @@ impl AssetMaintenanceContract {
         events::alert_created(&env, &alert);
     }
 
+    /// Marks the alert at `alert_index` as acknowledged by `by`.
+    ///
+    /// Auth: `by` must authorize. Traps with `NotFound` / `AlertIndexOutOfBounds` for an unknown asset or index. Emits `alert_acknowledged`.
     pub fn acknowledge_maintenance_alert(env: Env, asset_id: u64, alert_index: u32, by: Address) {
         by.require_auth();
         let mut alerts: Vec<MaintenanceAlert> = env
@@ -591,6 +630,7 @@ impl AssetMaintenanceContract {
         events::alert_acknowledged(&env, asset_id, alert_index, &by);
     }
 
+    /// All alerts for an asset. Read-only.
     pub fn get_alerts(env: Env, asset_id: u64) -> Vec<MaintenanceAlert> {
         env.storage()
             .persistent()
@@ -598,21 +638,25 @@ impl AssetMaintenanceContract {
             .unwrap_or(Vec::new(&env))
     }
 
+    /// The total cost of all recorded maintenance for the asset (0 if none). Read-only.
     pub fn calculate_total_maintenance_cost(env: Env, asset_id: u64) -> i128 {
         let stats = Self::get_asset_stats(env, asset_id);
         stats.total_cost
     }
 
+    /// The total recorded downtime in hours for the asset (0 if none). Read-only.
     pub fn calculate_asset_downtime(env: Env, asset_id: u64) -> u64 {
         let stats = Self::get_asset_stats(env, asset_id);
         stats.total_downtime_hours
     }
 
+    /// The asset's health score on a 1-100 scale (100 when nothing is recorded). Read-only.
     pub fn get_asset_health_score(env: Env, asset_id: u64) -> u32 {
         let stats = Self::get_asset_stats(env, asset_id);
         stats.health_score
     }
 
+    /// The asset's rollup: total cost, downtime, service count and health score. Read-only.
     pub fn get_asset_stats(env: Env, asset_id: u64) -> AssetStats {
         env.storage()
             .persistent()
@@ -625,11 +669,13 @@ impl AssetMaintenanceContract {
             })
     }
 
+    /// Whether the asset's total maintenance cost exceeds `threshold`. Read-only.
     pub fn is_maintenance_cost_excessive(env: Env, asset_id: u64, threshold: i128) -> bool {
         let stats = Self::get_asset_stats(env, asset_id);
         stats.total_cost > threshold
     }
 
+    /// Whether the asset's scheduled maintenance is past due. Read-only.
     pub fn get_overdue_maintenance(env: Env, asset_id: u64) -> bool {
         if let Some(schedule) = env
             .storage()
