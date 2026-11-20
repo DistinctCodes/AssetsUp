@@ -140,3 +140,47 @@ Any crate at zero coverage **fails**, unless it is named in the
 `multisig_transfer` is the only entry, pending [SC-32]. That keeps the build
 green for a known, tracked hole while still failing for any new crate that
 arrives without tests — removing the entry is how the gate gets tightened.
+
+## Locked builds
+
+Every `cargo build`, `test` and `clippy` invocation in `.github/workflows/CI.yaml`
+and in `scripts/*.sh` passes `--locked`, so CI never updates `Cargo.lock`
+behind your back and always tests the dependency versions that are committed
+(and audited by `cargo-deny`/`cargo-audit`). The `lockfile` job runs
+`cargo metadata --locked` first: if you change a `Cargo.toml` without
+committing the matching `Cargo.lock`, CI fails there. Fix it locally with
+`cargo update -w` (or `cargo build`) and commit the lockfile.
+
+## Pinned GitHub Actions
+
+Every `uses:` in `.github/workflows/` references a full commit SHA with the
+human-readable version in a trailing comment (`# v4`), never a branch or a
+mutable tag. To bump one, change the SHA and the comment together; Dependabot
+can open those PRs once it is configured for `github-actions`.
+
+## Interface snapshots and TypeScript bindings
+
+The `interface` CI job builds the WASM, then:
+
+1. **Spec snapshots** — `./scripts/check-spec.sh` dumps each contract's public
+   interface (`stellar contract info interface`) and compares it with the
+   committed `contracts/<crate>/spec.json`. Changing a public signature,
+   renaming or removing an entrypoint fails the job unless the snapshot is
+   updated in the same PR. To refresh it after an intended change:
+
+   ```bash
+   cd contracts
+   cargo build --locked --workspace --target wasm32-unknown-unknown --release
+   ./scripts/check-spec.sh --update
+   git add */spec.json
+   ```
+
+   Until the first snapshots are committed the job only warns and uploads the
+   generated specs in the `contract-interface` artifact; commit those files and
+   add `--require-snapshots` to the CI step to make a missing snapshot fatal.
+
+2. **TypeScript bindings** — `./scripts/generate-bindings.sh` runs
+   `stellar contract bindings typescript` for each contract into
+   `packages/contracts-ts/<crate>/` (generated, not committed).
+
+Both scripts need the Stellar CLI on `PATH`.
