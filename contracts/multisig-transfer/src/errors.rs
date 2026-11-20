@@ -105,6 +105,14 @@ pub enum MultiSigError {
     InvalidNewOwner = 443,
     /// The call into the registry contract failed.
     RegistryCallFailed = 444,
+
+    // ---------------------------------------------------------------
+    // Admin rotation: 450–459
+    // ---------------------------------------------------------------
+    /// There is no admin proposal in flight to accept or cancel.
+    NoPendingAdminProposal = 450,
+    /// The proposed admin is not a valid nominee (it is the current admin).
+    InvalidAdmin = 451,
 }
 
 #[cfg(test)]
@@ -164,6 +172,8 @@ mod tests {
             MultiSigError::InvalidOwner as u32,
             MultiSigError::InvalidNewOwner as u32,
             MultiSigError::RegistryCallFailed as u32,
+            MultiSigError::NoPendingAdminProposal as u32,
+            MultiSigError::InvalidAdmin as u32,
         ];
         for code in codes {
             assert!(

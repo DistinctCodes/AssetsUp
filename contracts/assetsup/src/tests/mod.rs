@@ -35,3 +35,6 @@ mod upgrade;
 
 // Property-based tests for share accounting
 mod proptests;
+
+// Tokenization linked to the registry; lock caps and consent
+mod tokenization_linkage;

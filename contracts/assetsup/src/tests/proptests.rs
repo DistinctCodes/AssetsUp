@@ -28,8 +28,10 @@ fn tokenized(env: &Env, supply: i128) -> (AssetUpContractClient<'_>, Address) {
     client.initialize(&admin);
 
     let tokenizer = Address::generate(env);
+    let registry_id = super::helpers::register_asset_for(env, &client, &admin, &tokenizer, 1);
     client.tokenize_asset(
         &1u64,
+        &registry_id,
         &String::from_str(env, "SHARE"),
         &supply,
         &7u32,

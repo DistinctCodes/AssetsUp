@@ -74,7 +74,7 @@ admin.
 | `tokenize_asset` | owner | ✅ |
 | `mint_tokens`, `burn_tokens` | issuer | ✅ |
 | `transfer_tokens` | `from` | ✅ |
-| `lock_tokens` | owner | ✅ |
+| `lock_tokens` | tokenizer **and** holder (unless the same address) | ✅ |
 | `claim_dividends` | `holder` | ✅ |
 | `cast_vote` | `voter` | ✅ |
 | `propose_detokenization` | `proposer` | ✅ |

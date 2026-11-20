@@ -81,6 +81,7 @@ pub fn extend_all(env: &Env) {
     extend_persistent(env, &DataKey::ApprovalSignatures);
     extend_persistent(env, &DataKey::AssetPendingRequest);
     extend_persistent(env, &DataKey::AssetHistory);
+    extend_persistent(env, &DataKey::PendingAdmin);
 }
 
 /// The extension target must be further out than the trigger point, otherwise

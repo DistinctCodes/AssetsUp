@@ -92,6 +92,16 @@ pub enum Error {
     /// symbol per underlying asset is the on-chain guard against tokenizing the
     /// same asset twice under a different id.
     DuplicateTokenSymbol = 132,
+    /// A token lock would last longer than the configured maximum lock
+    /// duration. A tokenizer must not be able to freeze a holder's balance
+    /// indefinitely.
+    LockDurationTooLong = 133,
+    /// The registry asset is retired and cannot be tokenized.
+    AssetRetired = 134,
+    /// The registry asset is tokenized: its ownership is represented by its
+    /// tokens, so it cannot be transferred or retired directly until it is
+    /// detokenized.
+    AssetIsTokenized = 135,
 
     // ---------------------------------------------------------------
     // Voting: 140–149
@@ -250,6 +260,9 @@ mod tests {
             Error::GeographicRestriction as u32,
             Error::HolderNotFound as u32,
             Error::DuplicateTokenSymbol as u32,
+            Error::LockDurationTooLong as u32,
+            Error::AssetRetired as u32,
+            Error::AssetIsTokenized as u32,
             Error::InsufficientVotingPower as u32,
             Error::AlreadyVoted as u32,
             Error::ProposalNotFound as u32,

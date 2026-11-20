@@ -22,6 +22,26 @@ exists.
   [`src/ttl.rs`](src/ttl.rs)): every read and write bumps the entry back out so
   a long-lived asset's history is not archived for being untouched.
 
+## Admin lifecycle
+
+The admin is set once by `init` and rotated in two steps, the same flow
+`assetsup` uses:
+
+1. The current admin calls `propose_admin(new_admin)`. Nothing moves yet; the
+   nominee is stored as the pending admin (`get_pending_admin`). Proposing again
+   replaces a proposal in flight; proposing the current admin fails with
+   `InvalidAdmin`.
+2. The nominee calls `accept_admin()`, authorized by the **nominee**. The stored
+   admin is replaced and the previous admin loses every admin right at once,
+   because each admin check reads the stored address. With no proposal in flight
+   it fails with `NoPendingAdminProposal`.
+
+The current admin can withdraw a proposal with `cancel_admin_proposal()`. Each
+step emits `admin_proposed`, `admin_proposal_cancelled` or `admin_changed`.
+`get_admin` returns the current admin. A lost admin key cannot be recovered by
+this flow (the current admin must authorize the proposal), so rotate before
+a key is lost, not after.
+
 ## Authorization model
 
 The contract has a single privileged principal and one delegated role.

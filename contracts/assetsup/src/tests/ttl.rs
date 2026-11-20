@@ -120,11 +120,13 @@ fn bump_asset_ttl_keeps_an_inactive_tokenized_asset_alive() {
     // Tokenization does not touch TTL on its own, so without the permissionless
     // keeper path an asset that is held but never traded would be archived.
     let env = create_env();
-    let (client, _admin) = setup(&env);
+    let (client, admin) = setup(&env);
     let tokenizer = Address::generate(&env);
+    let registry_id = super::helpers::register_asset_for(&env, &client, &admin, &tokenizer, 1);
 
     client.tokenize_asset(
         &1u64,
+        &registry_id,
         &String::from_str(&env, "KEEP"),
         &1000i128,
         &2u32,

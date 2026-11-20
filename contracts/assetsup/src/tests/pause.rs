@@ -158,6 +158,7 @@ fn tokenization_is_blocked_while_paused() {
     assert!(client
         .try_tokenize_asset(
             &1u64,
+            &asset_id(&env, 1),
             &String::from_str(&env, "TKN"),
             &1000i128,
             &7u32,

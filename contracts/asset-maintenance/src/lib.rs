@@ -28,6 +28,7 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Ve
 pub mod error;
 pub mod events;
 pub mod ttl;
+mod admin_transfer_tests;
 mod test;
 mod tests_coverage;
 mod proptests;
@@ -170,6 +171,9 @@ pub struct MaintenanceAlert {
 #[contracttype]
 pub enum DataKey {
     Admin,
+    /// Address nominated as the next admin but not yet accepted. Absent when
+    /// no transfer is in flight.
+    PendingAdmin,
     AssetRegistry,
     Provider(Address),
     MaintenanceHistory(u64),  // asset_id -> Vec<MaintenanceRecord>
@@ -230,6 +234,97 @@ impl AssetMaintenanceContract {
         ttl::extend_persistent(&env, &DataKey::AssetRegistry);
 
         events::contract_initialized(&env, &admin, &registry);
+    }
+
+    /// The stored admin, or a typed `NotInitialized` error.
+    fn load_admin(env: &Env) -> Address {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Admin)
+            .unwrap_or_else(|| handle_error(env, Error::NotInitialized))
+    }
+
+    /// Step one of a two-step admin transfer: nominate `new_admin`.
+    ///
+    /// Does **not** change the admin. The role only moves when the nominee
+    /// calls [`Self::accept_admin`], which proves the address is reachable and
+    /// controlled, so a mistyped address can never take over or brick the
+    /// admin-only entrypoints (provider registration, warranties, ...).
+    ///
+    /// Authorized by the current admin. Calling it again replaces a proposal in
+    /// flight. Errors: `NotInitialized`, `InvalidAdmin` (the nominee is the
+    /// current admin). Emits `admin_proposed`.
+    pub fn propose_admin(env: Env, new_admin: Address) {
+        ttl::extend_instance(&env);
+
+        let current = Self::load_admin(&env);
+        current.require_auth();
+
+        if new_admin == current {
+            handle_error(&env, Error::InvalidAdmin);
+        }
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::PendingAdmin, &new_admin);
+        ttl::extend_persistent(&env, &DataKey::PendingAdmin);
+
+        events::admin_proposed(&env, &current, &new_admin);
+    }
+
+    /// Step two: the nominee accepts, and only then does the role move.
+    ///
+    /// Authorized by the *incoming* address; the previous admin loses every
+    /// admin right immediately because each check reads the stored admin.
+    /// Errors: `NoPendingAdminProposal`, `NotInitialized`. Emits
+    /// `admin_changed`.
+    pub fn accept_admin(env: Env) {
+        ttl::extend_instance(&env);
+
+        let pending: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PendingAdmin)
+            .unwrap_or_else(|| handle_error(&env, Error::NoPendingAdminProposal));
+        pending.require_auth();
+
+        let old = Self::load_admin(&env);
+        env.storage().persistent().set(&DataKey::Admin, &pending);
+        ttl::extend_persistent(&env, &DataKey::Admin);
+        env.storage().persistent().remove(&DataKey::PendingAdmin);
+
+        events::admin_changed(&env, &old, &pending);
+    }
+
+    /// Withdraws a pending proposal. Only the current admin may cancel.
+    /// Errors: `NotInitialized`, `NoPendingAdminProposal`. Emits
+    /// `admin_proposal_cancelled`.
+    pub fn cancel_admin_proposal(env: Env) {
+        ttl::extend_instance(&env);
+
+        let current = Self::load_admin(&env);
+        current.require_auth();
+
+        let pending: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PendingAdmin)
+            .unwrap_or_else(|| handle_error(&env, Error::NoPendingAdminProposal));
+        env.storage().persistent().remove(&DataKey::PendingAdmin);
+
+        events::admin_proposal_cancelled(&env, &current, &pending);
+    }
+
+    /// The address currently nominated to become admin, if any.
+    pub fn get_pending_admin(env: Env) -> Option<Address> {
+        ttl::extend_persistent(&env, &DataKey::PendingAdmin);
+        env.storage().persistent().get(&DataKey::PendingAdmin)
+    }
+
+    /// The current admin.
+    pub fn get_admin(env: Env) -> Address {
+        ttl::extend_persistent(&env, &DataKey::Admin);
+        Self::load_admin(&env)
     }
 
     pub fn register_provider(env: Env, provider: ProviderProfile) {
