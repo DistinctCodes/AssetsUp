@@ -17,7 +17,16 @@ export interface ReportsSummary {
   }[];
 }
 
+export interface ReportsDateRange {
+  from?: string;
+  to?: string;
+}
+
 export const reportsApiClient = {
-  getSummary: (): Promise<ReportsSummary> =>
-    api.get<ReportsSummary>('/reports/summary').then((r) => r.data),
+  getSummary: (range?: ReportsDateRange): Promise<ReportsSummary> =>
+    api
+      .get<ReportsSummary>('/reports/summary', {
+        params: { from: range?.from || undefined, to: range?.to || undefined },
+      })
+      .then((r) => r.data),
 };

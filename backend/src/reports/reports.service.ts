@@ -25,7 +25,9 @@ export interface ReportsSummary {
  */
 @Injectable()
 export class ReportsService {
-  async getSummary(): Promise<ReportsSummary> {
+  async getSummary(
+    _range: { from?: string; to?: string } = {},
+  ): Promise<ReportsSummary> {
     // Each aggregate is a small grouped query over the assets table; wired to
     // the repositories they return real counts. The shape is fixed here so the
     // dashboard/reports pages render correctly.

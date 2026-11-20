@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { BarChart3, Package } from "lucide-react";
 import { clsx } from "clsx";
@@ -17,7 +18,11 @@ const STATUS_COLORS: Partial<Record<AssetStatus, string>> = {
 };
 
 export default function ReportsPage() {
-  const { data, isLoading } = useReportsSummary();
+  const searchParams = useSearchParams();
+  const { data, isLoading } = useReportsSummary({
+    from: searchParams.get("from") ?? undefined,
+    to: searchParams.get("to") ?? undefined,
+  });
 
   if (isLoading) {
     return (
@@ -49,12 +54,7 @@ export default function ReportsPage() {
 
       {/* Date Range Selector */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-        <DateRangeSelector
-          onChange={(range) => {
-            // In a real implementation, the API call would filter by these dates
-            console.log('Date range changed:', range);
-          }}
-        />
+        <DateRangeSelector />
       </div>
 
       {/* Summary cards */}
