@@ -211,3 +211,14 @@ cargo test -p asset-maintenance
 tests; `proptests.rs` adds property-based tests over maintenance cost and
 date-range inputs (balancing costs accepted, unbalanced or out-of-range values
 rejected).
+
+## Paginated getters
+
+`get_maintenance_history` and `get_alerts` return everything stored for an
+asset, which only grows; past Soroban's read limits they can no longer be
+called. Use the paged forms instead: `get_maintenance_history_page(asset_id,
+start, limit)` and `get_alerts_page(asset_id, start, limit)` return the items at
+`[start, start + limit)` with `limit` capped at `MAX_PAGE_SIZE` (50), an empty
+page past the end. `get_maintenance_history_count` and `get_alerts_count` give
+the totals. (`get_upcoming_maintenance` returns a single optional schedule, so
+it is not paged.)

@@ -1064,3 +1064,124 @@ fn parts_replaced_and_documents_round_trip() {
     assert_eq!(stored.documents_ipfs.len(), 1);
     assert_eq!(stored.technician_id, String::from_str(&env, "tech-01"));
 }
+
+// ---------------------------------------------------------------------------
+// Paginated getters (#1658)
+// ---------------------------------------------------------------------------
+
+/// More records than one page can hold, so the cap is actually exercised.
+const LONG_HISTORY: u64 = MAX_PAGE_SIZE as u64 + 10;
+
+fn long_history(env: &Env) -> (Ctx<'_>, u64) {
+    let ctx = setup(env);
+    let asset_id = 7u64;
+    for id in 1..=LONG_HISTORY {
+        ctx.client
+            .add_maintenance_record(&record(env, &ctx.provider, id, asset_id));
+    }
+    (ctx, asset_id)
+}
+
+#[test]
+fn history_pages_are_capped_and_cover_a_history_longer_than_the_cap() {
+    let env = Env::default();
+    let (ctx, asset_id) = long_history(&env);
+
+    assert_eq!(
+        ctx.client.get_maintenance_history_count(&asset_id),
+        LONG_HISTORY as u32
+    );
+
+    // Asking for far more than the cap still returns at most one capped page.
+    let first = ctx
+        .client
+        .get_maintenance_history_page(&asset_id, &0, &1_000);
+    assert_eq!(first.len(), MAX_PAGE_SIZE);
+    assert_eq!(first.get(0).unwrap().record_id, 1);
+
+    // The second page holds the remainder.
+    let second = ctx
+        .client
+        .get_maintenance_history_page(&asset_id, &MAX_PAGE_SIZE, &1_000);
+    assert_eq!(second.len(), 10);
+    assert_eq!(second.get(0).unwrap().record_id, MAX_PAGE_SIZE as u64 + 1);
+    assert_eq!(second.get(9).unwrap().record_id, LONG_HISTORY);
+}
+
+#[test]
+fn a_partial_page_returns_exactly_the_requested_window() {
+    let env = Env::default();
+    let (ctx, asset_id) = long_history(&env);
+
+    let page = ctx.client.get_maintenance_history_page(&asset_id, &5, &3);
+
+    assert_eq!(page.len(), 3);
+    assert_eq!(page.get(0).unwrap().record_id, 6);
+    assert_eq!(page.get(2).unwrap().record_id, 8);
+}
+
+#[test]
+fn a_page_past_the_end_is_empty_and_an_unknown_asset_has_no_pages() {
+    let env = Env::default();
+    let (ctx, asset_id) = long_history(&env);
+
+    assert_eq!(
+        ctx.client
+            .get_maintenance_history_page(&asset_id, &1_000, &10)
+            .len(),
+        0
+    );
+    assert_eq!(ctx.client.get_maintenance_history_count(&999), 0);
+    assert_eq!(
+        ctx.client.get_maintenance_history_page(&999, &0, &10).len(),
+        0
+    );
+}
+
+#[test]
+fn a_zero_limit_returns_an_empty_page() {
+    let env = Env::default();
+    let (ctx, asset_id) = long_history(&env);
+
+    assert_eq!(
+        ctx.client
+            .get_maintenance_history_page(&asset_id, &0, &0)
+            .len(),
+        0
+    );
+}
+
+#[test]
+fn the_unpaged_getter_still_returns_the_whole_history() {
+    let env = Env::default();
+    let (ctx, asset_id) = long_history(&env);
+
+    assert_eq!(
+        ctx.client.get_maintenance_history(&asset_id).len() as u64,
+        LONG_HISTORY
+    );
+}
+
+#[test]
+fn alert_pages_are_capped_and_counted() {
+    let env = Env::default();
+    let ctx = setup(&env);
+    let asset_id = 7u64;
+    for _ in 0..(MAX_PAGE_SIZE + 5) {
+        ctx.client.create_maintenance_alert(&alert(&env, asset_id));
+    }
+
+    assert_eq!(ctx.client.get_alerts_count(&asset_id), MAX_PAGE_SIZE + 5);
+    assert_eq!(
+        ctx.client.get_alerts_page(&asset_id, &0, &1_000).len(),
+        MAX_PAGE_SIZE
+    );
+    assert_eq!(
+        ctx.client
+            .get_alerts_page(&asset_id, &MAX_PAGE_SIZE, &1_000)
+            .len(),
+        5
+    );
+    assert_eq!(ctx.client.get_alerts_page(&asset_id, &1_000, &10).len(), 0);
+    assert_eq!(ctx.client.get_alerts_count(&999), 0);
+}
