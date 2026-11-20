@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -16,6 +17,7 @@ import { PublicAssetDto, toPublicAsset } from './dto/public-asset.dto';
 import { Asset, ASSET_DETAIL_RELATIONS } from './entities/asset.entity';
 import { AssetLifecycleService, AssetStatus } from './asset-lifecycle.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditAction } from '../audit-logs/entities/audit-log.entity';
 import { AssetHistoryService } from './asset-history.service';
 import { AssetHistoryAction } from './entities/asset-history-event.entity';
 import { Department } from '../departments/entities/department.entity';
@@ -25,6 +27,26 @@ import { BulkAssignDto } from './dto/bulk-assign.dto';
 import { BulkDeleteDto } from './dto/bulk-delete.dto';
 import { UpdateAssetStatusDto } from './dto/update-asset-status.dto';
 import { TransferAssetDto } from './dto/transfer-asset.dto';
+
+/** A domain event to publish once the transaction that produced it has committed. */
+interface PendingEvent {
+  name: 'asset.status_changed' | 'asset.transferred';
+  payload: Record<string, unknown>;
+}
+
+type PendingAudit = Parameters<AuditLogsService['logAction']>[0];
+
+/**
+ * Side effects collected while a transaction runs and published only after it
+ * commits. Emitting inside the callback told WebSocket clients (and any future
+ * listener) about changes that a later failure then rolled back.
+ */
+interface SideEffects {
+  events: PendingEvent[];
+  audits: PendingAudit[];
+}
+
+const NO_SIDE_EFFECTS: SideEffects = { events: [], audits: [] };
 
 export interface BulkResult {
   succeeded: string[];
@@ -44,6 +66,8 @@ const PROTECTED_ASSET_FIELDS = [
 
 @Injectable()
 export class AssetsService {
+  private readonly logger = new Logger(AssetsService.name);
+
   constructor(
     @InjectRepository(Asset)
     private readonly assetRepo: Repository<Asset>,
@@ -170,48 +194,88 @@ export class AssetsService {
     return toPublicAsset(asset);
   }
 
+  /**
+   * Publish what a committed transaction collected: domain events first, then
+   * audit rows. An audit write that fails after the commit is logged rather than
+   * thrown, because the change it describes has already been applied.
+   */
+  private async publish(effects: SideEffects) {
+    for (const event of effects.events) {
+      this.eventEmitter.emit(event.name, event.payload);
+    }
+    for (const entry of effects.audits) {
+      try {
+        await this.audit.logAction(entry);
+      } catch (err) {
+        this.logger.error(
+          `Failed to write audit log ${entry.action} for ${entry.entityType} ${entry.entityId}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+  }
+
   async updateStatus(id: string, dto: UpdateAssetStatusDto, actorId?: string) {
     const newStatus = this.lifecycle.normalizeStatus(dto.status);
 
-    await this.dataSource.transaction(async (manager) => {
-      const asset = await manager.findOne(Asset, { where: { id } });
-      if (!asset) throw new NotFoundException(`Asset ${id} not found`);
+    const effects = await this.dataSource.transaction(
+      async (manager): Promise<SideEffects> => {
+        const asset = await manager.findOne(Asset, { where: { id } });
+        if (!asset) throw new NotFoundException(`Asset ${id} not found`);
 
-      const previousStatus = asset.status;
-      if (previousStatus === newStatus) return;
+        const previousStatus = asset.status;
+        if (previousStatus === newStatus) return NO_SIDE_EFFECTS;
 
-      this.lifecycle.validateTransition(previousStatus as AssetStatus, newStatus);
+        this.lifecycle.validateTransition(
+          previousStatus as AssetStatus,
+          newStatus,
+        );
 
-      asset.status = newStatus;
-      await manager.save(asset);
+        asset.status = newStatus;
+        await manager.save(asset);
 
-      await this.history.record(
-        {
-          assetId: id,
-          action: AssetHistoryAction.STATUS_CHANGED,
-          description: dto.reason
-            ? `Status changed from ${previousStatus} to ${newStatus}: ${dto.reason}`
-            : `Status changed from ${previousStatus} to ${newStatus}`,
-          previousValue: { status: previousStatus },
-          newValue: { status: newStatus },
-          performedById: actorId,
-        },
-        manager,
-      );
+        await this.history.record(
+          {
+            assetId: id,
+            action: AssetHistoryAction.STATUS_CHANGED,
+            description: dto.reason
+              ? `Status changed from ${previousStatus} to ${newStatus}: ${dto.reason}`
+              : `Status changed from ${previousStatus} to ${newStatus}`,
+            previousValue: { status: previousStatus },
+            newValue: { status: newStatus },
+            performedById: actorId,
+          },
+          manager,
+        );
 
-      this.eventEmitter.emit('asset.status_changed', {
-        assetId: id,
-        departmentId: asset.departmentId,
-        previousStatus,
-        newStatus,
-      });
-      this.audit.logAction('ASSET_STATUS_CHANGE', 'Asset', id, actorId, {
-        previousStatus,
-        newStatus,
-        reason: dto.reason,
-      });
-    });
+        return {
+          events: [
+            {
+              name: 'asset.status_changed',
+              payload: {
+                assetId: id,
+                departmentId: asset.departmentId,
+                previousStatus,
+                newStatus,
+              },
+            },
+          ],
+          audits: [
+            {
+              action: AuditAction.STATUS_CHANGED,
+              entityType: 'asset',
+              entityId: id,
+              actorId,
+              previousValue: { status: previousStatus },
+              newValue: { status: newStatus, reason: dto.reason },
+            },
+          ],
+        };
+      },
+    );
 
+    await this.publish(effects);
     return this.findDetail(id);
   }
 
@@ -227,81 +291,101 @@ export class AssetsService {
 
     const note = dto.note ?? dto.notes;
 
-    await this.dataSource.transaction(async (manager) => {
-      const asset = await manager.findOne(Asset, { where: { id } });
-      if (!asset) throw new NotFoundException(`Asset ${id} not found`);
+    const effects = await this.dataSource.transaction(
+      async (manager): Promise<SideEffects> => {
+        const asset = await manager.findOne(Asset, { where: { id } });
+        if (!asset) throw new NotFoundException(`Asset ${id} not found`);
 
-      if (dto.departmentId) {
-        const department = await manager.findOne(Department, {
-          where: { id: dto.departmentId },
-        });
-        if (!department) {
-          throw new BadRequestException(`Department ${dto.departmentId} not found`);
+        if (dto.departmentId) {
+          const department = await manager.findOne(Department, {
+            where: { id: dto.departmentId },
+          });
+          if (!department) {
+            throw new BadRequestException(
+              `Department ${dto.departmentId} not found`,
+            );
+          }
         }
-      }
-      if (dto.assignedToId) {
-        const user = await manager.findOne(User, { where: { id: dto.assignedToId } });
-        if (!user) {
-          throw new BadRequestException(`User ${dto.assignedToId} not found`);
+        if (dto.assignedToId) {
+          const user = await manager.findOne(User, {
+            where: { id: dto.assignedToId },
+          });
+          if (!user) {
+            throw new BadRequestException(`User ${dto.assignedToId} not found`);
+          }
         }
-      }
 
-      const previous = {
-        departmentId: asset.departmentId ?? null,
-        assignedToId: asset.assignedToUserId ?? null,
-        status: asset.status,
-      };
+        const previous = {
+          departmentId: asset.departmentId ?? null,
+          assignedToId: asset.assignedToUserId ?? null,
+          status: asset.status,
+        };
 
-      if (dto.departmentId !== undefined) asset.departmentId = dto.departmentId;
-      if (targetsAssignee) {
-        const assignedToId = dto.assignedToId ?? null;
-        asset.assignedToUserId = assignedToId;
-        // Assigning a holder flips the asset to ASSIGNED; clearing it frees the asset.
-        const derivedStatus = assignedToId
-          ? AssetStatus.ASSIGNED
-          : AssetStatus.AVAILABLE;
-        if (
-          previous.assignedToId !== assignedToId &&
-          asset.status !== derivedStatus
-        ) {
-          this.lifecycle.validateTransition(asset.status as AssetStatus, derivedStatus);
-          asset.status = derivedStatus;
+        if (dto.departmentId !== undefined)
+          asset.departmentId = dto.departmentId;
+        if (targetsAssignee) {
+          const assignedToId = dto.assignedToId ?? null;
+          asset.assignedToUserId = assignedToId;
+          // Assigning a holder flips the asset to ASSIGNED; clearing it frees the asset.
+          const derivedStatus = assignedToId
+            ? AssetStatus.ASSIGNED
+            : AssetStatus.AVAILABLE;
+          if (
+            previous.assignedToId !== assignedToId &&
+            asset.status !== derivedStatus
+          ) {
+            this.lifecycle.validateTransition(
+              asset.status as AssetStatus,
+              derivedStatus,
+            );
+            asset.status = derivedStatus;
+          }
         }
-      }
 
-      await manager.save(asset);
+        await manager.save(asset);
 
-      const next = {
-        departmentId: asset.departmentId ?? null,
-        assignedToId: asset.assignedToUserId ?? null,
-        status: asset.status,
-      };
+        const next = {
+          departmentId: asset.departmentId ?? null,
+          assignedToId: asset.assignedToUserId ?? null,
+          status: asset.status,
+        };
 
-      await this.history.record(
-        {
-          assetId: id,
-          action: AssetHistoryAction.TRANSFERRED,
-          description: this.describeTransfer(previous, next, note),
-          previousValue: previous,
-          newValue: next,
-          performedById: actorId,
-        },
-        manager,
-      );
+        await this.history.record(
+          {
+            assetId: id,
+            action: AssetHistoryAction.TRANSFERRED,
+            description: this.describeTransfer(previous, next, note),
+            previousValue: previous,
+            newValue: next,
+            performedById: actorId,
+          },
+          manager,
+        );
 
-      this.eventEmitter.emit('asset.transferred', {
-        assetId: id,
-        previous,
-        new: next,
-        actorId,
-      });
-      this.audit.logAction('ASSET_TRANSFER', 'Asset', id, actorId, {
-        previous,
-        new: next,
-        note,
-      });
-    });
+        return {
+          events: [
+            {
+              name: 'asset.transferred',
+              payload: { assetId: id, previous, new: next, actorId },
+            },
+          ],
+          audits: [
+            {
+              // The audit action enum has no TRANSFERRED value; the change is
+              // described by the previous/new values.
+              action: AuditAction.UPDATED,
+              entityType: 'asset',
+              entityId: id,
+              actorId,
+              previousValue: previous,
+              newValue: { ...next, note },
+            },
+          ],
+        };
+      },
+    );
 
+    await this.publish(effects);
     return this.findDetail(id);
   }
 
@@ -333,53 +417,70 @@ export class AssetsService {
     const skipped: string[] = [];
 
     for (const id of dto.ids) {
-      await this.dataSource.transaction(async (manager) => {
-        const asset = await manager.findOne(Asset, { where: { id } });
-        if (!asset) {
-          failed.push({ id, reason: 'Asset not found' });
-          return;
-        }
-        if (asset.status === AssetStatus.RETIRED) {
-          skipped.push(id);
-          return;
-        }
-        try {
-          this.lifecycle.validateTransition(
-            asset.status as AssetStatus,
-            dto.status,
+      const effects = await this.dataSource.transaction(
+        async (manager): Promise<SideEffects> => {
+          const asset = await manager.findOne(Asset, { where: { id } });
+          if (!asset) {
+            failed.push({ id, reason: 'Asset not found' });
+            return NO_SIDE_EFFECTS;
+          }
+          if (asset.status === AssetStatus.RETIRED) {
+            skipped.push(id);
+            return NO_SIDE_EFFECTS;
+          }
+          try {
+            this.lifecycle.validateTransition(
+              asset.status as AssetStatus,
+              dto.status,
+            );
+          } catch (err: any) {
+            failed.push({
+              id,
+              reason: err.message || 'Invalid status transition',
+            });
+            return NO_SIDE_EFFECTS;
+          }
+          const previousStatus = asset.status;
+          asset.status = dto.status;
+          await manager.save(asset);
+          await this.history.record(
+            {
+              assetId: id,
+              action: AssetHistoryAction.STATUS_CHANGED,
+              description: `Status changed from ${previousStatus} to ${dto.status}`,
+              previousValue: { status: previousStatus },
+              newValue: { status: dto.status },
+              performedById: actorId,
+            },
+            manager,
           );
-        } catch (err: any) {
-          failed.push({
-            id,
-            reason: err.message || 'Invalid status transition',
-          });
-          return;
-        }
-        const previousStatus = asset.status;
-        asset.status = dto.status;
-        await manager.save(asset);
-        this.eventEmitter.emit('asset.status_changed', {
-          assetId: id,
-          departmentId: asset.departmentId,
-          previousStatus,
-          newStatus: dto.status,
-        });
-        this.lifecycle.recordHistory(id, {
-          eventType: 'STATUS_CHANGED',
-          actorUserId: actorId || 'system',
-          note: `Status changed from ${previousStatus} to ${dto.status}`,
-          fieldChanges: { previousStatus, newStatus: dto.status },
-        });
-        this.audit.logAction({
-          action: 'STATUS_CHANGED',
-          entityType: 'asset',
-          entityId: id,
-          actorId,
-          previousValue: { status: previousStatus },
-          newValue: { status: dto.status },
-        });
-        succeeded.push(id);
-      });
+          succeeded.push(id);
+          return {
+            events: [
+              {
+                name: 'asset.status_changed',
+                payload: {
+                  assetId: id,
+                  departmentId: asset.departmentId,
+                  previousStatus,
+                  newStatus: dto.status,
+                },
+              },
+            ],
+            audits: [
+              {
+                action: AuditAction.STATUS_CHANGED,
+                entityType: 'asset',
+                entityId: id,
+                actorId,
+                previousValue: { status: previousStatus },
+                newValue: { status: dto.status },
+              },
+            ],
+          };
+        },
+      );
+      await this.publish(effects);
     }
 
     return { succeeded, failed, skipped };
@@ -397,40 +498,52 @@ export class AssetsService {
     const skipped: string[] = [];
 
     for (const id of dto.ids) {
-      await this.dataSource.transaction(async (manager) => {
-        const asset = await manager.findOne(Asset, { where: { id } });
-        if (!asset) {
-          failed.push({ id, reason: 'Asset not found' });
-          return;
-        }
-        const previous = {
-          assignedToUserId: asset.assignedToUserId,
-          departmentId: asset.departmentId,
-        };
-        if (dto.userId) asset.assignedToUserId = dto.userId;
-        if (dto.departmentId) asset.departmentId = dto.departmentId;
-        await manager.save(asset);
-        this.lifecycle.recordHistory(id, {
-          eventType: 'ASSIGNED',
-          actorUserId: actorId || 'system',
-          note: `Bulk assignment update`,
-          fieldChanges: {
-            previous,
-            new: { userId: dto.userId, departmentId: dto.departmentId },
-          },
-        });
-        this.audit.logAction({
-          action: 'UPDATED',
-          entityType: 'asset',
-          entityId: id,
-          actorId,
-          newValue: {
-            assignedToUserId: dto.userId,
-            departmentId: dto.departmentId,
-          },
-        });
-        succeeded.push(id);
-      });
+      const effects = await this.dataSource.transaction(
+        async (manager): Promise<SideEffects> => {
+          const asset = await manager.findOne(Asset, { where: { id } });
+          if (!asset) {
+            failed.push({ id, reason: 'Asset not found' });
+            return NO_SIDE_EFFECTS;
+          }
+          const previous = {
+            assignedToUserId: asset.assignedToUserId ?? null,
+            departmentId: asset.departmentId ?? null,
+          };
+          if (dto.userId) asset.assignedToUserId = dto.userId;
+          if (dto.departmentId) asset.departmentId = dto.departmentId;
+          await manager.save(asset);
+          const next = {
+            assignedToUserId: asset.assignedToUserId ?? null,
+            departmentId: asset.departmentId ?? null,
+          };
+          await this.history.record(
+            {
+              assetId: id,
+              action: AssetHistoryAction.TRANSFERRED,
+              description: 'Bulk assignment update',
+              previousValue: previous,
+              newValue: next,
+              performedById: actorId,
+            },
+            manager,
+          );
+          succeeded.push(id);
+          return {
+            events: [],
+            audits: [
+              {
+                action: AuditAction.UPDATED,
+                entityType: 'asset',
+                entityId: id,
+                actorId,
+                previousValue: previous,
+                newValue: next,
+              },
+            ],
+          };
+        },
+      );
+      await this.publish(effects);
     }
 
     return { succeeded, failed, skipped };
@@ -442,26 +555,40 @@ export class AssetsService {
     const skipped: string[] = [];
 
     for (const id of dto.ids) {
-      await this.dataSource.transaction(async (manager) => {
-        const asset = await manager.findOne(Asset, { where: { id } });
-        if (!asset) {
-          failed.push({ id, reason: 'Asset not found' });
-          return;
-        }
-        await manager.softRemove(asset);
-        this.lifecycle.recordHistory(id, {
-          eventType: 'DELETED',
-          actorUserId: actorId || 'system',
-          note: 'Bulk soft delete',
-        });
-        this.audit.logAction({
-          action: 'DELETED',
-          entityType: 'asset',
-          entityId: id,
-          actorId,
-        });
-        succeeded.push(id);
-      });
+      const effects = await this.dataSource.transaction(
+        async (manager): Promise<SideEffects> => {
+          const asset = await manager.findOne(Asset, { where: { id } });
+          if (!asset) {
+            failed.push({ id, reason: 'Asset not found' });
+            return NO_SIDE_EFFECTS;
+          }
+          await manager.softRemove(asset);
+          // The history action enum has no DELETED value, so the deletion is
+          // recorded as an UPDATED event that says what happened.
+          await this.history.record(
+            {
+              assetId: id,
+              action: AssetHistoryAction.UPDATED,
+              description: 'Asset deleted (bulk soft delete)',
+              performedById: actorId,
+            },
+            manager,
+          );
+          succeeded.push(id);
+          return {
+            events: [],
+            audits: [
+              {
+                action: AuditAction.DELETED,
+                entityType: 'asset',
+                entityId: id,
+                actorId,
+              },
+            ],
+          };
+        },
+      );
+      await this.publish(effects);
     }
 
     return { succeeded, failed, skipped };
