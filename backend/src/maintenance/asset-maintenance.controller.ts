@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/co
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MaintenanceService } from './maintenance.service';
 import { CreateMaintenanceRecordDto } from './dto/create-maintenance-record.dto';
+import { UpdateMaintenanceStatusDto } from './dto/update-maintenance-status.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('assets')
@@ -29,9 +30,14 @@ export class AssetMaintenanceController {
   @Patch(':maintenanceId')
   @ApiOperation({ summary: "Update an asset's maintenance record status" })
   updateStatus(
+    @Param('id') assetId: string,
     @Param('maintenanceId') maintenanceId: string,
-    @Body('status') status: string,
+    @Body() dto: UpdateMaintenanceStatusDto,
   ) {
-    return this.maintenanceService.updateStatus(maintenanceId, status);
+    return this.maintenanceService.updateStatus(
+      maintenanceId,
+      dto.status,
+      assetId,
+    );
   }
 }
