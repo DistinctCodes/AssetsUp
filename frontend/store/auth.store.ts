@@ -53,6 +53,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   loadUser: async () => {
+    // Without a token GET /auth/me can only answer 401, so don't ask: the
+    // failure used to bounce signed-out visitors around /login in a loop.
+    if (typeof window !== 'undefined' && !localStorage.getItem('accessToken')) {
+      set({ user: null, isAuthenticated: false, isLoading: false });
+      return;
+    }
     set({ isLoading: true });
     try {
       const user = await authApi.me();

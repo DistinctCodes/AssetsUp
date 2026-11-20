@@ -2,7 +2,12 @@
 export const AUTH_COOKIE = "accessToken";
 
 /** Pages only meant for signed-out users. */
-export const AUTH_PAGES = ["/login", "/register", "/forgot-password"];
+export const AUTH_PAGES = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+];
 
 /** Reachable without signing in (besides the auth pages). */
 const PUBLIC_PREFIXES = ["/scan"];
