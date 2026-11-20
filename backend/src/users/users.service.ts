@@ -183,8 +183,23 @@ export class UsersService {
       throw new ForbiddenException('Cannot deactivate your own account');
     }
     const user = await this.findById(id);
+    const wasActive = user.isActive;
     user.isActive = isActive;
+    if (!isActive) {
+      // Deactivation ends every session: a stolen refresh token must stop working.
+      user.refreshTokenHash = null;
+    }
     const saved = await this.userRepository.save(user);
+    if (wasActive !== isActive) {
+      await this.auditLogsService?.logAction({
+        action: isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+        entityType: 'user',
+        entityId: id,
+        actorId: requestingUserId,
+        previousValue: { isActive: wasActive },
+        newValue: { isActive },
+      });
+    }
     return this.sanitize(saved);
   }
 
@@ -215,6 +230,8 @@ export class UsersService {
       user.passwordHash = await this.passwords.hash(dto.newPassword);
       user.passwordResetToken = null;
       user.passwordResetExpires = null;
+      // A password change ends existing sessions, like a password reset does.
+      user.refreshTokenHash = null;
     }
 
     const saved = await this.userRepository.save(user);
@@ -230,6 +247,10 @@ export class UsersService {
       },
     });
     return this.sanitize(saved);
+  }
+
+  async setLastLogin(userId: string, at: Date = new Date()) {
+    await this.userRepository.update(userId, { lastLoginAt: at });
   }
 
   async setRefreshTokenHash(userId: string, hash: string | null) {

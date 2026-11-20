@@ -49,8 +49,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Invalidate current session' })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
-  async logout(@GetUser() user: User) {
-    return this.authService.logout(user.id);
+  async logout(
+    @GetUser() user: User,
+    @Body('refreshToken') refreshToken?: string,
+  ) {
+    return this.authService.logout(user.id, refreshToken);
   }
 
   @Get('me')

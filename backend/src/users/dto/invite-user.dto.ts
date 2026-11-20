@@ -8,15 +8,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { UserRole } from '../entities/user.entity';
-
-// The frontend sends lowercase role names ("staff"); accept those as well as
-// the canonical enum values.
-const ROLE_ALIASES: Record<string, UserRole> = {
-  admin: UserRole.ADMIN,
-  manager: UserRole.MANAGER,
-  staff: UserRole.EMPLOYEE,
-  employee: UserRole.EMPLOYEE,
-};
+import { normalizeRole } from './role-alias';
 
 export class InviteUserDto {
   @ApiProperty({ example: 'new.hire@example.com' })
@@ -36,9 +28,7 @@ export class InviteUserDto {
   lastName: string;
 
   @ApiProperty({ enum: UserRole })
-  @Transform(({ value }) =>
-    typeof value === 'string' ? (ROLE_ALIASES[value.toLowerCase()] ?? value) : value,
-  )
+  @Transform(({ value }) => normalizeRole(value))
   @IsEnum(UserRole)
   role: UserRole;
 }
