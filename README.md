@@ -58,6 +58,8 @@ This structure allows new asset types and workflows to be introduced without red
 
 ---
 
+See [docs/onchain-integration.md](docs/onchain-integration.md) for how the backend and frontend relate to the Soroban contracts (configuration, deployment output, error mapping, local testnet setup).
+
 ## Technology Stack
 
 ### Frontend

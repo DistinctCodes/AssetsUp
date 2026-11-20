@@ -188,6 +188,27 @@ pub struct AssetStats {
     pub health_score: u32, // 1-100
 }
 
+/// Largest page any list getter returns, however large a `limit` is asked for.
+///
+/// Histories and alert lists only ever grow, so an unbounded getter eventually
+/// exceeds Soroban's per-invocation read limits and can no longer be called for
+/// a long-lived asset. Page with the `*_page` getters.
+pub const MAX_PAGE_SIZE: u32 = 50;
+
+/// The `[start, start + limit)` window of `list`, with `limit` capped at
+/// [`MAX_PAGE_SIZE`]. A `start` past the end gives an empty page.
+fn page_of<T>(list: &Vec<T>, start: u32, limit: u32) -> Vec<T>
+where
+    T: soroban_sdk::IntoVal<Env, soroban_sdk::Val>
+        + soroban_sdk::TryFromVal<Env, soroban_sdk::Val>
+        + Clone,
+{
+    let len = list.len();
+    let from = start.min(len);
+    let to = from.saturating_add(limit.min(MAX_PAGE_SIZE)).min(len);
+    list.slice(from..to)
+}
+
 #[contract]
 pub struct AssetMaintenanceContract;
 
@@ -380,6 +401,37 @@ impl AssetMaintenanceContract {
             .persistent()
             .get(&DataKey::MaintenanceHistory(asset_id))
             .unwrap_or(Vec::new(&env))
+    }
+
+    /// A page of the asset's maintenance history, oldest first: the records
+    /// at `[start, start + limit)`, with `limit` capped at [`MAX_PAGE_SIZE`].
+    /// A `start` past the end returns an empty page. Prefer this to
+    /// [`Self::get_maintenance_history`], which returns the whole (unbounded)
+    /// history. Read-only.
+    pub fn get_maintenance_history_page(
+        env: Env,
+        asset_id: u64,
+        start: u32,
+        limit: u32,
+    ) -> Vec<MaintenanceRecord> {
+        ttl::extend_persistent(&env, &DataKey::MaintenanceHistory(asset_id));
+        let history: Vec<MaintenanceRecord> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::MaintenanceHistory(asset_id))
+            .unwrap_or(Vec::new(&env));
+        page_of(&history, start, limit)
+    }
+
+    /// The number of maintenance records stored for the asset, so a caller
+    /// knows how many pages [`Self::get_maintenance_history_page`] has. Read-only.
+    pub fn get_maintenance_history_count(env: Env, asset_id: u64) -> u32 {
+        ttl::extend_persistent(&env, &DataKey::MaintenanceHistory(asset_id));
+        env.storage()
+            .persistent()
+            .get::<_, Vec<MaintenanceRecord>>(&DataKey::MaintenanceHistory(asset_id))
+            .map(|history| history.len())
+            .unwrap_or(0)
     }
 
     pub fn schedule_maintenance(env: Env, owner: Address, schedule: ScheduledMaintenance) {
@@ -596,6 +648,33 @@ impl AssetMaintenanceContract {
             .persistent()
             .get(&DataKey::Alerts(asset_id))
             .unwrap_or(Vec::new(&env))
+    }
+
+    /// A page of the asset's alerts: the alerts at `[start, start + limit)`,
+    /// with `limit` capped at [`MAX_PAGE_SIZE`]. A `start` past the end returns
+    /// an empty page. Prefer this to [`Self::get_alerts`], which returns every
+    /// alert. Read-only.
+    pub fn get_alerts_page(
+        env: Env,
+        asset_id: u64,
+        start: u32,
+        limit: u32,
+    ) -> Vec<MaintenanceAlert> {
+        let alerts: Vec<MaintenanceAlert> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Alerts(asset_id))
+            .unwrap_or(Vec::new(&env));
+        page_of(&alerts, start, limit)
+    }
+
+    /// The number of alerts stored for the asset. Read-only.
+    pub fn get_alerts_count(env: Env, asset_id: u64) -> u32 {
+        env.storage()
+            .persistent()
+            .get::<_, Vec<MaintenanceAlert>>(&DataKey::Alerts(asset_id))
+            .map(|alerts| alerts.len())
+            .unwrap_or(0)
     }
 
     pub fn calculate_total_maintenance_cost(env: Env, asset_id: u64) -> i128 {

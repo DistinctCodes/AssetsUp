@@ -240,6 +240,16 @@ whole crate — with a numbering that doesn't collide with `assetsup`'s, where
 code 5 is `Unauthorized` but `BranchAlreadyExists` here — is tracked in
 [SC-45].
 
+## Deployment
+
+There is a single deployment path for the whole workspace, including this
+contract: [`../scripts/deploy.sh`](../scripts/deploy.sh), documented in
+[`../scripts/README.md`](../scripts/README.md). It builds with the pinned
+toolchain, optimizes, deploys, initializes (`contrib.initialize`), verifies and
+writes `deployments/<network>.json`. The crate-local `scripts/` folder
+(`deploy.sh`, `initialize.sh`, `setup-testnet.sh`) was removed because it had
+drifted from that flow.
+
 ## Tests
 
 ```sh

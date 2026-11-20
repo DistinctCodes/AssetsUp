@@ -1,0 +1,78 @@
+name: Release
+
+# Publishes the optimised contract WASM, its SHA-256 hashes and the contract
+# specs for a tagged revision, so an auditor can check that an on-chain WASM
+# hash corresponds to a source revision. Trigger: push a tag like v1.2.3.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    working-directory: contracts
+
+jobs:
+  release:
+    name: Build and publish release artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read pinned toolchain
+        id: toolchain
+        run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          targets: wasm32-unknown-unknown
+
+      # The CLI range and subcommands used below have not been verified in CI
+      # yet; adjust here if the first tagged run reports a different interface.
+      - name: Install Stellar CLI
+        run: cargo install --locked stellar-cli --version "^23"
+
+      - name: Build the contracts (locked, release)
+        run: cargo build --locked --workspace --target wasm32-unknown-unknown --release
+
+      - name: Optimize, hash and dump the specs
+        run: |
+          set -euo pipefail
+          mkdir -p ../release-artifacts
+          crates="asset-maintenance assetsup contrib multisig-transfer multisig-wallet"
+          : > ../release-artifacts/SHA256SUMS
+          {
+            printf '{\n  "version": "%s",\n  "commit": "%s",\n  "contracts": {\n' "${GITHUB_REF_NAME}" "${GITHUB_SHA}"
+          } > ../release-artifacts/hashes.json
+          first=1
+          for crate in $crates; do
+            wasm="target/wasm32-unknown-unknown/release/${crate//-/_}.wasm"
+            stellar contract optimize --wasm "$wasm"
+            optimized="target/wasm32-unknown-unknown/release/${crate//-/_}.optimized.wasm"
+            cp "$optimized" "../release-artifacts/${crate}.wasm"
+            stellar contract info interface --wasm "$optimized" --output json-formatted \
+              > "../release-artifacts/${crate}.spec.json"
+            sha=$(sha256sum "../release-artifacts/${crate}.wasm" | cut -d' ' -f1)
+            echo "${sha}  ${crate}.wasm" >> ../release-artifacts/SHA256SUMS
+            [ "$first" -eq 1 ] || printf ',\n' >> ../release-artifacts/hashes.json
+            first=0
+            printf '    "%s": { "wasmSha256": "%s" }' "$crate" "$sha" >> ../release-artifacts/hashes.json
+          done
+          printf '\n  }\n}\n' >> ../release-artifacts/hashes.json
+          cat ../release-artifacts/SHA256SUMS
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" ../release-artifacts/* \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "Optimised contract WASM, SHA-256 hashes (SHA256SUMS, hashes.json) and contract specs built from ${GITHUB_SHA} with the toolchain pinned in contracts/rust-toolchain.toml and --locked. Verify with: sha256sum -c SHA256SUMS"
