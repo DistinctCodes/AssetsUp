@@ -935,6 +935,7 @@ name = "multisig-transfer"
 version = "0.1.0"
 dependencies = [
  "assetsup",
+ "proptest",
  "soroban-sdk",
 ]
 

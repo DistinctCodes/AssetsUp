@@ -35,3 +35,6 @@ mod upgrade;
 
 // Property-based tests for share accounting
 mod proptests;
+
+// Payload assertions for every event helper
+mod event_payloads;

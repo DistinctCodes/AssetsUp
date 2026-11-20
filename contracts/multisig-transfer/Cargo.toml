@@ -16,3 +16,5 @@ soroban-sdk = { workspace = true }
 soroban-sdk = { workspace = true, features = ["testutils"] }
 # Cross-contract integration tests register the real registry ([SC-51]).
 assetsup = { path = "../assetsup" }
+# Property-based tests for approval rules and the request lifecycle (#1653).
+proptest = "1"

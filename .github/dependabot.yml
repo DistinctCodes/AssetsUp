@@ -1,0 +1,65 @@
+# Dependabot version updates.
+#
+# Four ecosystems, all weekly. Minor and patch updates are grouped into a single
+# PR per ecosystem to keep review load low; major updates (for example a
+# soroban-sdk major) arrive as their own PRs so they can be reviewed on purpose.
+# Labels reference only labels that already exist in this repository.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - backend
+      - nestjs
+    groups:
+      backend-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - frontend
+      - NextJs
+    groups:
+      frontend-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: cargo
+    directory: /contracts
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - soroban-contract
+    groups:
+      contracts-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - devops
+    groups:
+      actions-minor-and-patch:
+        update-types:
+          - minor
+          - patch
