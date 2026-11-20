@@ -68,7 +68,7 @@ pub fn create_policy(env: Env, asset_id: BytesN<32>, policy_data: InsurancePolic
 
     let key = DataKey::Policy(policy_data.policy_id.clone());
     if store.has(&key) {
-        panic!("Policy already exists");
+        crate::handle_error(&env, crate::Error::PolicyAlreadyExists);
     }
 
     store.set(&key, &policy_data);
@@ -98,7 +98,7 @@ pub fn cancel_policy(env: Env, policy_id: BytesN<32>, caller: Address) {
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::PolicyNotFound));
 
     if caller != policy.holder && caller != policy.insurer {
-        panic!("Unauthorized");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 
     policy.status = PolicyStatus::Cancelled;
@@ -129,12 +129,12 @@ pub fn submit_claim(
     claimant.require_auth();
 
     if !is_policy_active(env.clone(), policy_id.clone()) {
-        panic!("Policy is not active");
+        crate::handle_error(&env, crate::Error::PolicyNotActive);
     }
 
     let policy: InsurancePolicy = get_policy(env.clone(), policy_id.clone());
     if claimant != policy.holder {
-        panic!("Only policy holder can submit claim");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 
     let claim_id_bytes = env.crypto().sha256(&policy_id.clone().into());
@@ -152,7 +152,7 @@ pub fn submit_claim(
     let store = env.storage().persistent();
     let claim_key = DataKey::Claim(claim.claim_id.clone());
     if store.has(&claim_key) {
-        panic!("Claim already exists");
+        crate::handle_error(&env, crate::Error::ClaimAlreadyExists);
     }
 
     store.set(&claim_key, &claim);
@@ -181,7 +181,7 @@ pub fn update_claim_status(
 
     let policy = get_policy(env.clone(), claim.policy_id.clone());
     if insurer != policy.insurer {
-        panic!("Unauthorized: Only insurer can update claim status");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 
     claim.status = new_status;

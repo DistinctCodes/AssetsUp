@@ -58,7 +58,7 @@ pub fn stake_tokens(env: Env, asset_id: u64, staker: Address, amount: i128, lock
     crate::pause::require_subsystem_not_paused(&env, crate::pause::Subsystem::Staking);
 
     if amount <= 0 {
-        panic!("Stake amount must be positive");
+        crate::handle_error(&env, crate::Error::InvalidInput);
     }
 
     let store = env.storage().persistent();
@@ -105,7 +105,7 @@ pub fn unstake_tokens(env: Env, asset_id: u64, staker: Address) {
 
     let now = env.ledger().timestamp();
     if now < stake.staked_at + stake.lock_period {
-        panic!("Lock period has not elapsed");
+        crate::handle_error(&env, crate::Error::LockPeriodNotElapsed);
     }
 
     let amount = stake.amount;
@@ -140,7 +140,7 @@ pub fn set_reward_period_length(env: Env, caller: Address, asset_id: u64, length
         .get(&GlobalDataKey::Admin)
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
     if caller != admin {
-        panic!("Unauthorized");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
     let now = env.ledger().timestamp();
     let period = RewardPeriod {
@@ -182,7 +182,7 @@ pub fn accrue_staking_rewards(env: Env, caller: Address, asset_id: u64) {
         .get(&GlobalDataKey::Admin)
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
     if caller != admin {
-        panic!("Unauthorized");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 
     let store = env.storage().persistent();

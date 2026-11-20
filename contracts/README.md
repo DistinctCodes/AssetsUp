@@ -128,3 +128,9 @@ against that checklist.
   [SC-33].
 - Workspace member paths are listed bare and alphabetically — no `./` prefixes,
   no mixed separators.
+
+## Conventions
+
+- **Reads that can miss return `Result<_, Error::...NotFound>`** (for example `assetsup::get_asset` and `contrib::get_asset`/`get_asset_info`), never `Option` or a string panic. Reads that cannot miss (lists, counters, flags) return plain values.
+- **Failures are typed.** Production code uses the crate's `contracterror` enum (`handle_error` or `Result`), never `panic!("...")`; `scripts/check-no-unwrap.sh` enforces it for `contrib` and `asset-maintenance`.
+- **Every contract exposes `initialize`** and fails a second call with `AlreadyInitialized`.

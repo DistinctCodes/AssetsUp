@@ -27,7 +27,7 @@ fn require_admin(env: &Env, caller: &Address) {
         .get(&DataKey::Admin)
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
     if caller != &admin {
-        panic!("Only admin can call this function");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 }
 
@@ -81,13 +81,13 @@ pub fn is_subsystem_paused(env: &Env, subsystem: Subsystem) -> bool {
 /// Global guard used by registry / insurance / lease entrypoints.
 pub fn require_not_paused(env: &Env) {
     if is_paused(env) {
-        panic!("Contract is paused");
+        crate::handle_error(&env, crate::Error::ContractPaused);
     }
 }
 
 /// Subsystem-scoped guard (issue #1531).
 pub fn require_subsystem_not_paused(env: &Env, subsystem: Subsystem) {
     if is_subsystem_paused(env, subsystem) {
-        panic!("Subsystem is paused");
+        crate::handle_error(&env, crate::Error::SubsystemPaused);
     }
 }

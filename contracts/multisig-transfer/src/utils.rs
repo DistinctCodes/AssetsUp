@@ -16,6 +16,14 @@ pub fn require_admin(e: &Env, caller: &Address) -> Result<(), MultiSigError> {
     Ok(())
 }
 
+/// Fails with `ContractPaused` while the emergency pause is active.
+pub fn require_not_paused(e: &Env) -> Result<(), MultiSigError> {
+    if storage::is_paused(e) {
+        return Err(MultiSigError::ContractPaused);
+    }
+    Ok(())
+}
+
 pub fn now(e: &Env) -> u64 {
     e.ledger().timestamp()
 }

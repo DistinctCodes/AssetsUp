@@ -35,7 +35,7 @@ fn ctx(env: &Env) -> (AssetMaintenanceContractClient<'_>, Address) {
     let provider = Address::generate(env);
 
     env.mock_all_auths();
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
     client.register_provider(&ProviderProfile {
         address: provider.clone(),
         name: String::from_str(env, "Service Corp"),

@@ -90,10 +90,10 @@ pub fn confirm_release(env: Env, escrow_id: u64, caller: Address) {
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::EscrowNotFound));
 
     if caller != escrow.buyer {
-        panic!("Unauthorized: only the buyer can release the escrow");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
     if escrow.status != EscrowStatus::Active {
-        panic!("Escrow is not active");
+        crate::handle_error(&env, crate::Error::EscrowNotActive);
     }
 
     escrow.status = EscrowStatus::Completed;
@@ -116,10 +116,10 @@ pub fn cancel_escrow(env: Env, escrow_id: u64, caller: Address) {
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::EscrowNotFound));
 
     if caller != escrow.buyer && caller != escrow.seller {
-        panic!("Unauthorized: only the buyer or seller can cancel the escrow");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
     if escrow.status != EscrowStatus::Active {
-        panic!("Escrow is not active");
+        crate::handle_error(&env, crate::Error::EscrowNotActive);
     }
 
     escrow.status = EscrowStatus::Cancelled;

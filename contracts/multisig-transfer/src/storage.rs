@@ -15,6 +15,7 @@ pub enum DataKey {
     ApprovalSignatures,  // Map<(u64, Address), BytesN<64>> (optional)
     AssetPendingRequest, // Map<BytesN<32>, u64>
     AssetHistory,        // Map<BytesN<32>, Vec<u64>>
+    Paused,              // bool
 }
 
 /// Every setter below extends the entry's TTL *after* writing it.
@@ -32,6 +33,15 @@ pub fn get_admin(e: &Env) -> Option<Address> {
 pub fn set_admin(e: &Env, admin: &Address) {
     e.storage().persistent().set(&DataKey::Admin, admin);
     ttl::extend_persistent(e, &DataKey::Admin);
+}
+
+pub fn is_paused(e: &Env) -> bool {
+    e.storage().persistent().get(&DataKey::Paused).unwrap_or(false)
+}
+
+pub fn set_paused(e: &Env, paused: bool) {
+    e.storage().persistent().set(&DataKey::Paused, &paused);
+    ttl::extend_persistent(e, &DataKey::Paused);
 }
 
 pub fn get_registry(e: &Env) -> Option<Address> {

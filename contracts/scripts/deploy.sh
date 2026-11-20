@@ -162,8 +162,8 @@ invoke "${DEPLOYED[assetsup]}" initialize --admin "$ADMIN" >/dev/null
 log "  contrib.initialize"
 invoke "${DEPLOYED[contrib]}" initialize --admin "$ADMIN" >/dev/null
 
-log "  asset-maintenance.init (registry: assetsup)"
-invoke "${DEPLOYED[asset-maintenance]}" init \
+log "  asset-maintenance.initialize (registry: assetsup)"
+invoke "${DEPLOYED[asset-maintenance]}" initialize \
   --admin "$ADMIN" --registry "${DEPLOYED[assetsup]}" >/dev/null
 
 log "  multisig-transfer.initialize (registry: assetsup)"

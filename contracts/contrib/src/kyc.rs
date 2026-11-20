@@ -41,7 +41,7 @@ fn require_admin(env: &Env, caller: &Address) {
         .get(&GlobalDataKey::Admin)
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
     if *caller != admin {
-        panic!("Unauthorized");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 }
 

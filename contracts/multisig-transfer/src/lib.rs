@@ -45,6 +45,7 @@ mod expiry_tests;
 mod integration_tests;
 #[cfg(test)]
 mod pagination_tests;
+mod pause_tests;
 mod registry;
 #[cfg(test)]
 mod revocation_tests;
@@ -85,6 +86,40 @@ impl MultiSigTransferContract {
             .set(&storage::DataKey::NextRequestId, &1u64);
 
         events::contract_initialized(&e, &admin, &asset_registry, utils::now(&e));
+    }
+
+    // ----------------------------
+    // Emergency pause
+    // ----------------------------
+
+    /// Halt `create_transfer_request`, `approve_transfer_request`,
+    /// `reject_transfer_request` and `execute_transfer`. Reads,
+    /// `cancel_transfer_request` and `expire_transfer_request` stay available
+    /// so in-flight requests can still release their asset lock.
+    ///
+    /// Errors: `NotInitialized`, `Unauthorized` (caller is not the admin).
+    pub fn pause(e: Env, caller: Address) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+        caller.require_auth();
+        utils::require_admin(&e, &caller)?;
+        storage::set_paused(&e, true);
+        events::contract_paused(&e, &caller, utils::now(&e));
+        Ok(())
+    }
+
+    /// Resume after [`Self::pause`]. Admin only.
+    pub fn unpause(e: Env, caller: Address) -> Result<(), MultiSigError> {
+        ttl::extend_all(&e);
+        caller.require_auth();
+        utils::require_admin(&e, &caller)?;
+        storage::set_paused(&e, false);
+        events::contract_unpaused(&e, &caller, utils::now(&e));
+        Ok(())
+    }
+
+    /// Whether the emergency pause is active. Read-only.
+    pub fn is_paused(e: Env) -> bool {
+        storage::is_paused(&e)
     }
 
     // ----------------------------
@@ -157,6 +192,7 @@ impl MultiSigTransferContract {
         execute_after: Option<u64>,
     ) -> Result<u64, MultiSigError> {
         ttl::extend_all(&e);
+        utils::require_not_paused(&e)?;
 
         // The ownership check below compares the registry's owner against a
         // caller-supplied address; authenticate it first.
@@ -256,6 +292,7 @@ impl MultiSigTransferContract {
         request_id: u64,
     ) -> Result<(), MultiSigError> {
         ttl::extend_all(&e);
+        utils::require_not_paused(&e)?;
 
         // The approver-membership check below compares against a
         // caller-supplied address; authenticate it first or approvals can be
@@ -318,6 +355,7 @@ impl MultiSigTransferContract {
         reason_hash: BytesN<32>,
     ) -> Result<(), MultiSigError> {
         ttl::extend_all(&e);
+        utils::require_not_paused(&e)?;
 
         caller.require_auth();
         let (_admin, _registry) = utils::require_init(&e)?;
@@ -354,6 +392,7 @@ impl MultiSigTransferContract {
     // ----------------------------
     pub fn execute_transfer(e: Env, caller: Address, request_id: u64) -> Result<(), MultiSigError> {
         ttl::extend_all(&e);
+        utils::require_not_paused(&e)?;
 
         let (_admin, registry_addr) = utils::require_init(&e)?;
         // Deliberately permissionless, like multisig-wallet's execute_*: the

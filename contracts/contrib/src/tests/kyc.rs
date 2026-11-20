@@ -51,7 +51,7 @@ fn test_admin_approves_kyc() {
 }
 
 #[test]
-#[should_panic(expected = "Unauthorized")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_non_admin_cannot_approve_kyc() {
     let env = Env::default();
     let (client, _admin) = setup_test(&env);

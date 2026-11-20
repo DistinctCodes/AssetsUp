@@ -36,7 +36,7 @@ fn test_authorized_oracle_updates_valuation() {
 }
 
 #[test]
-#[should_panic(expected = "Unauthorized oracle")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_unauthorized_source_rejected() {
     let env = Env::default();
     let (client, _admin) = setup_test(&env);
@@ -47,7 +47,7 @@ fn test_unauthorized_source_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "Unauthorized oracle")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_removed_oracle_rejected() {
     let env = Env::default();
     let (client, admin) = setup_test(&env);
