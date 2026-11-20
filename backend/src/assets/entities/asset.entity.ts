@@ -33,6 +33,14 @@ export class Asset {
   @Column()
   assetTag: string;
 
+  /**
+   * Optional public, checksummed label (see public-asset-tag.ts). Null until one is
+   * assigned; it never replaces `assetTag`, the serial number or the asset id.
+   */
+  @Index({ unique: true, where: '"publicTag" IS NOT NULL AND "deletedAt" IS NULL' })
+  @Column({ type: 'varchar', nullable: true })
+  publicTag?: string | null;
+
   @Column()
   name: string;
 

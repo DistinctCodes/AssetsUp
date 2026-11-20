@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -12,6 +13,11 @@ import {
   containsPattern,
   resolveSort,
 } from '../common/utils/list-query';
+import {
+  formatPublicTag,
+  generatePublicTag,
+  parsePublicTag,
+} from './public-asset-tag';
 import { ASSET_SORT_COLUMNS } from './dto/list-assets-query.dto';
 import { PublicAssetDto, toPublicAsset } from './dto/public-asset.dto';
 import { Asset, ASSET_DETAIL_RELATIONS } from './entities/asset.entity';
@@ -193,12 +199,45 @@ export class AssetsService {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         assetId,
       );
+    // A public tag is checked first: a mistyped one is rejected with a clear
+    // message instead of falling through to a lookup that can only say "not found".
+    const publicTag = isUuid ? ({ ok: false, reason: 'format' } as const) : parsePublicTag(assetId);
+    if (!publicTag.ok && publicTag.reason === 'checksum') {
+      throw new BadRequestException(
+        'The public asset tag is mistyped (checksum mismatch). Check the label and try again.',
+      );
+    }
     const asset = await this.assetRepo.findOne({
-      where: isUuid ? { id: assetId } : { assetTag: assetId },
+      where: isUuid
+        ? { id: assetId }
+        : publicTag.ok
+          ? { publicTag: publicTag.tag }
+          : { assetTag: assetId },
       relations: ['category', 'location'],
     });
     if (!asset) throw new NotFoundException('Asset not found');
     return toPublicAsset(asset);
+  }
+
+  /**
+   * Gives the asset an optional public tag (idempotent: an asset keeps the tag it already has).
+   * Returns the canonical and the display form.
+   */
+  async assignPublicTag(id: string): Promise<{ publicTag: string; display: string }> {
+    const asset = await this.assetRepo.findOne({ where: { id } });
+    if (!asset) throw new NotFoundException('Asset not found');
+    if (!asset.publicTag) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = generatePublicTag();
+        if (!(await this.assetRepo.findOne({ where: { publicTag: candidate } }))) {
+          asset.publicTag = candidate;
+          await this.assetRepo.save(asset);
+          break;
+        }
+      }
+      if (!asset.publicTag) throw new ConflictException('Could not allocate a public tag; try again.');
+    }
+    return { publicTag: asset.publicTag, display: formatPublicTag(asset.publicTag) };
   }
 
   /**
