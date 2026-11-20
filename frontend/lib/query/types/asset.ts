@@ -2,11 +2,46 @@
  * TypeScript types for Asset management
  */
 
+/**
+ * Mirrors the statuses the backend stores and returns
+ * (backend/src/assets/asset-lifecycle.service.ts). The backend still accepts
+ * ACTIVE and MAINTENANCE as input aliases, but never sends them back.
+ */
 export enum AssetStatus {
-  ACTIVE = 'ACTIVE',
+  AVAILABLE = 'AVAILABLE',
   ASSIGNED = 'ASSIGNED',
-  MAINTENANCE = 'MAINTENANCE',
+  IN_MAINTENANCE = 'IN_MAINTENANCE',
+  IN_TRANSIT = 'IN_TRANSIT',
   RETIRED = 'RETIRED',
+  DISPOSED = 'DISPOSED',
+  LOST = 'LOST',
+}
+
+/** Allowed status changes, the same table the backend enforces. */
+export const ASSET_STATUS_TRANSITIONS: Readonly<Record<AssetStatus, readonly AssetStatus[]>> = {
+  [AssetStatus.AVAILABLE]: [
+    AssetStatus.ASSIGNED,
+    AssetStatus.IN_MAINTENANCE,
+    AssetStatus.IN_TRANSIT,
+    AssetStatus.RETIRED,
+    AssetStatus.LOST,
+  ],
+  [AssetStatus.ASSIGNED]: [
+    AssetStatus.AVAILABLE,
+    AssetStatus.IN_MAINTENANCE,
+    AssetStatus.IN_TRANSIT,
+    AssetStatus.RETIRED,
+    AssetStatus.LOST,
+  ],
+  [AssetStatus.IN_MAINTENANCE]: [AssetStatus.AVAILABLE, AssetStatus.ASSIGNED, AssetStatus.RETIRED],
+  [AssetStatus.IN_TRANSIT]: [AssetStatus.AVAILABLE, AssetStatus.ASSIGNED, AssetStatus.LOST],
+  [AssetStatus.RETIRED]: [AssetStatus.DISPOSED],
+  [AssetStatus.DISPOSED]: [],
+  [AssetStatus.LOST]: [AssetStatus.AVAILABLE, AssetStatus.RETIRED, AssetStatus.DISPOSED],
+};
+
+export function allowedAssetTransitions(from: AssetStatus): readonly AssetStatus[] {
+  return ASSET_STATUS_TRANSITIONS[from] ?? [];
 }
 
 export enum AssetCondition {

@@ -107,10 +107,10 @@ interface DashboardWidgetsProps {
 const statCards = [
   { label: "Total Assets", key: "total", icon: Package, status: null },
   {
-    label: "Active",
+    label: "Available",
     key: "active",
     icon: CheckCircle2,
-    status: AssetStatus.ACTIVE,
+    status: AssetStatus.AVAILABLE,
   },
   {
     label: "Assigned",
@@ -122,16 +122,16 @@ const statCards = [
     label: "In Maintenance",
     key: "maintenance",
     icon: Wrench,
-    status: AssetStatus.MAINTENANCE,
+    status: AssetStatus.IN_MAINTENANCE,
   },
 ] as const;
 
 export function SummaryStatsWidget({ data, isLoading }: DashboardWidgetsProps) {
   const counts = {
     total: data?.total ?? 0,
-    active: data?.byStatus?.[AssetStatus.ACTIVE] ?? 0,
+    active: data?.byStatus?.[AssetStatus.AVAILABLE] ?? 0,
     assigned: data?.byStatus?.[AssetStatus.ASSIGNED] ?? 0,
-    maintenance: data?.byStatus?.[AssetStatus.MAINTENANCE] ?? 0,
+    maintenance: data?.byStatus?.[AssetStatus.IN_MAINTENANCE] ?? 0,
   };
 
   return (
@@ -166,8 +166,8 @@ export function SummaryStatsWidget({ data, isLoading }: DashboardWidgetsProps) {
 export function AssetsByStatusWidget({ data }: DashboardWidgetsProps) {
   const statusData = [
     {
-      label: "Active",
-      count: data?.byStatus?.[AssetStatus.ACTIVE] ?? 12,
+      label: "Available",
+      count: data?.byStatus?.[AssetStatus.AVAILABLE] ?? 12,
       color: "bg-emerald-500",
     },
     {
@@ -177,7 +177,7 @@ export function AssetsByStatusWidget({ data }: DashboardWidgetsProps) {
     },
     {
       label: "Maintenance",
-      count: data?.byStatus?.[AssetStatus.MAINTENANCE] ?? 3,
+      count: data?.byStatus?.[AssetStatus.IN_MAINTENANCE] ?? 3,
       color: "bg-amber-500",
     },
     {

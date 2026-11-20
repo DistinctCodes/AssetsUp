@@ -51,7 +51,7 @@ export function CreateAssetModal({ onClose, onSuccess }: Props) {
     resolver: zodResolver(schema),
     defaultValues: {
       condition: AssetCondition.NEW,
-      status: AssetStatus.ACTIVE,
+      status: AssetStatus.AVAILABLE,
     },
   });
 

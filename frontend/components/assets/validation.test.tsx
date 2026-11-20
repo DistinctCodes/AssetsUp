@@ -4,9 +4,9 @@ import { StatusBadge } from './validation';
 import { AssetStatus } from '@/lib/query/types/asset';
 
 describe('validation.tsx StatusBadge', () => {
-  it('renders ACTIVE status with correct label and color', () => {
-    render(<StatusBadge status={AssetStatus.ACTIVE} />);
-    const badge = screen.getByText('Active');
+  it('renders AVAILABLE status with correct label and color', () => {
+    render(<StatusBadge status={AssetStatus.AVAILABLE} />);
+    const badge = screen.getByText('Available');
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain('bg-green-100');
     expect(badge.className).toContain('text-green-700');
@@ -20,9 +20,9 @@ describe('validation.tsx StatusBadge', () => {
     expect(badge.className).toContain('text-blue-700');
   });
 
-  it('renders MAINTENANCE status with correct label and color', () => {
-    render(<StatusBadge status={AssetStatus.MAINTENANCE} />);
-    const badge = screen.getByText('Maintenance');
+  it('renders IN_MAINTENANCE status with correct label and color', () => {
+    render(<StatusBadge status={AssetStatus.IN_MAINTENANCE} />);
+    const badge = screen.getByText('In maintenance');
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain('bg-yellow-100');
     expect(badge.className).toContain('text-yellow-700');

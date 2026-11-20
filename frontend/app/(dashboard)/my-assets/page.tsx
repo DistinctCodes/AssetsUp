@@ -1,37 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Package, AlertTriangle, ArrowRightLeft, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ConditionBadge } from "@/components/assets/condition-badge";
-import { useAssets } from "@/lib/query/hooks/useAssets";
+import { useMyAssets, useMyRequests } from "@/lib/query/hooks/useMyAssets";
 import { useAuthStore } from "@/store/auth.store";
-
-interface MyRequest {
-  id: string;
-  type: "transfer" | "maintenance";
-  title: string;
-  status: string;
-  createdAt: string;
-}
-
-const MOCK_REQUESTS: MyRequest[] = [];
 
 export default function MyAssetsPage() {
   const [tab, setTab] = useState<"assets" | "requests">("assets");
   const user = useAuthStore((s) => s.user);
 
-  // The asset list endpoint has no assignedToId filter yet, so this
-  // fetches a reasonably large page of assets (same shared data source
-  // and Asset shape as the main /assets table) and filters to the
-  // current user client-side, rather than maintaining a second,
-  // hand-rolled "my assets" data source.
-  const { data, isLoading } = useAssets({ limit: 100 });
-  const assets = useMemo(
-    () => (data?.data ?? []).filter((asset) => asset.assignedTo?.id === user?.id),
-    [data, user?.id],
-  );
+  // The server filters by assignee (`assignedToId=me`), so this is exactly the
+  // user's assets however many assets the organisation has.
+  const { data: assets = [], isLoading } = useMyAssets(user?.id);
+  const { data: requests = [], isLoading: requestsLoading } = useMyRequests(user?.id);
 
   return (
     <div>
@@ -50,7 +34,7 @@ export default function MyAssetsPage() {
         <button onClick={() => setTab("requests")} className={`px-4 py-2 rounded-md text-sm font-medium ${
           tab === "requests" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
         }`}>
-          My Requests ({MOCK_REQUESTS.length})
+          My Requests ({requests.length})
         </button>
       </div>
 
@@ -97,13 +81,17 @@ export default function MyAssetsPage() {
 
       {tab === "requests" && (
         <div className="space-y-3">
-          {MOCK_REQUESTS.length === 0 ? (
+          {requestsLoading ? (
+            <div className="bg-white border rounded-xl p-12 text-center text-gray-400">
+              Loading your requests...
+            </div>
+          ) : requests.length === 0 ? (
             <div className="bg-white border rounded-xl p-12 text-center">
               <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">No requests yet</p>
             </div>
           ) : (
-            MOCK_REQUESTS.map((req) => (
+            requests.map((req) => (
               <div key={req.id} className="bg-white border rounded-xl p-4 flex items-center gap-4">
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">{req.title}</p>

@@ -85,6 +85,7 @@ export class AssetsService {
     departmentId?: string;
     locationId?: string;
     status?: string;
+    assignedToId?: string;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -119,6 +120,8 @@ export class AssetsService {
     if (query?.locationId)
       qb.andWhere('asset.locationId = :l', { l: query.locationId });
     if (query?.status) qb.andWhere('asset.status = :st', { st: query.status });
+    if (query?.assignedToId)
+      qb.andWhere('asset.assignedToUserId = :au', { au: query.assignedToId });
 
     const [items, total] = await qb.getManyAndCount();
     return {
