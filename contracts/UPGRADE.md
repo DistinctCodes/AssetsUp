@@ -186,3 +186,12 @@ The WASM swap itself is **not** unit-tested: the test environment registers
 contracts natively rather than from uploaded WASM, so
 `update_current_contract_wasm` cannot execute there. That step is verified by
 this runbook on testnet before it is run anywhere else.
+
+## Removed entrypoints
+
+`contrib` no longer exposes the duplicate alias entrypoints `add_registrar`,
+`remove_registrar` and `get_total_asset_count`. Use the canonical names, which
+match `assetsup`: `add_authorized_registrar`, `remove_authorized_registrar` and
+`get_total_count`. Any off-chain caller, script or generated client that used an
+alias must switch before upgrading a deployed `contrib` instance.
+

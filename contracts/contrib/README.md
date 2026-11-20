@@ -126,14 +126,13 @@ true of the compiled contract, not just the source tree.
 | `retire_asset` | `asset_id, caller` | `()` | `caller` |
 | `add_authorized_registrar` | `caller, registrar` | `()` | `caller` |
 | `remove_authorized_registrar` | `caller, registrar` | `()` | `caller` |
-| `add_registrar` / `remove_registrar` | `caller, registrar` | `()` | aliases of the above |
 
 Unlike `assetsup`, these entrypoints **do** call `require_auth()` on the acting
 address. `contrib` is the correct reference implementation for authorization in
 this workspace.
 
 Reads: `get_admin`, `get_asset`, `get_asset_info`, `get_assets_by_owner`,
-`get_total_count`, `get_total_asset_count`, `is_authorized_registrar`,
+`get_total_count`, `is_authorized_registrar`,
 `get_audit_logs`, `is_paused`.
 
 ### Pause

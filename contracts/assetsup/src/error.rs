@@ -60,6 +60,8 @@ pub enum Error {
     InvalidPayment = 106,
     /// The contract has not been initialized with its metadata.
     ContractNotInitialized = 107,
+    /// A batch call named more ids than the documented maximum.
+    BatchTooLarge = 108,
 
     // ---------------------------------------------------------------
     // Tokenization and balances: 120–139
@@ -237,6 +239,7 @@ mod tests {
             Error::SubscriptionAlreadyExists as u32,
             Error::InvalidPayment as u32,
             Error::ContractNotInitialized as u32,
+            Error::BatchTooLarge as u32,
             Error::AssetAlreadyTokenized as u32,
             Error::AssetNotTokenized as u32,
             Error::InvalidTokenSupply as u32,

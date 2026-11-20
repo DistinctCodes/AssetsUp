@@ -60,6 +60,32 @@ mod tests;
 
 pub use types::*;
 
+/// Largest page any list getter returns, and the cap applied by the
+/// un-paged getters kept for compatibility.
+///
+/// The backing vectors (an owner's assets, token holders, a whitelist, audit
+/// entries, policies, leases) only ever grow, so an unbounded read eventually
+/// exceeds Soroban's per-invocation read-byte and CPU limits and can no longer
+/// be called. Page with the `*_page` entrypoints.
+pub const MAX_PAGE_SIZE: u32 = 100;
+
+/// Most ids accepted by [`AssetUpContract::batch_get_asset_info`].
+pub const MAX_BATCH_SIZE: u32 = 50;
+
+/// The `[start, start + limit)` window of `list`, with `limit` capped at
+/// [`MAX_PAGE_SIZE`]. A `start` past the end yields an empty page.
+fn page_of<T>(list: &Vec<T>, start: u32, limit: u32) -> Vec<T>
+where
+    T: soroban_sdk::IntoVal<Env, soroban_sdk::Val>
+        + soroban_sdk::TryFromVal<Env, soroban_sdk::Val>
+        + Clone,
+{
+    let len = list.len();
+    let from = start.min(len);
+    let to = from.saturating_add(limit.min(MAX_PAGE_SIZE)).min(len);
+    list.slice(from..to)
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
@@ -226,6 +252,10 @@ impl AssetUpContract {
             store.get(&owner_key).unwrap_or_else(|| Vec::new(&env));
         owner_assets.push_back(asset.id.clone());
         store.set(&owner_key, &owner_assets);
+        // A fresh write starts at the network's short minimum lifetime; without
+        // this an owner whose registry is never read could have it archived
+        // while their assets still exist.
+        ttl::extend_persistent(&env, &owner_key);
 
         // Update total asset count
         let mut total_count = Self::get_total_asset_count(env.clone())?;
@@ -414,6 +444,7 @@ impl AssetUpContract {
             old_owner_assets.remove(index as u32);
         }
         store.set(&old_owner_key, &old_owner_assets);
+        ttl::extend_persistent(&env, &old_owner_key);
 
         // Add asset to new owner's registry
         let new_owner_key = asset::DataKey::OwnerRegistry(new_owner.clone());
@@ -421,6 +452,7 @@ impl AssetUpContract {
             store.get(&new_owner_key).unwrap_or_else(|| Vec::new(&env));
         new_owner_assets.push_back(asset_id.clone());
         store.set(&new_owner_key, &new_owner_assets);
+        ttl::extend_persistent(&env, &new_owner_key);
 
         // Update asset
         asset.owner = new_owner.clone();
@@ -486,6 +518,7 @@ impl AssetUpContract {
         asset.status = AssetStatus::Retired;
         store.set(&key, &asset);
         ttl::extend_persistent(&env, &key);
+        ttl::extend_persistent(&env, &asset::DataKey::OwnerRegistry(asset.owner.clone()));
 
         // Append audit log
         audit::append_audit_log(
@@ -519,13 +552,34 @@ impl AssetUpContract {
         }
     }
 
+    /// The first [`MAX_PAGE_SIZE`] ids of the assets owned by `owner`.
+    ///
+    /// Capped; use [`Self::get_assets_by_owner_page`] to read an owner who holds
+    /// more. Extends the owner registry's TTL. Read-only.
     pub fn get_assets_by_owner(env: Env, owner: Address) -> Result<Vec<BytesN<32>>, Error> {
+        Self::get_assets_by_owner_page(env, owner, 0, MAX_PAGE_SIZE)
+    }
+
+    /// A page of the ids of the assets owned by `owner`: the entries at
+    /// `[start, start + limit)`, `limit` capped at [`MAX_PAGE_SIZE`], an empty
+    /// page past the end. Extends the owner registry's TTL on every read so an
+    /// owner who is only ever queried does not lose their registry to
+    /// archival. Read-only.
+    pub fn get_assets_by_owner_page(
+        env: Env,
+        owner: Address,
+        start: u32,
+        limit: u32,
+    ) -> Result<Vec<BytesN<32>>, Error> {
         let key = asset::DataKey::OwnerRegistry(owner);
-        let store = env.storage().persistent();
-        match store.get(&key) {
-            Some(assets) => Ok(assets),
-            None => Ok(Vec::new(&env)),
-        }
+        ttl::extend_persistent(&env, &key);
+        let assets: Vec<BytesN<32>> = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| Vec::new(&env));
+        Ok(page_of(&assets, start, limit))
+    }
     }
 
     /// The asset's full transfer history, oldest first.
@@ -661,16 +715,22 @@ impl AssetUpContract {
         })
     }
 
+    /// Summaries for several assets, positionally: element `i` is the summary
+    /// for `asset_ids[i]`, or `None` if that id is not registered, so a missing
+    /// asset is distinguishable from one that was omitted and results can be
+    /// matched back to the input.
+    ///
+    /// Errors: `BatchTooLarge` for more than [`MAX_BATCH_SIZE`] ids. Read-only.
     pub fn batch_get_asset_info(
         env: Env,
         asset_ids: Vec<BytesN<32>>,
-    ) -> Result<Vec<asset::AssetInfo>, Error> {
+    ) -> Result<Vec<Option<asset::AssetInfo>>, Error> {
+        if asset_ids.len() > MAX_BATCH_SIZE {
+            return Err(Error::BatchTooLarge);
+        }
         let mut results = Vec::new(&env);
         for asset_id in asset_ids.iter() {
-            match Self::get_asset_info(env.clone(), asset_id.clone()) {
-                Ok(info) => results.push_back(info),
-                Err(_) => continue, // Skip assets that don't exist
-            }
+            results.push_back(Self::get_asset_info(env.clone(), asset_id.clone()).ok());
         }
         Ok(results)
     }
@@ -889,7 +949,19 @@ impl AssetUpContract {
         env: Env,
         asset_id: BytesN<32>,
     ) -> Result<Vec<audit::AuditEntry>, Error> {
-        Ok(audit::get_asset_log(&env, &asset_id))
+        Self::get_asset_audit_logs_page(env, asset_id, 0, MAX_PAGE_SIZE)
+    }
+
+    /// A page of the asset's audit entries, oldest first (`[start, start +
+    /// limit)`, `limit` capped at [`MAX_PAGE_SIZE`]). The un-paged
+    /// [`Self::get_asset_audit_logs`] returns only the first page.
+    pub fn get_asset_audit_logs_page(
+        env: Env,
+        asset_id: BytesN<32>,
+        start: u32,
+        limit: u32,
+    ) -> Result<Vec<audit::AuditEntry>, Error> {
+        Ok(page_of(&audit::get_asset_log(&env, &asset_id), start, limit))
     }
 
     // =====================
@@ -987,7 +1059,23 @@ impl AssetUpContract {
 
     /// Get all token holders for an asset
     pub fn get_token_holders(env: Env, asset_id: u64) -> Result<Vec<Address>, Error> {
-        tokenization::get_token_holders(&env, asset_id)
+        Self::get_token_holders_page(env, asset_id, 0, MAX_PAGE_SIZE)
+    }
+
+    /// A page of the asset's token holders (`[start, start + limit)`, `limit`
+    /// capped at [`MAX_PAGE_SIZE`]). Errors: `AssetNotTokenized`. The un-paged
+    /// [`Self::get_token_holders`] returns only the first page.
+    pub fn get_token_holders_page(
+        env: Env,
+        asset_id: u64,
+        start: u32,
+        limit: u32,
+    ) -> Result<Vec<Address>, Error> {
+        Ok(page_of(
+            &tokenization::get_token_holders(&env, asset_id)?,
+            start,
+            limit,
+        ))
     }
 
     /// Lock tokens until timestamp (only the asset tokenizer can call this)
@@ -1164,7 +1252,23 @@ impl AssetUpContract {
 
     /// Get whitelist
     pub fn get_whitelist(env: Env, asset_id: u64) -> Result<Vec<Address>, Error> {
-        transfer_restrictions::get_whitelist(&env, asset_id)
+        Self::get_whitelist_page(env, asset_id, 0, MAX_PAGE_SIZE)
+    }
+
+    /// A page of the asset's transfer whitelist (`[start, start + limit)`,
+    /// `limit` capped at [`MAX_PAGE_SIZE`]). The un-paged
+    /// [`Self::get_whitelist`] returns only the first page.
+    pub fn get_whitelist_page(
+        env: Env,
+        asset_id: u64,
+        start: u32,
+        limit: u32,
+    ) -> Result<Vec<Address>, Error> {
+        Ok(page_of(
+            &transfer_restrictions::get_whitelist(&env, asset_id)?,
+            start,
+            limit,
+        ))
     }
 
     /// Set the jurisdiction allow-list for an asset's transfers
@@ -1301,7 +1405,19 @@ impl AssetUpContract {
 
     /// Get all policies for an asset
     pub fn get_asset_insurance_policies(env: Env, asset_id: BytesN<32>) -> Vec<BytesN<32>> {
-        insurance::get_asset_policies(env, asset_id)
+        Self::get_asset_insurance_policies_page(env, asset_id, 0, MAX_PAGE_SIZE)
+    }
+
+    /// A page of the asset's insurance policy ids (`[start, start + limit)`,
+    /// `limit` capped at [`MAX_PAGE_SIZE`]). The un-paged
+    /// [`Self::get_asset_insurance_policies`] returns only the first page.
+    pub fn get_asset_insurance_policies_page(
+        env: Env,
+        asset_id: BytesN<32>,
+        start: u32,
+        limit: u32,
+    ) -> Vec<BytesN<32>> {
+        page_of(&insurance::get_asset_policies(env, asset_id), start, limit)
     }
 
     /// Emit an on-chain expiry reminder for a policy nearing its end date
@@ -1379,6 +1495,18 @@ impl AssetUpContract {
 
     /// Return all lease IDs for a given lessee.
     pub fn get_lessee_leases(env: Env, lessee: Address) -> Vec<BytesN<32>> {
-        lease::get_lessee_leases(&env, lessee)
+        Self::get_lessee_leases_page(env, lessee, 0, MAX_PAGE_SIZE)
+    }
+
+    /// A page of the lease ids held by `lessee` (`[start, start + limit)`,
+    /// `limit` capped at [`MAX_PAGE_SIZE`]). The un-paged
+    /// [`Self::get_lessee_leases`] returns only the first page.
+    pub fn get_lessee_leases_page(
+        env: Env,
+        lessee: Address,
+        start: u32,
+        limit: u32,
+    ) -> Vec<BytesN<32>> {
+        page_of(&lease::get_lessee_leases(&env, lessee), start, limit)
     }
 }
