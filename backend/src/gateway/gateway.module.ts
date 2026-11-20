@@ -13,6 +13,7 @@ import {
   MaintenanceStatus,
 } from '../maintenance/entities/maintenance-record.entity';
 import { Asset } from '../assets/entities/asset.entity';
+import { User } from '../users/entities/user.entity';
 
 /**
  * Periodic scheduler that scans for maintenance records due within the next 24 hours
@@ -48,6 +49,7 @@ class MaintenanceDueScheduler {
         maintenanceId: record.id,
         assetId: record.assetId,
         departmentId: asset?.departmentId,
+        assignedToUserId: asset?.assignedToUserId ?? undefined,
         title: record.title,
         scheduledDate: record.scheduledDate?.toISOString(),
       });
@@ -63,7 +65,7 @@ class MaintenanceDueScheduler {
     ConfigModule,
     JwtModule,
     ScheduleModule.forRoot(),
-    TypeOrmModule.forFeature([MaintenanceRecord, Asset]),
+    TypeOrmModule.forFeature([MaintenanceRecord, Asset, User]),
     NotificationsModule,
   ],
   providers: [EventsGateway, MaintenanceDueScheduler],
