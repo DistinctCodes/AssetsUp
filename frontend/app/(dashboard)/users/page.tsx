@@ -10,6 +10,7 @@ import { getUserActionErrorMessage } from '@/lib/api/users';
 import { toast } from '@/components/ui/toast';
 import { AppUser, UserRole } from '@/lib/api/users';
 import { Button } from '@/components/ui/button';
+import { Pagination } from '@/components/ui/pagination';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
@@ -26,26 +27,20 @@ export default function UsersPage() {
   const [search, setSearch]       = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
 
-  const { data: users = [], isLoading } = useUsersList();
+  const [page, setPage] = useState(1);
+  // The backend paginates and searches; only the role filter still works on the loaded page.
+  const { data, isLoading } = useUsersList({ page, limit: 20, search: search || undefined });
+  const users = data?.items ?? [];
   const updateRole = useUpdateUserRole();
   const toggleActive = useToggleUserActive();
   const inviteUser = useInviteUser();
   const [showInvite, setShowInvite] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<AppUser | null>(null);
 
-  // client-side filter (list is typically small)
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return users.filter((u) => {
-      const matchSearch =
-        !q ||
-        u.firstName.toLowerCase().includes(q) ||
-        u.lastName.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q);
-      const matchRole = !roleFilter || u.role === roleFilter;
-      return matchSearch && matchRole;
-    });
-  }, [users, search, roleFilter]);
+  const filtered = useMemo(
+    () => users.filter((u) => !roleFilter || u.role === roleFilter),
+    [users, roleFilter],
+  );
 
   const handleRoleChange = (user: AppUser, newRole: UserRole) => {
     if (newRole === user.role) return;
@@ -62,7 +57,7 @@ export default function UsersPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Users & Roles</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {users.length} member{users.length !== 1 ? 's' : ''} in your organisation
+            {data?.total ?? 0} member{(data?.total ?? 0) !== 1 ? 's' : ''} in your organisation
           </p>
         </div>
         {currentUser?.role === 'admin' && (
@@ -80,7 +75,10 @@ export default function UsersPage() {
             type="text"
             placeholder="Search by name or email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
           />
         </div>
@@ -204,6 +202,13 @@ export default function UsersPage() {
             )}
           </tbody>
         </table>
+
+        <Pagination
+          page={data?.page ?? page}
+          totalPages={data?.totalPages ?? 1}
+          total={data?.total ?? 0}
+          onPageChange={setPage}
+        />
 
         {/* Role legend */}
         {users.length > 0 && (

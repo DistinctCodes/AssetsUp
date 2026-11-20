@@ -5,12 +5,23 @@ import {
   UpdateVendorInput,
   Vendor,
 } from '@/lib/api/vendors';
+import type { PageParams, Paginated } from '@/lib/api/paginated';
 import { queryKeys } from '../keys';
 
-export function useVendors() {
+/** One page of vendors, for the vendors list. */
+export function useVendors(params?: PageParams) {
+  return useQuery<Paginated<Vendor>>({
+    queryKey: queryKeys.vendors.page(params ?? {}),
+    queryFn: () => vendorApiClient.getVendors(params),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** Up to 100 vendors as an array, for select boxes. */
+export function useVendorOptions() {
   return useQuery<Vendor[]>({
-    queryKey: queryKeys.vendors.lists(),
-    queryFn: () => vendorApiClient.getVendors(),
+    queryKey: [...queryKeys.vendors.all, 'options'],
+    queryFn: () => vendorApiClient.getVendorOptions(),
   });
 }
 

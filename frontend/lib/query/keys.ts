@@ -22,6 +22,7 @@ export const queryKeys = {
   departments: {
     all: ['departments'] as const,
     list: () => [...queryKeys.departments.all, 'list'] as const,
+    page: (params: object) => [...queryKeys.departments.all, 'page', params] as const,
   },
   categories: {
     all: ['categories'] as const,
@@ -60,11 +61,13 @@ export const queryKeys = {
   vendors: {
     all: ['vendors'] as const,
     lists: () => [...queryKeys.vendors.all, 'list'] as const,
+    page: (params: object) => [...queryKeys.vendors.all, 'list', params] as const,
     detail: (id: string) => [...queryKeys.vendors.all, 'detail', id] as const,
   },
   purchaseOrders: {
     all: ['purchase-orders'] as const,
     lists: () => [...queryKeys.purchaseOrders.all, 'list'] as const,
+    page: (params: object) => [...queryKeys.purchaseOrders.all, 'list', params] as const,
     detail: (id: string) => [...queryKeys.purchaseOrders.all, 'detail', id] as const,
   },
   transfers: {

@@ -1,4 +1,5 @@
 import { api } from '../api';
+import type { PageParams, Paginated } from './paginated';
 
 export type UserRole = 'admin' | 'manager' | 'staff';
 
@@ -63,8 +64,9 @@ export function getUserActionErrorMessage(
 }
 
 export const usersApiClient = {
-  getUsers: (search?: string): Promise<AppUser[]> =>
-    api.get<AppUser[]>('/users', { params: search ? { search } : undefined }).then((r) => r.data),
+  /** GET /users answers with { items, total, page, limit, totalPages }. */
+  getUsers: (params?: PageParams): Promise<Paginated<AppUser>> =>
+    api.get<Paginated<AppUser>>('/users', { params }).then((r) => r.data),
 
   updateRole: (id: string, role: UserRole): Promise<AppUser> =>
     api.patch<AppUser>(`/users/${id}/role`, { role }).then((r) => r.data),

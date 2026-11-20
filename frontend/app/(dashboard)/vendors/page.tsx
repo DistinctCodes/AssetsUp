@@ -5,6 +5,7 @@ import { Plus, Search, Pencil, Trash2, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/ui/pagination";
 import { VendorModal } from "@/components/vendors/vendor-modal";
 import {
   useVendors,
@@ -19,18 +20,11 @@ export default function VendorsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null);
   const [deleteError, setDeleteError] = useState("");
 
-  const { data: vendors = [], isLoading } = useVendors();
+  const [page, setPage] = useState(1);
+  // The backend paginates and searches, so the list is one page at a time.
+  const { data, isLoading } = useVendors({ page, limit: 20, search: search || undefined });
+  const filtered = data?.items ?? [];
   const deleteVendor = useDeleteVendor();
-
-  const filtered = vendors.filter((v) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      v.name.toLowerCase().includes(q) ||
-      v.code.toLowerCase().includes(q) ||
-      v.contactName?.toLowerCase().includes(q)
-    );
-  });
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -73,7 +67,10 @@ export default function VendorsPage() {
             type="text"
             placeholder="Search by name, code, or contact..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
           />
         </div>
@@ -187,6 +184,12 @@ export default function VendorsPage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={data?.page ?? page}
+          totalPages={data?.totalPages ?? 1}
+          total={data?.total ?? 0}
+          onPageChange={setPage}
+        />
 
         {!isLoading && filtered.length > 0 && (
           <div className="px-4 py-3 border-t border-gray-200">

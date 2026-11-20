@@ -1,4 +1,5 @@
 import { api } from '../api';
+import { MAX_PAGE_SIZE, type PageParams, type Paginated } from './paginated';
 
 export interface Vendor {
   id: string;
@@ -31,8 +32,14 @@ export interface CreateVendorInput {
 export interface UpdateVendorInput extends Partial<CreateVendorInput> {}
 
 export const vendorApiClient = {
-  getVendors: (): Promise<Vendor[]> =>
-    api.get<Vendor[]>('/vendors').then((r) => r.data),
+  getVendors: (params?: PageParams): Promise<Paginated<Vendor>> =>
+    api.get<Paginated<Vendor>>('/vendors', { params }).then((r) => r.data),
+
+  /** Up to 100 vendors as a plain array, for select boxes. */
+  getVendorOptions: (): Promise<Vendor[]> =>
+    api
+      .get<Paginated<Vendor>>('/vendors', { params: { limit: MAX_PAGE_SIZE } })
+      .then((r) => r.data.items),
 
   getVendor: (id: string): Promise<Vendor> =>
     api.get<Vendor>(`/vendors/${id}`).then((r) => r.data),
