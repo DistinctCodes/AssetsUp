@@ -22,5 +22,5 @@ export const notificationsApiClient = {
     api.patch(`/notifications/${id}/read`).then(() => undefined),
 
   markAllRead: (): Promise<void> =>
-    api.patch('/notifications/mark-all-read').then(() => undefined),
+    api.patch('/notifications/read-all').then(() => undefined),
 };
