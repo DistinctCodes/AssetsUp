@@ -86,7 +86,15 @@ export class ReservationsService {
     const qb = this.reservationRepo
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.asset', 'asset')
-      .leftJoinAndSelect('r.reservedBy', 'reservedBy');
+      // Only the public user columns: a full User row carries password and
+      // token hashes.
+      .leftJoin('r.reservedBy', 'reservedBy')
+      .addSelect([
+        'reservedBy.id',
+        'reservedBy.firstName',
+        'reservedBy.lastName',
+        'reservedBy.email',
+      ]);
 
     if (filters.assetId) {
       qb.andWhere('r.assetId = :assetId', { assetId: filters.assetId });

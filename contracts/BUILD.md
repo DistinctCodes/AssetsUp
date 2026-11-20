@@ -184,3 +184,13 @@ The `interface` CI job builds the WASM, then:
    `packages/contracts-ts/<crate>/` (generated, not committed).
 
 Both scripts need the Stellar CLI on `PATH`.
+## Rustdoc on public entrypoints
+
+The `#[contractimpl]` blocks of `assetsup`, `contrib` and `asset-maintenance`
+carry `#[warn(missing_docs)]`, so every public entrypoint needs a doc comment
+saying what it does and, where it applies, who must authorize, which errors it
+returns and which event it emits. The `docs` CI job runs
+`cargo check ... --lib` with `RUSTFLAGS="-D warnings"` (so a missing doc fails
+the build) and `cargo doc --no-deps` with `RUSTDOCFLAGS="-D warnings"` (so a
+broken intra-doc link fails it too). Try it locally with the same two commands.
+

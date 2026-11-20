@@ -131,6 +131,43 @@ jobs:
       - name: Build all crates
         run: cargo build --locked --all --verbose
 
+  # Public contract entrypoints must be documented (auth, errors, events).
+  # `#[warn(missing_docs)]` on the `#[contractimpl]` blocks of assetsup, contrib
+  # and asset-maintenance turns a missing doc comment into a warning, and
+  # `-D warnings` here makes that warning fail the job. `cargo doc` with
+  # `-D warnings` additionally fails on broken intra-doc links.
+  docs:
+    name: Rustdoc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read pinned toolchain
+        id: toolchain
+        run: echo "channel=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/target
+          key: ${{ runner.os }}-cargo-docs-${{ hashFiles('contracts/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-docs-
+            ${{ runner.os }}-cargo-
+      - name: Fail on undocumented public entrypoints
+        env:
+          RUSTFLAGS: "-D warnings"
+        run: cargo check -p assetsup -p contrib -p asset-maintenance --lib
+      - name: Build the docs
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --no-deps --all
+
   build-wasm:
     name: Build WASM
     runs-on: ubuntu-latest

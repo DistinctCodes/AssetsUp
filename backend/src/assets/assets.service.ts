@@ -22,6 +22,7 @@ import { AssetHistoryService } from './asset-history.service';
 import { AssetHistoryAction } from './entities/asset-history-event.entity';
 import { Department } from '../departments/entities/department.entity';
 import { User } from '../users/entities/user.entity';
+import { PublicUserRef, toPublicUserRef } from '../users/dto/public-user.dto';
 import { BulkStatusDto } from './dto/bulk-status.dto';
 import { BulkAssignDto } from './dto/bulk-assign.dto';
 import { BulkDeleteDto } from './dto/bulk-delete.dto';
@@ -168,13 +169,16 @@ export class AssetsService {
   }
 
   /** Load an asset with the relations the frontend detail cache expects. */
-  async findDetail(id: string) {
+  async findDetail(
+    id: string,
+  ): Promise<Omit<Asset, 'assignedTo'> & { assignedTo: PublicUserRef | null }> {
     const asset = await this.assetRepo.findOne({
       where: { id },
       relations: ASSET_DETAIL_RELATIONS,
     });
     if (!asset) throw new NotFoundException(`Asset ${id} not found`);
-    return asset;
+    // `assignedTo` is loaded as a full User row; only its public fields may leave.
+    return { ...asset, assignedTo: toPublicUserRef(asset.assignedTo) };
   }
 
   /**

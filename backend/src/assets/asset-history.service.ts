@@ -5,6 +5,7 @@ import {
   AssetHistoryAction,
   AssetHistoryEvent,
 } from './entities/asset-history-event.entity';
+import { PublicUserRef, toPublicUserRef } from '../users/dto/public-user.dto';
 
 export interface RecordHistoryInput {
   assetId: string;
@@ -14,6 +15,11 @@ export interface RecordHistoryInput {
   newValue?: Record<string, unknown> | null;
   performedById?: string;
 }
+
+/** A history event as returned by the API: `performedBy` is the public user ref only. */
+export type AssetHistoryEntry = Omit<AssetHistoryEvent, 'performedBy'> & {
+  performedBy: PublicUserRef | null;
+};
 
 export interface AssetHistoryFilters {
   action?: AssetHistoryAction;
@@ -55,7 +61,7 @@ export class AssetHistoryService {
     page = 1,
     limit = 20,
   ): Promise<{
-    data: AssetHistoryEvent[];
+    data: AssetHistoryEntry[];
     total: number;
     page: number;
     limit: number;
@@ -87,7 +93,12 @@ export class AssetHistoryService {
     const startIndex = (safePage - 1) * safeLimit;
 
     return {
-      data: filtered.slice(startIndex, startIndex + safeLimit),
+      data: filtered
+        .slice(startIndex, startIndex + safeLimit)
+        .map((event) => ({
+          ...event,
+          performedBy: toPublicUserRef(event.performedBy),
+        })),
       total: filtered.length,
       page: safePage,
       limit: safeLimit,
