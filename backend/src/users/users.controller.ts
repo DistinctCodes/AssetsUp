@@ -26,6 +26,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
 
 @ApiTags('users')
 @ApiBearerAuth('JWT-auth')
@@ -72,11 +73,11 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Role updated' })
   updateRole(
     @Param('id') id: string,
-    @Body('role') role: UserRole,
+    @Body() dto: UpdateRoleDto,
     @Req() req: any,
   ) {
     const requestingUserId = req.user?.id || req.user?.sub;
-    return this.usersService.updateRole(id, role, requestingUserId);
+    return this.usersService.updateRole(id, dto.role, requestingUserId);
   }
 
   @Post('invite')

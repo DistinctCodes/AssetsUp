@@ -146,8 +146,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Checked after the password so an account's status is not revealed to
+    // someone who does not know its password.
+    if (user.isActive === false) {
+      throw new UnauthorizedException('This account has been deactivated');
+    }
+
     const authUser = this.sanitizeUser(user);
     const tokens = await this.generateTokenPair(authUser);
+    await this.usersService.setLastLogin(user.id);
     await this.auditLogsService?.logAction({
       action: 'CREATED',
       entityType: 'auth',
@@ -176,6 +183,11 @@ export class AuthService {
       }
 
       const user = await this.usersService.findById(payload.sub);
+      if (user.isActive === false) {
+        await this.usersService.setRefreshTokenHash(user.id, null);
+        this.revokeRefreshToken(payload?.jti, payload?.exp);
+        throw new UnauthorizedException('This account has been deactivated');
+      }
       if (!user.refreshTokenHash) {
         throw new UnauthorizedException('Refresh token has been revoked');
       }
@@ -212,10 +224,14 @@ export class AuthService {
     if (refreshToken) {
       try {
         const payload = this.jwtService.decode(refreshToken) as {
+          sub?: string;
           jti?: string;
           exp?: number;
         } | null;
-        this.revokeRefreshToken(payload?.jti, payload?.exp);
+        // Only revoke a token that belongs to the user logging out.
+        if (payload?.sub === userId) {
+          this.revokeRefreshToken(payload.jti, payload.exp);
+        }
       } catch {
         // Malformed token on logout isn't actionable — the user is being
         // logged out either way via the hash reset above.
