@@ -13,6 +13,7 @@ import {
   DepartmentWithCount,
   CategoryWithCount,
 } from "@/lib/api/assets";
+import type { PageParams, Paginated } from "@/lib/api/paginated";
 import { queryKeys } from "../keys";
 import { Asset, AssetUser, UpdateAssetStatusInput, TransferAssetInput } from "../types/asset";
 import { ApiError } from "../types";
@@ -33,10 +34,20 @@ export function useAssets(
 
 // ── Departments ──────────────────────────────────────────────
 
+/** Up to 100 departments as an array, for select boxes. */
 export function useDepartmentsList() {
   return useQuery<DepartmentWithCount[], ApiError>({
     queryKey: queryKeys.departments.list(),
-    queryFn: () => assetApiClient.getDepartments(),
+    queryFn: () => assetApiClient.getDepartmentOptions(),
+  });
+}
+
+/** One page of departments, for the departments list. */
+export function useDepartmentsPage(params?: PageParams) {
+  return useQuery<Paginated<DepartmentWithCount>, ApiError>({
+    queryKey: queryKeys.departments.page(params ?? {}),
+    queryFn: () => assetApiClient.getDepartments(params),
+    placeholderData: (previous) => previous,
   });
 }
 

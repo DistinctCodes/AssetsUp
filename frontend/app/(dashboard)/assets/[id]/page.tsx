@@ -37,11 +37,9 @@ import {
   useAssetNotes,
   useDeleteAsset,
   useUploadDocument,
-  useDeleteDocument,
   useCreateMaintenanceRecord,
   useUpdateMaintenanceStatus,
   useCreateNote,
-  useDeleteNote,
 } from "@/lib/query/hooks/useAsset";
 import type { MaintenanceType } from "@/lib/query/types/asset";
 
@@ -262,8 +260,6 @@ export default function AssetDetailPage() {
 
   // Confirm dialogs
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<string | null>(null);
-  const [confirmDeleteNote, setConfirmDeleteNote] = useState<string | null>(null);
 
   // Modals
   const [showScheduleMaintenance, setShowScheduleMaintenance] = useState(false);
@@ -284,8 +280,6 @@ export default function AssetDetailPage() {
   const { mutate: deleteAsset, isPending: deletingAsset } = useDeleteAsset(id, {
     onSuccess: () => router.push("/assets"),
   });
-  const { mutate: deleteDoc, isPending: deletingDoc } = useDeleteDocument(id);
-  const { mutate: deleteNote, isPending: deletingNote } = useDeleteNote(id);
   const { mutate: markComplete, isPending: markingComplete } = useUpdateMaintenanceStatus(id);
   const { mutate: addNote, isPending: addingNote } = useCreateNote(id, {
     onSuccess: () => setNoteContent(""),
@@ -679,15 +673,6 @@ export default function AssetDetailPage() {
                       {format(new Date(doc.createdAt), "MMM d, yyyy")}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="!text-red-500"
-                    aria-label={`Delete document ${doc.name}`}
-                    onClick={() => setConfirmDeleteDoc(doc.id)}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
                 </div>
               ))}
             </div>
@@ -738,15 +723,6 @@ export default function AssetDetailPage() {
                       <p className="text-sm text-gray-800 whitespace-pre-wrap flex-1">
                         {note.content}
                       </p>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="!text-red-500 shrink-0"
-                        aria-label="Delete note"
-                        onClick={() => setConfirmDeleteNote(note.id)}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
                     </div>
                     <p className="text-xs text-gray-400 mt-1.5">
                       {note.createdBy.name} ·{" "}
@@ -772,33 +748,7 @@ export default function AssetDetailPage() {
         />
       )}
 
-      {confirmDeleteDoc && (
-        <ConfirmDialog
-          title="Delete Document"
-          message="Are you sure you want to delete this document?"
-          confirmLabel="Delete"
-          loading={deletingDoc}
-          onConfirm={() => {
-            deleteDoc(confirmDeleteDoc);
-            setConfirmDeleteDoc(null);
-          }}
-          onCancel={() => setConfirmDeleteDoc(null)}
-        />
-      )}
-
-      {confirmDeleteNote && (
-        <ConfirmDialog
-          title="Delete Note"
-          message="Are you sure you want to delete this note?"
-          confirmLabel="Delete"
-          loading={deletingNote}
-          onConfirm={() => {
-            deleteNote(confirmDeleteNote);
-            setConfirmDeleteNote(null);
-          }}
-          onCancel={() => setConfirmDeleteNote(null)}
-        />
-      )}
+      {/* Deleting notes and documents is not offered: the backend has no DELETE routes for them yet. */}
 
       {/* ── Modals ── */}
       {showScheduleMaintenance && (

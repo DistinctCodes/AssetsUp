@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/ui/pagination";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CreatePOModal } from "@/components/purchase-orders/create-po-modal";
 import { ReceiveModal } from "@/components/purchase-orders/receive-modal";
@@ -34,7 +35,9 @@ export default function PurchaseOrdersPage() {
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrder | null>(null);
   const [cancelTarget, setCancelTarget] = useState<PurchaseOrder | null>(null);
 
-  const { data: orders = [], isLoading } = usePurchaseOrders();
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = usePurchaseOrders({ page, limit: 20 });
+  const orders = data?.items ?? [];
   const cancelPO = useCancelPO();
   const submitPO = useSubmitPO();
   const approvePO = useApprovePO();
@@ -152,6 +155,14 @@ export default function PurchaseOrdersPage() {
             )}
           </tbody>
         </table>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 border-t-0 -mt-px rounded-t-none">
+        <Pagination
+          page={data?.page ?? page}
+          totalPages={data?.totalPages ?? 1}
+          total={data?.total ?? 0}
+          onPageChange={setPage}
+        />
       </div>
 
       {showCreate && <CreatePOModal onClose={() => setShowCreate(false)} />}

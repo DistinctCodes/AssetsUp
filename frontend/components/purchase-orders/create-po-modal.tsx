@@ -8,7 +8,7 @@ import { X, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCreatePO } from "@/lib/query/hooks/usePurchaseOrders";
-import { useVendors } from "@/lib/query/hooks/useVendors";
+import { useVendorOptions } from "@/lib/query/hooks/useVendors";
 
 const schema = z.object({
   vendorId: z.string().min(1, "Vendor is required"),
@@ -30,7 +30,7 @@ interface Props {
 }
 
 export function CreatePOModal({ onClose }: Props) {
-  const { data: vendors = [] } = useVendors();
+  const { data: vendors = [] } = useVendorOptions();
   const createPO = useCreatePO();
   const [error, setError] = useState("");
 

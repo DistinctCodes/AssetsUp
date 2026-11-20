@@ -1,5 +1,6 @@
 // frontend/lib/query/hooks/useUser.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { PageParams, Paginated } from "@/lib/api/paginated";
 import {
   usersApiClient,
   AppUser,
@@ -10,13 +11,14 @@ import {
 
 const usersKeys = {
   all: ["users"] as const,
-  list: (search?: string) => [...usersKeys.all, "list", search ?? ""] as const,
+  list: (params?: PageParams) => [...usersKeys.all, "list", params ?? {}] as const,
 };
 
-export function useUsersList(search?: string) {
-  return useQuery<AppUser[]>({
-    queryKey: usersKeys.list(search),
-    queryFn: () => usersApiClient.getUsers(search),
+export function useUsersList(params?: PageParams) {
+  return useQuery<Paginated<AppUser>>({
+    queryKey: usersKeys.list(params),
+    queryFn: () => usersApiClient.getUsers(params),
+    placeholderData: (previous) => previous,
   });
 }
 

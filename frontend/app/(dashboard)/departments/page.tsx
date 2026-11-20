@@ -5,8 +5,9 @@ import { Plus, Trash2, Building2, Tag, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Pagination } from '@/components/ui/pagination';
 import {
-  useDepartmentsList,
+  useDepartmentsPage,
   useCreateDepartment,
   useDeleteDepartment,
   useCategories,
@@ -58,7 +59,9 @@ export default function DepartmentsPage() {
 // ── Departments Tab ──────────────────────────────────────────
 
 function DepartmentsTab() {
-  const { data: departments = [], isLoading } = useDepartmentsList();
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useDepartmentsPage({ page, limit: 20 });
+  const departments = data?.items ?? [];
   const createDept = useCreateDepartment();
   const deleteDept = useDeleteDepartment();
 
@@ -92,7 +95,7 @@ function DepartmentsTab() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-500">
-          {departments.length} department{departments.length !== 1 ? 's' : ''}
+          {data?.total ?? 0} department{(data?.total ?? 0) !== 1 ? 's' : ''}
         </p>
         <Button size="sm" onClick={() => { setShowForm(true); setFormError(''); }}>
           <Plus size={15} className="mr-1" />
@@ -156,6 +159,13 @@ function DepartmentsTab() {
           ))}
         </div>
       )}
+
+      <Pagination
+        page={data?.page ?? page}
+        totalPages={data?.totalPages ?? 1}
+        total={data?.total ?? 0}
+        onPageChange={setPage}
+      />
 
       {deleteTarget && (
         <ConfirmDialog

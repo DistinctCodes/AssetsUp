@@ -1,4 +1,5 @@
 import { api } from '../api';
+import { MAX_PAGE_SIZE, type PageParams, type Paginated } from './paginated';
 import type {
   Asset,
   AssetHistoryEvent,
@@ -90,8 +91,14 @@ export const assetApiClient = {
   getAssetNotes: (id: string): Promise<AssetNote[]> =>
     api.get<AssetNote[]>(`/assets/${id}/notes`).then((r) => r.data),
 
-  getDepartments: (): Promise<DepartmentWithCount[]> =>
-    api.get<DepartmentWithCount[]>('/departments').then((r) => r.data),
+  getDepartments: (params?: PageParams): Promise<Paginated<DepartmentWithCount>> =>
+    api.get<Paginated<DepartmentWithCount>>('/departments', { params }).then((r) => r.data),
+
+  /** Up to 100 departments as a plain array, for select boxes. */
+  getDepartmentOptions: (): Promise<DepartmentWithCount[]> =>
+    api
+      .get<Paginated<DepartmentWithCount>>('/departments', { params: { limit: MAX_PAGE_SIZE } })
+      .then((r) => r.data.items),
 
   createDepartment: (data: { name: string; description?: string }): Promise<Department> =>
     api.post<Department>('/departments', data).then((r) => r.data),
@@ -114,8 +121,11 @@ export const assetApiClient = {
   updateCategory: (id: string, data: { name?: string; description?: string }): Promise<{ id: string; name: string }> =>
     api.patch<{ id: string; name: string }>(`/categories/${id}`, data).then((r) => r.data),
 
+  /** Up to 100 users for pickers: GET /users is paginated, so unwrap `items`. */
   getUsers: (): Promise<AssetUser[]> =>
-    api.get<AssetUser[]>('/users').then((r) => r.data),
+    api
+      .get<Paginated<AssetUser>>('/users', { params: { limit: MAX_PAGE_SIZE } })
+      .then((r) => r.data.items),
 
   updateAssetStatus: (id: string, data: UpdateAssetStatusInput): Promise<Asset> =>
     api.patch<Asset>(`/assets/${id}/status`, data).then((r) => r.data),
@@ -137,17 +147,11 @@ export const assetApiClient = {
       .then((r) => r.data);
   },
 
-  deleteDocument: (assetId: string, documentId: string): Promise<void> =>
-    api.delete(`/assets/${assetId}/documents/${documentId}`).then(() => undefined),
-
   createMaintenanceRecord: (assetId: string, data: CreateMaintenanceInput): Promise<MaintenanceRecord> =>
     api.post<MaintenanceRecord>(`/assets/${assetId}/maintenance`, data).then((r) => r.data),
 
   createNote: (assetId: string, data: CreateNoteInput): Promise<AssetNote> =>
     api.post<AssetNote>(`/assets/${assetId}/notes`, data).then((r) => r.data),
-
-  deleteNote: (assetId: string, noteId: string): Promise<void> =>
-    api.delete(`/assets/${assetId}/notes/${noteId}`).then(() => undefined),
 
   updateMaintenanceStatus: (
     assetId: string,

@@ -1,4 +1,5 @@
 import { api } from '../api';
+import type { PageParams, Paginated } from './paginated';
 
 /** Mirrors backend/src/purchase-orders/purchase-order-transitions.ts. */
 export enum POStatus {
@@ -80,8 +81,8 @@ export interface ReceiveLineInput {
 }
 
 export const poApiClient = {
-  getPOs: (): Promise<PurchaseOrder[]> =>
-    api.get<PurchaseOrder[]>('/purchase-orders').then((r) => r.data),
+  getPOs: (params?: PageParams): Promise<Paginated<PurchaseOrder>> =>
+    api.get<Paginated<PurchaseOrder>>('/purchase-orders', { params }).then((r) => r.data),
 
   getPO: (id: string): Promise<PurchaseOrder> =>
     api.get<PurchaseOrder>(`/purchase-orders/${id}`).then((r) => r.data),

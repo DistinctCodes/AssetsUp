@@ -91,7 +91,7 @@ export function useDepartments(
 ) {
   return useQuery<Department[], ApiError>({
     queryKey: queryKeys.departments.list(),
-    queryFn: () => assetApiClient.getDepartments(),
+    queryFn: () => assetApiClient.getDepartmentOptions(),
     ...options,
   });
 }
@@ -186,22 +186,6 @@ export function useUploadDocument(
   });
 }
 
-export function useDeleteDocument(
-  assetId: string,
-  options?: UseMutationOptions<void, ApiError, string>
-) {
-  const queryClient = useQueryClient();
-
-  return useMutation<void, ApiError, string>({
-    mutationFn: (documentId) => assetApiClient.deleteDocument(assetId, documentId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.assets.documents(assetId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.assets.history(assetId) });
-    },
-    ...options,
-  });
-}
-
 export function useCreateMaintenanceRecord(
   assetId: string,
   options?: UseMutationOptions<MaintenanceRecord, ApiError, CreateMaintenanceInput>
@@ -229,21 +213,6 @@ export function useCreateNote(
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.notes(assetId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.history(assetId) });
-    },
-    ...options,
-  });
-}
-
-export function useDeleteNote(
-  assetId: string,
-  options?: UseMutationOptions<void, ApiError, string>
-) {
-  const queryClient = useQueryClient();
-
-  return useMutation<void, ApiError, string>({
-    mutationFn: (noteId) => assetApiClient.deleteNote(assetId, noteId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.assets.notes(assetId) });
     },
     ...options,
   });

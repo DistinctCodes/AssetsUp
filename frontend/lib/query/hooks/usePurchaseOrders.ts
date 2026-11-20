@@ -5,12 +5,14 @@ import {
   ReceiveLineInput,
   PurchaseOrder,
 } from '@/lib/api/purchase-orders';
+import type { PageParams, Paginated } from '@/lib/api/paginated';
 import { queryKeys } from '../keys';
 
-export function usePurchaseOrders() {
-  return useQuery<PurchaseOrder[]>({
-    queryKey: queryKeys.purchaseOrders.lists(),
-    queryFn: () => poApiClient.getPOs(),
+export function usePurchaseOrders(params?: PageParams) {
+  return useQuery<Paginated<PurchaseOrder>>({
+    queryKey: queryKeys.purchaseOrders.page(params ?? {}),
+    queryFn: () => poApiClient.getPOs(params),
+    placeholderData: (previous) => previous,
   });
 }
 

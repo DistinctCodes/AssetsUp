@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Download, Plus, BarChart3, Table as TableIcon } from "lucide-react";
+import { useState } from "react";
+import { Download, BarChart3, Table as TableIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { savedReportsApiClient, type SavedReport } from "@/lib/api/saved-reports";
 
 const DATASETS = ["assets", "maintenance", "transfers", "activity"] as const;
 const GROUP_BY_OPTIONS = ["status", "category", "department", "month"] as const;
@@ -13,46 +12,9 @@ export default function ReportBuilderPage() {
   const [dataset, setDataset] = useState<string>("assets");
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [groupBy, setGroupBy] = useState<string>("");
-  const [reportName, setReportName] = useState("");
-  const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
-  const [showSave, setShowSave] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "chart">("table");
 
-  // Load saved reports from the API on mount
-  useEffect(() => {
-    savedReportsApiClient
-      .list()
-      .then(setSavedReports)
-      .catch(() => setSavedReports([]));
-  }, []);
-
   const addFilter = () => setFilters((prev) => ({ ...prev, "": "" }));
-
-  const saveReport = async () => {
-    if (!reportName) return;
-    try {
-      const created = await savedReportsApiClient.create({
-        name: reportName,
-        dataset,
-        filters: { ...filters },
-        groupBy,
-        viewMode,
-      });
-      setSavedReports((prev) => [...prev, created]);
-    } catch {
-      // Fallback: store locally if the API is not available yet
-      setSavedReports((prev) => [...prev, {
-        id: Date.now().toString(),
-        name: reportName,
-        dataset,
-        filters: { ...filters },
-        groupBy,
-        viewMode,
-      }]);
-    }
-    setShowSave(false);
-    setReportName("");
-  };
 
   const exportCSV = () => {
     const blob = new Blob(["Not yet connected to live data"], { type: "text/csv" });
@@ -72,11 +34,11 @@ export default function ReportBuilderPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Report Builder</h1>
           <p className="text-sm text-gray-500 mt-1">Compose custom filtered reports and export</p>
+          {/* Saving reports is hidden until the backend has a saved-reports module. */}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportCSV}><Download className="w-4 h-4 mr-1" /> CSV</Button>
           <Button variant="outline" onClick={exportPDF}><Download className="w-4 h-4 mr-1" /> PDF</Button>
-          <Button onClick={() => setShowSave(true)}><Plus className="w-4 h-4 mr-1" /> Save Report</Button>
         </div>
       </div>
 
@@ -118,34 +80,6 @@ export default function ReportBuilderPage() {
           </div>
         </div>
       </div>
-
-      {savedReports.length > 0 && (
-        <div className="mt-8">
-          <h3 className="font-medium text-gray-700 mb-3">Saved Reports</h3>
-          <div className="grid grid-cols-3 gap-3">
-            {savedReports.map((r) => (
-              <div key={r.id} className="bg-white border rounded-lg p-3 hover:shadow-sm cursor-pointer">
-                <p className="font-medium text-sm">{r.name}</p>
-                <p className="text-xs text-gray-500">{r.dataset} · {Object.keys(r.filters).length} filters</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showSave && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowSave(false)} />
-          <div className="relative bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
-            <h3 className="font-semibold mb-3">Save Report</h3>
-            <Input placeholder="Report name" value={reportName} onChange={(e) => setReportName(e.target.value)} className="mb-4" />
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowSave(false)}>Cancel</Button>
-              <Button onClick={saveReport}>Save</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
