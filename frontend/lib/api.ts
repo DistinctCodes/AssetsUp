@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 import { env } from './env';
+import { describeEnvelopeError, unwrapEnvelope } from './api-envelope';
 
 const API_BASE = env.NEXT_PUBLIC_API_URL;
 
@@ -8,6 +9,10 @@ export const api = axios.create({
   baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
 });
+
+// Unwrap the backend's { success, data } envelope first, so every later
+// interceptor and every caller sees the inner payload.
+api.interceptors.response.use(unwrapEnvelope, describeEnvelopeError);
 
 // Track if a refresh is in progress to de-duplicate concurrent refresh requests
 let isRefreshing = false;

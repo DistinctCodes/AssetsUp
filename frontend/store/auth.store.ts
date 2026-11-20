@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { authApi, AuthUser, LoginPayload, RegisterPayload } from '@/lib/auth-api';
+import { clearTokens, persistTokens } from '@/lib/auth-tokens';
 
 /**
- * Token handling has moved from localStorage to httpOnly cookies.
- * The backend sets `HttpOnly; Secure; SameSite=Lax` cookies for both
- * access and refresh tokens. The client sends `withCredentials` on
- * all requests so the browser attaches them automatically.
+ * Token handling: the backend returns `accessToken`/`refreshToken` in the JSON
+ * body and sets no cookies. The client therefore stores both tokens in
+ * localStorage (read by the axios request interceptor) and writes the
+ * `accessToken` cookie that `middleware.ts` checks. See `lib/auth-tokens.ts`.
  */
 
 interface AuthState {
@@ -29,6 +30,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const data = await authApi.login(payload);
+      persistTokens(data);
       set({ user: data.user, isAuthenticated: true });
     } finally { set({ isLoading: false }); }
   },
@@ -37,13 +39,17 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const data = await authApi.register(payload);
+      persistTokens(data);
       set({ user: data.user, isAuthenticated: true });
     } finally { set({ isLoading: false }); }
   },
 
   logout: async () => {
     try { await authApi.logout(); }
-    finally { set({ user: null, isAuthenticated: false }); }
+    finally {
+      clearTokens();
+      set({ user: null, isAuthenticated: false });
+    }
   },
 
   loadUser: async () => {
@@ -51,7 +57,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const user = await authApi.me();
       set({ user, isAuthenticated: true });
-    } catch { set({ user: null, isAuthenticated: false }); }
+    } catch {
+      clearTokens();
+      set({ user: null, isAuthenticated: false });
+    }
     finally { set({ isLoading: false }); }
   },
 }));
