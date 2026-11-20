@@ -46,12 +46,12 @@ a key is lost, not after.
 
 The contract has a single privileged principal and one delegated role.
 
-- **Admin.** Stored at `init`; the stored address must authenticate for every
+- **Admin.** Stored at `initialize`; the stored address must authenticate for every
   registry-level mutation: `register_provider`, `deactivate_provider`,
   `add_warranty_information`, `update_warranty_information`,
   `file_warranty_claim`, and `create_maintenance_alert` all call the internal
   `require_admin` helper, which loads `DataKey::Admin` and calls
-  `require_auth()` on it. `init` itself requires the *incoming* admin's
+  `require_auth()` on it. `initialize` itself requires the *incoming* admin's
   authorization.
 - **Service providers.** The only role that may *log maintenance*. A record is
   accepted only when (a) the `provider` named in the record authenticated the
@@ -93,7 +93,7 @@ unguarded.
 
 | Entrypoint | Args | Returns | Auth |
 |---|---|---|---|
-| `init` | `admin, registry` | `()` | — (none) |
+| `initialize` | `admin, registry` | `()` | — (none) |
 | `register_provider` | `provider: ProviderProfile` | `()` | stored `admin` |
 | `deactivate_provider` | `provider_address` | `()` | stored `admin` |
 | `get_provider_details` | `provider_address` | `Option<ProviderProfile>` | read-only |
@@ -149,7 +149,7 @@ convention.
 
 | Event (topic 0) | Emitted by |
 |---|---|
-| `contract_initialized` | `init` |
+| `contract_initialized` | `initialize` |
 | `provider_registered` | `register_provider` |
 | `provider_deactivated` | `deactivate_provider` |
 | `maintenance_recorded` | `add_maintenance_record` |
@@ -202,7 +202,7 @@ let admin = Address::generate(&env);
 let registry = Address::generate(&env);
 let provider = Address::generate(&env);
 
-client.init(&admin, &registry);
+client.initialize(&admin, &registry);
 
 // The provider records a completed service against asset 1.
 let record = MaintenanceRecord {

@@ -34,7 +34,7 @@ fn require_admin(env: &Env, caller: &Address) {
         .get(&GlobalDataKey::Admin)
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
     if *caller != admin {
-        panic!("Unauthorized");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 }
 
@@ -67,7 +67,7 @@ pub fn update_valuation(env: Env, source: Address, asset_id: u64, value: i128, c
         .get(&DataKey::Oracle(source.clone()))
         .unwrap_or(false)
     {
-        panic!("Unauthorized oracle");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 
     let entry = ValuationEntry {

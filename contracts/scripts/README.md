@@ -49,7 +49,7 @@ cd contracts
 4. **Initialize** — wires cross-contract addresses:
    - `assetsup.initialize(admin)`
    - `contrib.initialize(admin)`
-   - `asset-maintenance.init(admin, registry = assetsup)`
+   - `asset-maintenance.initialize(admin, registry = assetsup)`
    - `multisig-transfer.initialize(admin, asset_registry = assetsup)`
 5. **Verify** — calls a read entrypoint on each deployed contract and fails the
    run if any does not respond.

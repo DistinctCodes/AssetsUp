@@ -47,7 +47,7 @@ fn test_register_asset_success() {
 }
 
 #[test]
-#[should_panic(expected = "Asset already exists")]
+#[should_panic(expected = "Error(Contract, #201)")]
 fn test_register_asset_duplicate_panic() {
     let env = Env::default();
     let (client, admin) = setup_test(&env);
@@ -77,7 +77,7 @@ fn test_transfer_asset_success() {
 }
 
 #[test]
-#[should_panic(expected = "Unauthorized")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_transfer_asset_unauthorized_panic() {
     let env = Env::default();
     let (client, admin) = setup_test(&env);
@@ -92,7 +92,7 @@ fn test_transfer_asset_unauthorized_panic() {
 }
 
 #[test]
-#[should_panic(expected = "Asset is retired")]
+#[should_panic(expected = "Error(Contract, #202)")]
 fn test_transfer_asset_retired_panic() {
     let env = Env::default();
     let (client, admin) = setup_test(&env);
@@ -122,7 +122,7 @@ fn test_retire_asset_success() {
 }
 
 #[test]
-#[should_panic(expected = "Already retired")]
+#[should_panic(expected = "Error(Contract, #202)")]
 fn test_retire_asset_already_retired_panic() {
     let env = Env::default();
     let (client, admin) = setup_test(&env);
@@ -136,7 +136,7 @@ fn test_retire_asset_already_retired_panic() {
 }
 
 #[test]
-#[should_panic(expected = "Asset not found")]
+#[should_panic(expected = "Error(Contract, #200)")]
 fn test_get_asset_info_not_found_panic() {
     let env = Env::default();
     let (client, _admin) = setup_test(&env);
@@ -164,7 +164,7 @@ fn test_pause_unpause_flow() {
 }
 
 #[test]
-#[should_panic(expected = "Contract is paused")]
+#[should_panic(expected = "Error(Contract, #6)")]
 fn test_fail_when_paused() {
     let env = Env::default();
     let (client, admin) = setup_test(&env);

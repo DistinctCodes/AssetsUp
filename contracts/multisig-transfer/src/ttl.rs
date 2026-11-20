@@ -74,6 +74,7 @@ pub fn extend_all(env: &Env) {
     extend_persistent(env, &DataKey::Admin);
     extend_persistent(env, &DataKey::AssetRegistry);
     extend_persistent(env, &DataKey::NextRequestId);
+    extend_persistent(env, &DataKey::Paused);
     extend_persistent(env, &DataKey::Requests);
     extend_persistent(env, &DataKey::Rules);
     extend_persistent(env, &DataKey::PendingApprovals);

@@ -16,6 +16,8 @@ pub enum DataKey {
     AssetPendingRequest, // Map<BytesN<32>, u64>
     AssetHistory,        // Map<BytesN<32>, Vec<u64>>
     PendingAdmin,        // Address (absent unless an admin transfer is in flight)
+
+    Paused,              // bool
 }
 
 /// Every setter below extends the entry's TTL *after* writing it.
@@ -46,6 +48,15 @@ pub fn set_pending_admin(e: &Env, admin: &Address) {
 
 pub fn clear_pending_admin(e: &Env) {
     e.storage().persistent().remove(&DataKey::PendingAdmin);
+}
+
+pub fn is_paused(e: &Env) -> bool {
+    e.storage().persistent().get(&DataKey::Paused).unwrap_or(false)
+}
+
+pub fn set_paused(e: &Env, paused: bool) {
+    e.storage().persistent().set(&DataKey::Paused, &paused);
+    ttl::extend_persistent(e, &DataKey::Paused);
 }
 
 pub fn get_registry(e: &Env) -> Option<Address> {

@@ -48,18 +48,28 @@ pub enum Error {
     PolicyNotFound = 220,
     /// No insurance claim exists under this id.
     ClaimNotFound = 221,
+    /// A policy with this id already exists.
+    PolicyAlreadyExists = 222,
+    /// The policy is not active.
+    PolicyNotActive = 223,
+    /// A claim with this id already exists.
+    ClaimAlreadyExists = 224,
 
     // ---------------------------------------------------------------
     // Lease: 240–249
     // ---------------------------------------------------------------
     /// No lease exists under this id.
     LeaseNotFound = 240,
+    /// A lease already exists for this asset.
+    LeaseAlreadyExists = 241,
 
     // ---------------------------------------------------------------
     // Escrow: 250–259
     // ---------------------------------------------------------------
     /// No escrow exists under this id.
     EscrowNotFound = 250,
+    /// The escrow is no longer active.
+    EscrowNotActive = 251,
 
     // ---------------------------------------------------------------
     // KYC: 260–269
@@ -74,6 +84,10 @@ pub enum Error {
     StakeNotFound = 270,
     /// Reward period data is missing.
     RewardPeriodNotFound = 271,
+    /// The stake's lock period has not elapsed.
+    LockPeriodNotElapsed = 272,
+    /// The subsystem is paused.
+    SubsystemPaused = 273,
 }
 
 /// Panic with a typed contract error so clients can match on the code.

@@ -61,7 +61,7 @@ fn test_buyer_confirms_release() {
 }
 
 #[test]
-#[should_panic(expected = "Unauthorized: only the buyer can release the escrow")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_seller_cannot_confirm_release() {
     let env = Env::default();
     let (client, _admin) = setup_test(&env);
@@ -99,7 +99,7 @@ fn test_buyer_cancels_escrow() {
 }
 
 #[test]
-#[should_panic(expected = "Unauthorized: only the buyer or seller can cancel the escrow")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_unrelated_address_cannot_cancel() {
     let env = Env::default();
     let (client, _admin) = setup_test(&env);
@@ -110,7 +110,7 @@ fn test_unrelated_address_cannot_cancel() {
 }
 
 #[test]
-#[should_panic(expected = "Escrow is not active")]
+#[should_panic(expected = "Error(Contract, #251)")]
 fn test_cannot_release_after_cancel() {
     let env = Env::default();
     let (client, _admin) = setup_test(&env);

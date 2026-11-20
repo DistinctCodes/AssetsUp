@@ -103,7 +103,7 @@ impl ContribContract {
         admin.require_auth();
 
         if env.storage().persistent().has(&DataKey::Admin) {
-            panic!("Already initialized");
+            crate::handle_error(&env, crate::Error::AlreadyInitialized);
         }
         env.storage().persistent().set(&DataKey::Admin, &admin);
         env.storage().persistent().set(&DataKey::Paused, &false);
@@ -130,7 +130,7 @@ impl ContribContract {
             .get(&DataKey::Admin)
             .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
         if caller != admin {
-            panic!("Unauthorized");
+            crate::handle_error(&env, crate::Error::Unauthorized);
         }
         env.storage()
             .persistent()
@@ -147,7 +147,7 @@ impl ContribContract {
             .get(&DataKey::Admin)
             .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
         if caller != admin {
-            panic!("Unauthorized");
+            crate::handle_error(&env, crate::Error::Unauthorized);
         }
         env.storage()
             .persistent()
@@ -181,14 +181,14 @@ impl ContribContract {
             .get(&DataKey::AuthorizedRegistrar(registrar.clone()))
             .unwrap_or(false)
         {
-            panic!("Unauthorized registrar");
+            crate::handle_error(&env, crate::Error::Unauthorized);
         }
 
         let store = env.storage().persistent();
         let key = DataKey::Asset(asset.id.clone());
 
         if store.has(&key) {
-            panic!("Asset already exists");
+            crate::handle_error(&env, crate::Error::AssetAlreadyExists);
         }
 
         store.set(&key, &asset);
@@ -221,11 +221,11 @@ impl ContribContract {
             .unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound));
 
         if asset.owner != caller {
-            panic!("Unauthorized");
+            crate::handle_error(&env, crate::Error::Unauthorized);
         }
 
         if asset.status == AssetStatus::Retired {
-            panic!("Asset is retired");
+            crate::handle_error(&env, crate::Error::AssetRetired);
         }
 
         let old_owner = asset.owner.clone();
@@ -261,11 +261,11 @@ impl ContribContract {
             .unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound));
 
         if asset.owner != caller {
-            panic!("Unauthorized");
+            crate::handle_error(&env, crate::Error::Unauthorized);
         }
 
         if asset.status == AssetStatus::Retired {
-            panic!("Already retired");
+            crate::handle_error(&env, crate::Error::AssetRetired);
         }
 
         asset.status = AssetStatus::Retired;
@@ -282,15 +282,21 @@ impl ContribContract {
         events::asset_retired(&env, &asset_id, &caller);
     }
 
-    pub fn get_asset(env: Env, asset_id: BytesN<32>) -> Option<Asset> {
-        env.storage().persistent().get(&DataKey::Asset(asset_id))
-    }
-
-    pub fn get_asset_info(env: Env, asset_id: BytesN<32>) -> Asset {
+    /// The asset registered under `asset_id`.
+    ///
+    /// Read convention shared with `assetsup`: a read that can miss returns
+    /// `Result<_, Error::AssetNotFound>`, never `Option` or a panic.
+    pub fn get_asset(env: Env, asset_id: BytesN<32>) -> Result<Asset, Error> {
         env.storage()
             .persistent()
             .get(&DataKey::Asset(asset_id))
-            .unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound))
+            .ok_or(Error::AssetNotFound)
+    }
+
+    /// Same as [`Self::get_asset`]; kept so callers that used the old
+    /// panicking name keep compiling, now with a typed `Result`.
+    pub fn get_asset_info(env: Env, asset_id: BytesN<32>) -> Result<Asset, Error> {
+        Self::get_asset(env, asset_id)
     }
 
     pub fn get_assets_by_owner(env: Env, owner: Address) -> Vec<BytesN<32>> {
@@ -312,7 +318,7 @@ impl ContribContract {
             .get(&DataKey::Admin)
             .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
         if caller != admin {
-            panic!("Unauthorized");
+            crate::handle_error(&env, crate::Error::Unauthorized);
         }
         env.storage().persistent().set(&DataKey::Paused, &true);
     }
@@ -325,7 +331,7 @@ impl ContribContract {
             .get(&DataKey::Admin)
             .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
         if caller != admin {
-            panic!("Unauthorized");
+            crate::handle_error(&env, crate::Error::Unauthorized);
         }
         env.storage().persistent().set(&DataKey::Paused, &false);
     }
@@ -379,7 +385,7 @@ impl ContribContract {
             .get(&DataKey::Paused)
             .unwrap_or(false)
         {
-            panic!("Contract is paused");
+            crate::handle_error(&env, crate::Error::ContractPaused);
         }
     }
 

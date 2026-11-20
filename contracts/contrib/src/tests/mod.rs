@@ -69,7 +69,7 @@ fn test_register_asset_success() {
     env.mock_all_auths();
     client.register_asset(&admin, &asset);
 
-    let stored = client.get_asset(&asset_id).unwrap();
+    let stored = client.get_asset(&asset_id);
     assert_eq!(stored.id, asset_id);
     assert_eq!(stored.name, String::from_str(&env, "Test Asset"));
     assert_eq!(stored.owner, owner);

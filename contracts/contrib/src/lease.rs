@@ -50,7 +50,7 @@ pub fn create_lease(
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::AssetNotFound));
 
     if asset.owner != lessor {
-        panic!("Unauthorized: Only asset owner can create lease");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 
     // Generate a unique lease_id
@@ -71,7 +71,7 @@ pub fn create_lease(
 
     let key = DataKey::Lease(lease_id.clone());
     if store.has(&key) {
-        panic!("Lease already exists for this asset (simplified ID collision)");
+        crate::handle_error(&env, crate::Error::LeaseAlreadyExists);
     }
 
     store.set(&key, &lease);
@@ -96,7 +96,7 @@ pub fn check_in_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::LeaseNotFound));
 
     if caller != lease.lessor {
-        panic!("Unauthorized: Only lessor can check in lease");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 
     lease.status = LeaseStatus::Returned;
@@ -118,7 +118,7 @@ pub fn cancel_lease(env: Env, lease_id: BytesN<32>, caller: Address) {
         .unwrap_or_else(|| crate::handle_error(&env, crate::Error::NotInitialized));
 
     if caller != lease.lessor && caller != admin {
-        panic!("Unauthorized: Only lessor or admin can cancel lease");
+        crate::handle_error(&env, crate::Error::Unauthorized);
     }
 
     lease.status = LeaseStatus::Cancelled;

@@ -17,7 +17,7 @@ fn test_init_and_provider_registration() {
     // init now requires the admin's authorization, so auths must be mocked
     // before it rather than after.
     env.mock_all_auths();
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let provider_addr = Address::generate(&env);
     let provider = ProviderProfile {
@@ -54,7 +54,7 @@ fn test_maintenance_lifecycle() {
 
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let provider_addr = Address::generate(&env);
     let provider = ProviderProfile {
@@ -119,7 +119,7 @@ fn test_warranty_and_claims() {
 
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let asset_id = 102u64;
     let warranty = WarrantyInfo {
@@ -154,7 +154,7 @@ fn test_alerts_and_stats() {
 
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let asset_id = 103u64;
     let alert = MaintenanceAlert {
@@ -210,7 +210,7 @@ fn test_unauthorized_maintenance_logging() {
 
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let provider_addr = Address::generate(&env);
     let unauthorized_addr = Address::generate(&env);
@@ -265,7 +265,7 @@ fn test_out_of_bounds_alert_index_is_rejected() {
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let asset_id = 104u64;
     client.create_maintenance_alert(&make_alert(&env, asset_id, "Service due soon"));
@@ -294,7 +294,7 @@ fn test_double_acknowledge_is_idempotent() {
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let asset_id = 105u64;
     client.create_maintenance_alert(&make_alert(&env, asset_id, "Service due soon"));
@@ -324,7 +324,7 @@ fn test_zero_and_negative_claim_amounts_are_rejected() {
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let asset_id = 106u64;
     client.add_warranty_information(&WarrantyInfo {
@@ -364,7 +364,7 @@ fn test_claims_above_any_covered_value_are_allowed_as_advisory() {
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let asset_id = 107u64;
     client.add_warranty_information(&WarrantyInfo {
@@ -400,7 +400,7 @@ fn test_aggregate_functions_empty_history() {
 
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let asset_id = 98u64;
 
@@ -421,7 +421,7 @@ fn test_aggregate_functions_single_record() {
 
     let admin = Address::generate(&env);
     let registry = Address::generate(&env);
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
 
     let provider_addr = Address::generate(&env);
     let provider = ProviderProfile {

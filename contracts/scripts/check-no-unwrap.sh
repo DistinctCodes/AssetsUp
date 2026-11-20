@@ -14,6 +14,12 @@ check_file() {
     echo "ERROR: bare .unwrap()/.expect() in $file"
     FAIL=1
   fi
+  # Bare panic!("...") surfaces as an opaque HostError with no stable code; use
+  # the crate's typed Error with handle_error / Result instead.
+  if grep -nE 'panic!\(' "$file" | grep -vE '^[0-9]+:\s*//'; then
+    echo "ERROR: bare panic! in $file (use a typed Error)"
+    FAIL=1
+  fi
 }
 
 echo "Checking multisig-wallet production sources..."

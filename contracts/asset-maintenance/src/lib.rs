@@ -234,15 +234,15 @@ impl AssetMaintenanceContract {
         admin.require_auth();
     }
 
-    pub fn init(env: Env, admin: Address, registry: Address) {
-        // Without this, whoever calls init first becomes admin of a freshly
+    pub fn initialize(env: Env, admin: Address, registry: Address) {
+        // Without this, whoever calls initialize first becomes admin of a freshly
         // deployed contract, regardless of who deployed it.
         admin.require_auth();
 
         ttl::extend_instance(&env);
 
         if env.storage().persistent().has(&DataKey::Admin) {
-            panic!("already initialized");
+            handle_error(&env, Error::AlreadyInitialized);
         }
         env.storage().persistent().set(&DataKey::Admin, &admin);
         env.storage()
@@ -396,40 +396,40 @@ impl AssetMaintenanceContract {
             .get(&DataKey::Provider(record.provider.clone()))
             .unwrap_or_else(|| handle_error(&env, Error::ProviderNotRegistered));
         if !provider_data.is_active {
-            panic!("provider is inactive");
+            handle_error(&env, Error::ProviderInactive);
         }
 
         // 2. Validation Rules
         if record.service_date > env.ledger().timestamp() {
-            panic!("service date cannot be in future");
+            handle_error(&env, Error::InvalidArguments);
         }
         if record.labor_cost < 0 || record.parts_cost < 0 || record.total_cost < 0 {
-            panic!("cost values must be non-negative");
+            handle_error(&env, Error::InvalidArguments);
         }
         let max_cost: i128 = 999_999_999_999; // Upper bound on individual cost
         if record.labor_cost > max_cost
             || record.parts_cost > max_cost
             || record.total_cost > max_cost
         {
-            panic!("cost value exceeds maximum allowed");
+            handle_error(&env, Error::InvalidArguments);
         }
         if record.labor_cost + record.parts_cost != record.total_cost {
-            panic!("labor + parts cost must equal total cost");
+            handle_error(&env, Error::InvalidArguments);
         }
         if record.condition_before < 1
             || record.condition_before > 10
             || record.condition_after < 1
             || record.condition_after > 10
         {
-            panic!("condition ratings must be 1-10");
+            handle_error(&env, Error::InvalidArguments);
         }
         if record.quality_rating < 1 || record.quality_rating > 10 {
-            panic!("quality rating must be 1-10");
+            handle_error(&env, Error::InvalidArguments);
         }
 
         // 3. Verify asset exists
         if !Self::verify_asset_exists(&env, record.asset_id) {
-            panic!("asset does not exist");
+            handle_error(&env, Error::AssetNotFound);
         }
 
         // 4. Update Maintenance History
@@ -544,7 +544,7 @@ impl AssetMaintenanceContract {
             .persistent()
             .has(&DataKey::MaintenanceSchedule(schedule.asset_id))
         {
-            panic!("no schedule exists for asset");
+            handle_error(&env, Error::ScheduleNotFound);
         }
 
         Self::store_schedule(&env, &schedule);
@@ -557,7 +557,7 @@ impl AssetMaintenanceContract {
         // Asset owner check (placeholder - assuming caller is owner or admin)
         // In a real system, we'd check if owner is truly the owner via Registry
         if schedule.frequency_days == 0 {
-            panic!("frequency must be positive");
+            handle_error(&env, Error::InvalidArguments);
         }
 
         env.storage()
@@ -638,7 +638,7 @@ impl AssetMaintenanceContract {
             .persistent()
             .has(&DataKey::Warranty(warranty.asset_id))
         {
-            panic!("no warranty exists for asset");
+            handle_error(&env, Error::WarrantyNotFound);
         }
 
         Self::store_warranty(&env, &warranty);
@@ -649,7 +649,7 @@ impl AssetMaintenanceContract {
     /// that the add and update entrypoints each emit their own.
     fn store_warranty(env: &Env, warranty: &WarrantyInfo) {
         if warranty.end_date <= warranty.start_date {
-            panic!("warranty dates invalid");
+            handle_error(&env, Error::InvalidArguments);
         }
         env.storage()
             .persistent()
@@ -670,7 +670,7 @@ impl AssetMaintenanceContract {
         Self::require_admin(&env);
 
         if claim_amount <= 0 {
-            panic!("claim amount must be positive");
+            handle_error(&env, Error::InvalidArguments);
         }
 
         let mut warranty: WarrantyInfo = env
@@ -680,13 +680,13 @@ impl AssetMaintenanceContract {
             .unwrap_or_else(|| handle_error(&env, Error::WarrantyNotFound));
 
         if warranty.status != WarrantyStatus::Active {
-            panic!("warranty is not active");
+            handle_error(&env, Error::WarrantyNotActive);
         }
         if env.ledger().timestamp() > warranty.end_date {
-            panic!("warranty has expired");
+            handle_error(&env, Error::WarrantyExpired);
         }
         if warranty.claim_count >= warranty.max_claims {
-            panic!("max claims reached");
+            handle_error(&env, Error::MaxClaimsReached);
         }
 
         warranty.claim_count += 1;
@@ -722,7 +722,7 @@ impl AssetMaintenanceContract {
             .unwrap_or_else(|| handle_error(&env, Error::NotFound));
 
         if alert_index >= alerts.len() {
-            panic!("alert index out of bounds");
+            handle_error(&env, Error::AlertIndexOutOfBounds);
         }
 
         let mut alert = alerts

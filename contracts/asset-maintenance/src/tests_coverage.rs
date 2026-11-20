@@ -38,7 +38,7 @@ fn setup(env: &Env) -> Ctx<'_> {
     let provider = Address::generate(env);
 
     env.mock_all_auths();
-    client.init(&admin, &registry);
+    client.initialize(&admin, &registry);
     client.register_provider(&provider_profile(env, &provider, true));
 
     Ctx {
@@ -151,11 +151,11 @@ fn init_stores_admin_and_registry() {
 }
 
 #[test]
-#[should_panic(expected = "already initialized")]
+#[should_panic(expected = "Error(Contract, #1)")]
 fn init_twice_panics() {
     let env = Env::default();
     let ctx = setup(&env);
-    ctx.client.init(&ctx.admin, &Address::generate(&env));
+    ctx.client.initialize(&ctx.admin, &Address::generate(&env));
 }
 
 #[test]
@@ -165,7 +165,7 @@ fn init_requires_the_admins_authorization() {
     let contract_id = env.register(AssetMaintenanceContract, ());
     let client = AssetMaintenanceContractClient::new(&env, &contract_id);
 
-    let res = client.try_init(&Address::generate(&env), &Address::generate(&env));
+    let res = client.try_initialize(&Address::generate(&env), &Address::generate(&env));
     assert!(res.is_err(), "init must require the admin's authorization");
 }
 
@@ -289,7 +289,7 @@ fn maintenance_history_is_empty_for_an_unknown_asset() {
 }
 
 #[test]
-#[should_panic(expected = "provider not registered")]
+#[should_panic(expected = "Error(Contract, #500)")]
 fn a_record_from_an_unregistered_provider_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -300,7 +300,7 @@ fn a_record_from_an_unregistered_provider_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "provider is inactive")]
+#[should_panic(expected = "Error(Contract, #501)")]
 fn a_record_from_a_deactivated_provider_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -311,7 +311,7 @@ fn a_record_from_a_deactivated_provider_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "service date cannot be in future")]
+#[should_panic(expected = "Error(Contract, #509)")]
 fn a_record_dated_in_the_future_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -346,7 +346,7 @@ fn a_record_dated_far_in_the_past_is_accepted() {
 }
 
 #[test]
-#[should_panic(expected = "cost values must be non-negative")]
+#[should_panic(expected = "Error(Contract, #509)")]
 fn a_record_with_a_negative_cost_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -358,7 +358,7 @@ fn a_record_with_a_negative_cost_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "labor + parts cost must equal total cost")]
+#[should_panic(expected = "Error(Contract, #509)")]
 fn a_record_whose_costs_do_not_balance_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -383,7 +383,7 @@ fn a_zero_cost_record_is_accepted() {
 }
 
 #[test]
-#[should_panic(expected = "condition ratings must be 1-10")]
+#[should_panic(expected = "Error(Contract, #509)")]
 fn a_condition_rating_below_the_range_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -394,7 +394,7 @@ fn a_condition_rating_below_the_range_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "condition ratings must be 1-10")]
+#[should_panic(expected = "Error(Contract, #509)")]
 fn a_condition_rating_above_the_range_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -417,7 +417,7 @@ fn condition_ratings_at_both_ends_of_the_range_are_accepted() {
 }
 
 #[test]
-#[should_panic(expected = "quality rating must be 1-10")]
+#[should_panic(expected = "Error(Contract, #509)")]
 fn a_quality_rating_of_zero_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -428,7 +428,7 @@ fn a_quality_rating_of_zero_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "quality rating must be 1-10")]
+#[should_panic(expected = "Error(Contract, #509)")]
 fn a_quality_rating_above_ten_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -559,7 +559,7 @@ fn get_upcoming_maintenance_is_none_when_nothing_is_scheduled() {
 }
 
 #[test]
-#[should_panic(expected = "frequency must be positive")]
+#[should_panic(expected = "Error(Contract, #509)")]
 fn a_schedule_with_zero_frequency_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -613,7 +613,7 @@ fn get_overdue_maintenance_is_false_without_a_schedule() {
 }
 
 #[test]
-#[should_panic(expected = "no schedule exists for asset")]
+#[should_panic(expected = "Error(Contract, #502)")]
 fn updating_a_schedule_that_does_not_exist_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -769,7 +769,7 @@ fn get_warranty_is_none_for_an_asset_without_one() {
 }
 
 #[test]
-#[should_panic(expected = "warranty dates invalid")]
+#[should_panic(expected = "Error(Contract, #509)")]
 fn a_warranty_ending_before_it_starts_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -778,7 +778,7 @@ fn a_warranty_ending_before_it_starts_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "warranty dates invalid")]
+#[should_panic(expected = "Error(Contract, #509)")]
 fn a_zero_length_warranty_is_rejected() {
     // Boundary: end must be strictly after start.
     let env = Env::default();
@@ -788,7 +788,7 @@ fn a_zero_length_warranty_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "no warranty exists for asset")]
+#[should_panic(expected = "Error(Contract, #503)")]
 fn updating_a_warranty_that_does_not_exist_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -841,7 +841,7 @@ fn filing_a_claim_increments_the_claim_count() {
 }
 
 #[test]
-#[should_panic(expected = "no warranty found")]
+#[should_panic(expected = "Error(Contract, #503)")]
 fn claiming_against_a_missing_warranty_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -849,7 +849,7 @@ fn claiming_against_a_missing_warranty_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "max claims reached")]
+#[should_panic(expected = "Error(Contract, #506)")]
 fn claiming_beyond_the_maximum_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -863,7 +863,7 @@ fn claiming_beyond_the_maximum_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "warranty has expired")]
+#[should_panic(expected = "Error(Contract, #505)")]
 fn claiming_after_the_warranty_expires_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);
@@ -878,7 +878,7 @@ fn claiming_after_the_warranty_expires_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "warranty is not active")]
+#[should_panic(expected = "Error(Contract, #504)")]
 fn claiming_against_a_voided_warranty_is_rejected() {
     let env = Env::default();
     let ctx = setup(&env);

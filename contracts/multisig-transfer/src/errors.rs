@@ -20,6 +20,8 @@ pub enum MultiSigError {
     // ---------------------------------------------------------------
     /// An entrypoint was called before the contract was initialized.
     NotInitialized = 2,
+    /// A mutating entrypoint was called while the emergency pause is active.
+    ContractPaused = 6,
     /// The caller authenticated but is not permitted to perform this action.
     Unauthorized = 3,
 

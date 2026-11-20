@@ -132,6 +132,24 @@ pub struct ContractInitialized {
     pub timestamp: u64,
 }
 
+/// The admin paused the contract.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractPaused {
+    #[topic]
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
+/// The admin resumed the contract.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractUnpaused {
+    #[topic]
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
 // ---------------------------------------------------------------------------
 // Emission helpers
 //
@@ -318,10 +336,26 @@ pub fn admin_proposal_cancelled(
     .publish(e);
 }
 
+pub fn contract_paused(e: &Env, admin: &Address, timestamp: u64) {
+    ContractPaused {
+        admin: admin.clone(),
+        timestamp,
+    }
+    .publish(e);
+}
+
 pub fn admin_changed(e: &Env, old_admin: &Address, new_admin: &Address, timestamp: u64) {
     AdminChanged {
         new_admin: new_admin.clone(),
         old_admin: old_admin.clone(),
+        timestamp,
+    }
+    .publish(e);
+}
+
+pub fn contract_unpaused(e: &Env, admin: &Address, timestamp: u64) {
+    ContractUnpaused {
+        admin: admin.clone(),
         timestamp,
     }
     .publish(e);

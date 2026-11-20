@@ -111,6 +111,8 @@ archive the record *without* releasing the lock, which is strictly worse.
 | `reject_transfer_request` | `caller, request_id, reason_hash` | `Result<()>` | approver membership check | `RequestNotFound`, `RequestNotPending`, `ApproverNotAuthorized` |
 | `execute_transfer` | `caller, request_id` | `Result<()>` | `caller` | `RequestNotFound`, `RequestNotPending`, `NotEnoughApprovals`, `ExecuteTooEarly`, `RequestExpired`, `RegistryCallFailed` |
 | `cancel_transfer_request` | `caller, request_id` | `Result<()>` | requester or admin | `RequestNotFound`, `RequestNotPending`, `Unauthorized` |
+| `pause` / `unpause` | `caller` | `Result<()>` | admin | `NotInitialized`, `Unauthorized` |
+| `is_paused` | — | `bool` | — | — |
 | `expire_transfer_request` | `caller, request_id` | `Result<()>` | — (none, permissionless) | `NotInitialized`, `RequestNotFound`, `RequestNotPending`, `ApprovalWindowStillOpen` |
 | `propose_admin` | `new_admin` | `Result<()>` | current admin | `NotInitialized`, `InvalidAdmin` |
 | `accept_admin` | — | `Result<()>` | the proposed address | `NoPendingAdminProposal`, `NotInitialized` |
@@ -207,3 +209,7 @@ cargo test -p multisig-transfer
 
 This crate currently has **no tests at all**. Writing the suite is tracked in
 [SC-32].
+
+## Emergency pause
+
+While paused, `create_transfer_request`, `approve_transfer_request`, `reject_transfer_request` and `execute_transfer` fail with `ContractPaused` (6). Reads, `cancel_transfer_request` and `expire_transfer_request` stay available so in-flight requests can release their asset lock. `pause`/`unpause` emit `contract_paused` / `contract_unpaused`.

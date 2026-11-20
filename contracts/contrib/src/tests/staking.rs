@@ -68,7 +68,7 @@ fn test_mid_period_joiner_is_prorated() {
 }
 
 #[test]
-#[should_panic(expected = "Subsystem is paused")]
+#[should_panic(expected = "Error(Contract, #273)")]
 fn test_staking_subsystem_pause_blocks_stake() {
     let env = Env::default();
     let (client, admin) = setup(&env);
