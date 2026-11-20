@@ -10,13 +10,20 @@ import { ReceiveModal } from "@/components/purchase-orders/receive-modal";
 import {
   usePurchaseOrders,
   useCancelPO,
+  useSubmitPO,
+  useApprovePO,
 } from "@/lib/query/hooks/usePurchaseOrders";
-import { PurchaseOrder, POStatus } from "@/lib/api/purchase-orders";
+import {
+  PurchaseOrder,
+  POStatus,
+  availablePOActions,
+} from "@/lib/api/purchase-orders";
+import { useAuthStore } from "@/store/auth.store";
 
 const STATUS_COLORS: Record<string, string> = {
   [POStatus.DRAFT]: "bg-gray-100 text-gray-700",
-  [POStatus.ORDERED]: "bg-blue-100 text-blue-700",
-  [POStatus.PARTIALLY_RECEIVED]: "bg-yellow-100 text-yellow-700",
+  [POStatus.SUBMITTED]: "bg-blue-100 text-blue-700",
+  [POStatus.APPROVED]: "bg-indigo-100 text-indigo-700",
   [POStatus.RECEIVED]: "bg-green-100 text-green-700",
   [POStatus.CANCELLED]: "bg-red-100 text-red-700",
 };
@@ -29,6 +36,9 @@ export default function PurchaseOrdersPage() {
 
   const { data: orders = [], isLoading } = usePurchaseOrders();
   const cancelPO = useCancelPO();
+  const submitPO = useSubmitPO();
+  const approvePO = useApprovePO();
+  const role = useAuthStore((s) => s.user?.role);
 
   const filtered = orders.filter((o) => {
     if (!search) return true;
@@ -107,16 +117,34 @@ export default function PurchaseOrdersPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {(po.status === POStatus.ORDERED || po.status === POStatus.PARTIALLY_RECEIVED) && (
-                        <Button variant="outline" size="sm" onClick={() => setReceiveTarget(po)}>
-                          Receive
-                        </Button>
-                      )}
-                      {po.status === POStatus.DRAFT && (
-                        <Button variant="outline" size="sm" onClick={() => setCancelTarget(po)}>
-                          Cancel
-                        </Button>
-                      )}
+                      {availablePOActions(po.status, role).map((action) => {
+                        switch (action) {
+                          case "submit":
+                            return (
+                              <Button key={action} variant="outline" size="sm" disabled={submitPO.isPending} onClick={() => submitPO.mutate(po.id)}>
+                                Submit
+                              </Button>
+                            );
+                          case "approve":
+                            return (
+                              <Button key={action} variant="outline" size="sm" disabled={approvePO.isPending} onClick={() => approvePO.mutate(po.id)}>
+                                Approve
+                              </Button>
+                            );
+                          case "receive":
+                            return (
+                              <Button key={action} variant="outline" size="sm" onClick={() => setReceiveTarget(po)}>
+                                Receive
+                              </Button>
+                            );
+                          case "cancel":
+                            return (
+                              <Button key={action} variant="outline" size="sm" onClick={() => setCancelTarget(po)}>
+                                Cancel
+                              </Button>
+                            );
+                        }
+                      })}
                     </div>
                   </td>
                 </tr>
