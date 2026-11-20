@@ -60,8 +60,8 @@ export class DepartmentsService {
 
   async update(id: string, dto: Partial<Department>, actorId?: string) {
     const dept = await this.findById(id);
-    if (dto.parentDepartmentId && dto.parentDepartmentId === id) {
-      throw new BadRequestException('A department cannot be its own parent');
+    if (dto.parentDepartmentId) {
+      await this.assertNoCircularReference(id, dto.parentDepartmentId);
     }
     const previous = { name: dept.name, code: dept.code };
     Object.assign(dept, dto);
@@ -75,6 +75,37 @@ export class DepartmentsService {
       newValue: { name: saved.name, code: saved.code },
     });
     return saved;
+  }
+
+  /**
+   * Rejects making `proposedParentId` the parent of `departmentId` when that
+   * would create a cycle, directly (its own parent) or indirectly (the
+   * department already appears among the proposed parent's ancestors).
+   */
+  private async assertNoCircularReference(
+    departmentId: string,
+    proposedParentId: string,
+  ) {
+    if (proposedParentId === departmentId) {
+      throw new BadRequestException('A department cannot be its own parent');
+    }
+
+    // A chain can't be longer than the number of departments without already
+    // containing a cycle, so the bound also stops a loop that already exists in data.
+    const maxDepth = await this.deptRepo.count();
+
+    let currentId: string | null | undefined = proposedParentId;
+    for (let depth = 0; currentId && depth <= maxDepth; depth++) {
+      if (currentId === departmentId) {
+        throw new BadRequestException(
+          'This change would create a circular department hierarchy',
+        );
+      }
+      const current: Department | null = await this.deptRepo.findOne({
+        where: { id: currentId },
+      });
+      currentId = current?.parentDepartmentId ?? null;
+    }
   }
 
   async delete(id: string, actorId?: string) {

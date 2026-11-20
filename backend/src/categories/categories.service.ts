@@ -2,16 +2,20 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
+import { Asset } from '../assets/entities/asset.entity';
 
 @Injectable()
 export class CategoriesService {
   constructor(
     @InjectRepository(Category)
     private readonly categoryRepo: Repository<Category>,
+    @InjectRepository(Asset)
+    private readonly assetRepo: Repository<Asset>,
   ) {}
 
   async findAll() {
@@ -75,6 +79,23 @@ export class CategoriesService {
 
   async delete(id: string) {
     const cat = await this.findById(id);
+
+    const childCount = await this.categoryRepo.count({
+      where: { parentCategoryId: id },
+    });
+    if (childCount > 0) {
+      throw new ConflictException(
+        `This category has ${childCount} subcategor${childCount === 1 ? 'y' : 'ies'}. Delete or move them before deleting this category.`,
+      );
+    }
+
+    const assetCount = await this.assetRepo.count({ where: { categoryId: id } });
+    if (assetCount > 0) {
+      throw new ConflictException(
+        `This category still has ${assetCount} asset(s) assigned to it. Reassign them before deleting.`,
+      );
+    }
+
     return this.categoryRepo.remove(cat);
   }
 }

@@ -27,7 +27,10 @@ describe('abdulrcrtw Modules (BE-92, BE-91, BE-90, BE-89)', () => {
         .fn()
         .mockImplementation((dto) => Promise.resolve({ id: 'm-1', ...dto })),
     };
-    const service = new MaintenanceService(mockRepo as any);
+    const assetsService = {
+      findById: jest.fn().mockResolvedValue({ id: 'ast-1', status: 'AVAILABLE' }),
+    };
+    const service = new MaintenanceService(mockRepo as any, assetsService as any);
     const rec = await service.create({
       assetId: 'ast-1',
       title: 'Screen repair',

@@ -1,9 +1,14 @@
 import { CategoriesService } from './categories.service';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 
 describe('CategoriesService', () => {
   let service: CategoriesService;
   let mockRepo: any;
+  let mockAssetRepo: any;
 
   beforeEach(() => {
     mockRepo = {
@@ -12,8 +17,10 @@ describe('CategoriesService', () => {
       create: jest.fn(),
       save: jest.fn(),
       remove: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     };
-    service = new CategoriesService(mockRepo);
+    mockAssetRepo = { count: jest.fn().mockResolvedValue(0) };
+    service = new CategoriesService(mockRepo, mockAssetRepo);
   });
 
   afterEach(() => {
@@ -267,5 +274,47 @@ describe('CategoriesService', () => {
       expect(updated.defaultDepreciationRate).toBe(20);
       expect(updated.defaultUsefulLifeMonths).toBe(36);
     });
+  });
+});
+
+describe('CategoriesService.delete (in use)', () => {
+  let service: CategoriesService;
+  let repo: any;
+  let assetRepo: any;
+
+  beforeEach(() => {
+    repo = {
+      findOne: jest.fn().mockResolvedValue({ id: 'c-1', name: 'Laptops' }),
+      count: jest.fn().mockResolvedValue(0),
+      remove: jest.fn().mockImplementation((c) => Promise.resolve(c)),
+    };
+    assetRepo = { count: jest.fn().mockResolvedValue(0) };
+    service = new CategoriesService(repo, assetRepo);
+  });
+
+  it('removes an unused category', async () => {
+    await service.delete('c-1');
+    expect(repo.count).toHaveBeenCalledWith({ where: { parentCategoryId: 'c-1' } });
+    expect(assetRepo.count).toHaveBeenCalledWith({ where: { categoryId: 'c-1' } });
+    expect(repo.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 409 when the category has child categories', async () => {
+    repo.count.mockResolvedValue(2);
+    await expect(service.delete('c-1')).rejects.toThrow(ConflictException);
+    await expect(service.delete('c-1')).rejects.toThrow(/2 subcategories/);
+    expect(repo.remove).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when assets use the category', async () => {
+    assetRepo.count.mockResolvedValue(3);
+    await expect(service.delete('c-1')).rejects.toThrow(ConflictException);
+    await expect(service.delete('c-1')).rejects.toThrow(/3 asset\(s\)/);
+    expect(repo.remove).not.toHaveBeenCalled();
+  });
+
+  it('still returns 404 for an unknown category', async () => {
+    repo.findOne.mockResolvedValue(null);
+    await expect(service.delete('nope')).rejects.toThrow(NotFoundException);
   });
 });
