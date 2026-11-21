@@ -81,6 +81,18 @@ export class AssetsController {
     return this.assetsService.findPublicByScan(assetId);
   }
 
+  @Post(':id/public-tag')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary: 'Assign the optional public (checksummed) tag; idempotent',
+  })
+  @ApiResponse({ status: 201, description: 'The asset public tag' })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  assignPublicTag(@Param('id') id: string) {
+    return this.assetsService.assignPublicTag(id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get asset details' })
   @ApiResponse({ status: 200, description: 'Asset details' })
