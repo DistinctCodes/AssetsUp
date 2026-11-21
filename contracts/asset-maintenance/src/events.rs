@@ -5,7 +5,7 @@
 //! `lower_snake_case`. `asset_id` is always a `#[topic]` so consumers can index
 //! per asset.
 
-use soroban_sdk::{contractevent, Address, Env};
+use soroban_sdk::{contractevent, Address, Env, String};
 
 use crate::{AlertSeverity, AlertType, MaintenanceAlert, MaintenanceRecord, ScheduledMaintenance};
 
@@ -50,6 +50,24 @@ pub struct AdminChanged {
     pub timestamp: u64,
 }
 
+/// Emergency pause was activated.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractPaused {
+    #[topic]
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
+/// Emergency pause was lifted.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractUnpaused {
+    #[topic]
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
 /// A maintenance provider was registered.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -76,6 +94,43 @@ pub struct MaintenanceRecorded {
     pub asset_id: u64,
     pub record_id: u64,
     pub provider: Address,
+    pub timestamp: u64,
+}
+
+/// An asset was marked as burned and can no longer be scheduled for service.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AssetMarkedBurned {
+    #[topic]
+    pub asset_id: u64,
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
+/// A mistaken record was voided; the original entry is retained.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaintenanceRecordVoided {
+    #[topic]
+    pub asset_id: u64,
+    pub index: u32,
+    pub record_id: u64,
+    pub admin: Address,
+    pub reason: String,
+    pub timestamp: u64,
+}
+
+/// A mistaken record was amended by appending a corrected record.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaintenanceRecordAmended {
+    #[topic]
+    pub asset_id: u64,
+    pub index: u32,
+    pub record_id: u64,
+    pub correction_index: u32,
+    pub admin: Address,
+    pub reason: String,
     pub timestamp: u64,
 }
 
@@ -207,6 +262,71 @@ pub fn admin_changed(env: &Env, old_admin: &Address, new_admin: &Address) {
     AdminChanged {
         new_admin: new_admin.clone(),
         old_admin: old_admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn contract_paused(env: &Env, admin: &Address) {
+    ContractPaused {
+        admin: admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn contract_unpaused(env: &Env, admin: &Address) {
+    ContractUnpaused {
+        admin: admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn asset_marked_burned(env: &Env, asset_id: u64, admin: &Address) {
+    AssetMarkedBurned {
+        asset_id,
+        admin: admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn maintenance_record_voided(
+    env: &Env,
+    asset_id: u64,
+    index: u32,
+    record_id: u64,
+    admin: &Address,
+    reason: &String,
+) {
+    MaintenanceRecordVoided {
+        asset_id,
+        index,
+        record_id,
+        admin: admin.clone(),
+        reason: reason.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn maintenance_record_amended(
+    env: &Env,
+    asset_id: u64,
+    index: u32,
+    record_id: u64,
+    correction_index: u32,
+    admin: &Address,
+    reason: &String,
+) {
+    MaintenanceRecordAmended {
+        asset_id,
+        index,
+        record_id,
+        correction_index,
+        admin: admin.clone(),
+        reason: reason.clone(),
         timestamp: env.ledger().timestamp(),
     }
     .publish(env);

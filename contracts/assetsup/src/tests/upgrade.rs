@@ -11,8 +11,8 @@
 //! version stamp, migration idempotency, and that a full registry — including
 //! transferred and retired assets — reads back intact after migrating.
 
-use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{Address, BytesN, Env};
+use soroban_sdk::testutils::{Address as _, Events as _};
+use soroban_sdk::{Address, BytesN, Env, Symbol, TryIntoVal, Vec};
 
 use super::helpers::{create_env, create_test_asset, initialize_contract};
 use crate::upgrade::CURRENT_VERSION;
@@ -158,4 +158,92 @@ fn migrating_from_a_future_version_is_refused() {
     // interpreted; refusing is the only correct answer.
     let env = create_env();
     assert!(crate::upgrade::migrate_from(&env, CURRENT_VERSION + 1).is_err());
+}
+
+#[test]
+fn a_freshly_initialized_contract_allows_no_wasm_hash() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+
+    assert!(client.get_allowed_wasm_hashes().is_empty());
+    assert!(!client.is_wasm_hash_allowed(&placeholder_wasm_hash(&env)));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #196)")]
+fn an_unlisted_wasm_hash_is_rejected_before_the_swap() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    env.mock_all_auths();
+
+    client.upgrade(&placeholder_wasm_hash(&env));
+}
+
+#[test]
+fn an_allowed_hash_can_be_listed_and_removed() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    env.mock_all_auths();
+    let hash = placeholder_wasm_hash(&env);
+
+    client.allow_wasm_hash(&hash);
+    let events = env.events().all();
+    let (_contract, topics, _data) = events.last().unwrap();
+    let name: Symbol = topics.get(0).unwrap().try_into_val(&env).unwrap();
+    assert_eq!(name, Symbol::new(&env, "wasm_hash_allowed"));
+
+    assert!(client.is_wasm_hash_allowed(&hash));
+    assert_eq!(
+        client.get_allowed_wasm_hashes(),
+        Vec::from_array(&env, [hash.clone()])
+    );
+
+    client.remove_wasm_hash(&hash);
+    let events = env.events().all();
+    let (_contract, topics, _data) = events.last().unwrap();
+    let name: Symbol = topics.get(0).unwrap().try_into_val(&env).unwrap();
+    assert_eq!(name, Symbol::new(&env, "wasm_hash_removed"));
+
+    assert!(!client.is_wasm_hash_allowed(&hash));
+    assert!(client.get_allowed_wasm_hashes().is_empty());
+}
+
+#[test]
+fn allowlist_changes_require_the_admins_authorization() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    env.mock_all_auths();
+    let hash = placeholder_wasm_hash(&env);
+    env.set_auths(&[]);
+
+    assert!(client.try_allow_wasm_hash(&hash).is_err());
+    assert!(client.try_remove_wasm_hash(&hash).is_err());
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #197)")]
+fn allowing_the_same_hash_twice_is_rejected() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    env.mock_all_auths();
+    let hash = placeholder_wasm_hash(&env);
+
+    client.allow_wasm_hash(&hash);
+    client.allow_wasm_hash(&hash);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #196)")]
+fn removing_an_unlisted_hash_is_rejected() {
+    let env = create_env();
+    let admin = Address::generate(&env);
+    let client = initialize_contract(&env, &admin);
+    env.mock_all_auths();
+
+    client.remove_wasm_hash(&placeholder_wasm_hash(&env));
 }

@@ -395,6 +395,26 @@ pub struct ContractUpgraded {
     pub timestamp: u64,
 }
 
+/// A WASM hash was added to the upgrade allowlist.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WasmHashAllowed {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
+/// A WASM hash was removed from the upgrade allowlist.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WasmHashRemoved {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    pub admin: Address,
+    pub timestamp: u64,
+}
+
 /// Storage was migrated from one layout version to another.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -752,6 +772,24 @@ pub fn contract_upgraded(env: &Env, admin: &Address, new_wasm_hash: &BytesN<32>,
         admin: admin.clone(),
         new_wasm_hash: new_wasm_hash.clone(),
         version,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn wasm_hash_allowed(env: &Env, admin: &Address, wasm_hash: &BytesN<32>) {
+    WasmHashAllowed {
+        wasm_hash: wasm_hash.clone(),
+        admin: admin.clone(),
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+pub fn wasm_hash_removed(env: &Env, admin: &Address, wasm_hash: &BytesN<32>) {
+    WasmHashRemoved {
+        wasm_hash: wasm_hash.clone(),
+        admin: admin.clone(),
         timestamp: env.ledger().timestamp(),
     }
     .publish(env);

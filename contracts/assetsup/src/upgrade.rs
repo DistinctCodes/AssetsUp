@@ -21,11 +21,46 @@
 //! each step needs, and is **idempotent**: running it twice is a no-op, so a
 //! retried or duplicated migration transaction cannot corrupt state.
 
-use soroban_sdk::{Address, BytesN, Env};
+use soroban_sdk::{contracterror, panic_with_error, Address, BytesN, Env};
 
 use crate::error::Error;
 use crate::events;
 use crate::DataKey;
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum UpgradeError {
+    WasmHashNotAllowed = 196,
+    WasmHashAlreadyAllowed = 197,
+}
+
+pub fn is_hash_allowed(env: &Env, wasm_hash: &BytesN<32>) -> bool {
+    let hashes: soroban_sdk::Vec<BytesN<32>> = env
+        .storage()
+        .persistent()
+        .get(&DataKey::AllowedWasmHashes)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env));
+    hashes.contains(wasm_hash)
+}
+
+pub fn require_hash_allowed(env: &Env, wasm_hash: &BytesN<32>) {
+    if !is_hash_allowed(env, wasm_hash) {
+        panic_with_error!(env, UpgradeError::WasmHashNotAllowed);
+    }
+}
+
+pub fn require_hash_unlisted(env: &Env, wasm_hash: &BytesN<32>) {
+    if is_hash_allowed(env, wasm_hash) {
+        panic_with_error!(env, UpgradeError::WasmHashAlreadyAllowed);
+    }
+}
+
+pub fn require_hash_listed(env: &Env, wasm_hash: &BytesN<32>) {
+    if !is_hash_allowed(env, wasm_hash) {
+        panic_with_error!(env, UpgradeError::WasmHashNotAllowed);
+    }
+}
 
 /// The storage layout version this build of the contract expects.
 ///

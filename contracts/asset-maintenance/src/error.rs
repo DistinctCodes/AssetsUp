@@ -46,6 +46,12 @@ pub enum Error {
     NoPendingAdminProposal = 510,
     /// The proposed admin is not a valid nominee (it is the current admin).
     InvalidAdmin = 511,
+    /// The referenced maintenance record does not exist.
+    RecordNotFound = 512,
+    /// The record already carries a void or amendment annotation.
+    RecordAlreadyResolved = 513,
+    /// The asset was burned or detokenized and cannot be serviced.
+    AssetBurned = 514,
 }
 
 pub fn handle_error(env: &Env, error: Error) -> ! {
@@ -73,6 +79,9 @@ mod tests {
             Error::InvalidArguments as u32,
             Error::NoPendingAdminProposal as u32,
             Error::InvalidAdmin as u32,
+            Error::RecordNotFound as u32,
+            Error::RecordAlreadyResolved as u32,
+            Error::AssetBurned as u32,
         ] {
             assert!((500..600).contains(&code));
         }
