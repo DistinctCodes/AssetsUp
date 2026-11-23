@@ -67,6 +67,52 @@ pub fn get_address_jurisdiction(env: &Env, address: Address) -> Option<String> {
         .flatten()
 }
 
+/// The admin-managed set of KYC/compliance attesters who may record a holder's
+/// jurisdiction. Attestation is deliberately separated from self-authentication:
+/// a holder must not be able to declare their own jurisdiction.
+fn attesters(env: &Env) -> Vec<Address> {
+    env.storage()
+        .persistent()
+        .get(&TokenDataKey::JurisdictionAttesters)
+        .flatten()
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+/// Add an address to the jurisdiction attester set. Idempotent.
+pub fn add_jurisdiction_attester(env: &Env, attester: Address) -> Result<(), Error> {
+    let mut list = attesters(env);
+    if list.iter().any(|a| a == attester) {
+        return Ok(());
+    }
+    list.push_back(attester);
+    env.storage()
+        .persistent()
+        .set(&TokenDataKey::JurisdictionAttesters, &list);
+    Ok(())
+}
+
+/// Remove an address from the jurisdiction attester set. Idempotent.
+pub fn remove_jurisdiction_attester(env: &Env, attester: Address) -> Result<(), Error> {
+    let mut list = attesters(env);
+    if let Some(index) = list.iter().position(|a| a == attester) {
+        list.remove(index as u32);
+        env.storage()
+            .persistent()
+            .set(&TokenDataKey::JurisdictionAttesters, &list);
+    }
+    Ok(())
+}
+
+/// Whether `attester` is currently permitted to record jurisdictions.
+pub fn is_jurisdiction_attester(env: &Env, attester: Address) -> bool {
+    attesters(env).iter().any(|a| a == attester)
+}
+
+/// The addresses currently permitted to record jurisdictions.
+pub fn get_jurisdiction_attesters(env: &Env) -> Vec<Address> {
+    attesters(env)
+}
+
 /// Add an address to the whitelist
 pub fn add_to_whitelist(env: &Env, asset_id: u64, address: Address) -> Result<(), Error> {
     let store = env.storage().persistent();
