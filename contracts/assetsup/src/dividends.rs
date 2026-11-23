@@ -107,6 +107,20 @@ pub fn claim_dividends(env: &Env, asset_id: u64, holder: Address) -> Result<i128
         return Err(Error::NoDividendsToClaim);
     }
 
+    // Pay the claim in the configured dividend token BEFORE clearing the
+    // ledger. A failed transfer reverts the invocation, so `unclaimed` stays
+    // untouched and the holder can retry once the contract is funded. Assets
+    // with no token configured keep the legacy bookkeeping-only behaviour so
+    // existing holders are not stranded; the public entrypoint configures the
+    // token before any real distribution.
+    if let Ok(token) = get_dividend_token(env, asset_id) {
+        TokenClient::new(env, &token).transfer(
+            &env.current_contract_address(),
+            &holder,
+            &unclaimed,
+        );
+    }
+
     // Clear unclaimed dividends
     ownership.unclaimed_dividends = 0;
     store.set(&holder_key, &ownership);
