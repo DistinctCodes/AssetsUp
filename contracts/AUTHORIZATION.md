@@ -42,6 +42,24 @@ privileged address.
 `transfer_asset_ownership` was the most serious: a direct path to taking any
 registered asset by naming its owner.
 
+This change also closes three of the ⚠️ rows below:
+
+| Entrypoint | Was | Now |
+|---|---|---|
+| `update_valuation` | no auth | ✅ `caller`, must be tokenizer or admin |
+| `distribute_dividends` | no auth | ✅ `caller`, must be tokenizer or admin; pulls funds |
+| `set_dividend_token` | did not exist | ✅ `caller`, must be tokenizer or admin |
+
+`update_valuation` deliberately allows the tokenizer or admin rather than a
+registered oracle: `assetsup` has no oracle registry, and adding one is a
+separate design decision. `distribute_dividends` additionally pulls
+`total_amount` of the configured dividend token from the authenticated caller
+into the contract before crediting holders, so payouts are backed by real
+funds. `claim_dividends` transfers that token from the contract to the holder
+before clearing the ledger. All three share the
+`require_asset_admin_or_tokenizer` helper in `lib.rs`; module functions remain
+unauthenticated and keep their signatures.
+
 ### Lifecycle and administration
 
 | Entrypoint | Principal | |
@@ -76,9 +94,12 @@ admin.
 | `transfer_tokens` | `from` | ✅ |
 | `lock_tokens` | tokenizer **and** holder (unless the same address) | ✅ |
 | `claim_dividends` | `holder` | ✅ |
+| `update_valuation` | `caller`, must be tokenizer or admin | ✅ (added here) |
+| `distribute_dividends` | `caller`, must be tokenizer or admin | ✅ (added here) |
+| `set_dividend_token` | `caller`, must be tokenizer or admin | ✅ (added here) |
 | `cast_vote` | `voter` | ✅ |
 | `propose_detokenization` | `proposer` | ✅ |
-| `unlock_tokens`, `update_valuation`, `distribute_dividends`, `enable_revenue_sharing`, `disable_revenue_sharing`, `execute_detokenization` | — | ⚠️ **no auth** |
+| `unlock_tokens`, `enable_revenue_sharing`, `disable_revenue_sharing`, `execute_detokenization` | — | ⚠️ **no auth** |
 | `set_transfer_restriction`, `add_to_whitelist`, `remove_from_whitelist` | — | ⚠️ **no auth** |
 | `get_token_balance`, `get_token_holders`, `is_tokens_locked`, `get_ownership_percentage`, `get_tokenized_asset`, `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`, `proposal_passed`, `is_whitelisted`, `get_whitelist`, `get_detokenization_proposal`, `is_detokenization_active` | — | 📖 |
 
@@ -89,12 +110,12 @@ one of those functions directly would bypass authorization. They are
 `pub(crate)` and only reachable through the wrappers today, but that is a
 property of the module layout rather than an enforced boundary.
 
-The ⚠️ rows are **not fixed here.** They are real gaps, but each needs a
-decision about *which* principal should be required — the token issuer, the
-asset owner, or the admin — and that is a design question rather than an
-oversight. They are listed so the next change starts from a list rather than a
-search. None is an ownership-transfer path, which is why the four registry
-entrypoints took priority.
+The remaining ⚠️ rows are still open. Each needs a decision about *which*
+principal should be required — the token issuer, the asset owner, or the admin
+— and that is a design question rather than an oversight. They are listed so
+the next change starts from a list rather than a search. None is an
+ownership-transfer path, which is why the four registry entrypoints took
+priority.
 
 ---
 
