@@ -13,7 +13,6 @@
 //! address. `transfer_asset_ownership` was a direct asset-theft path.
 
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::testutils::Ledger as _;
 use soroban_sdk::{Address, BytesN, Env, IntoVal, String, Vec};
 
 use super::helpers::{create_env, create_test_asset, register_asset_for};
