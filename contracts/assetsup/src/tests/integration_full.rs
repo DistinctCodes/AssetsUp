@@ -128,8 +128,8 @@ fn test_transfer_restrictions_workflow() {
         &AssetType::Physical,
     );
 
-    // Set transfer restrictions
-    client.set_transfer_restriction(&asset_id, &true);
+    // Set transfer restrictions (tokenizer/admin only)
+    client.set_transfer_restriction(&asset_id, &true, &owner);
 
     // Add investor1 to whitelist (tokenizer/admin only)
     client.add_to_whitelist(&asset_id, &investor1, &owner);

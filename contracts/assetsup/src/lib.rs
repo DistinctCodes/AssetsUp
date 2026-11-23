@@ -1422,13 +1422,17 @@ impl AssetUpContract {
     // Transfer Restrictions
     // =====================
 
-    /// Set transfer restrictions
+    /// Set transfer restrictions.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
     pub fn set_transfer_restriction(
         env: Env,
         asset_id: u64,
         require_accredited: bool,
+        caller: Address,
     ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         transfer_restrictions::set_transfer_restriction(
             &env,
