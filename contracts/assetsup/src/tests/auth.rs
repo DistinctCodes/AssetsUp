@@ -485,3 +485,47 @@ fn an_attester_can_record_jurisdiction_and_loses_the_role_when_removed() {
     };
     assert_eq!(err, Error::Unauthorized);
 }
+
+// ---------------------------------------------------------------------------
+// #1790: transfer restriction authorization
+// ---------------------------------------------------------------------------
+
+#[test]
+fn setting_transfer_restrictions_requires_the_callers_authorization() {
+    let env = create_env();
+    let (client, _admin, tokenizer) = tokenized_client(&env);
+
+    env.set_auths(&[]);
+    assert!(client
+        .try_set_transfer_restriction(&1u64, &true, &tokenizer)
+        .is_err());
+}
+
+#[test]
+fn setting_transfer_restrictions_rejects_a_third_party() {
+    let env = create_env();
+    let (client, _admin, _tokenizer) = tokenized_client(&env);
+    let intruder = Address::generate(&env);
+
+    env.mock_all_auths();
+    let err = match client.try_set_transfer_restriction(&1u64, &true, &intruder) {
+        Err(Ok(e)) => e,
+        other => panic!("expected Unauthorized, got {other:?}"),
+    };
+    assert_eq!(err, Error::Unauthorized);
+}
+
+#[test]
+fn the_tokenizer_and_admin_can_set_transfer_restrictions() {
+    let env = create_env();
+    let (client, admin, tokenizer) = tokenized_client(&env);
+
+    env.mock_all_auths();
+    client.set_transfer_restriction(&1u64, &true, &tokenizer);
+    client.set_transfer_restriction(&1u64, &false, &admin);
+
+    let stored = env.as_contract(&client.address, || {
+        crate::transfer_restrictions::get_transfer_restriction(&env, 1u64).unwrap()
+    });
+    assert!(!stored.require_accredited);
+}
