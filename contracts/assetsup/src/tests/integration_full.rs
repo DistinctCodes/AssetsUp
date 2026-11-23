@@ -41,7 +41,7 @@ fn test_full_asset_tokenization_workflow() {
     assert_eq!(client.get_token_balance(&asset_id, &investor2), 300000);
 
     // Step 4: Enable revenue sharing and distribute dividends
-    client.enable_revenue_sharing(&asset_id);
+    client.enable_revenue_sharing(&asset_id, &owner);
     client.distribute_dividends(&asset_id, &10000i128);
 
     // Verify dividend distribution
