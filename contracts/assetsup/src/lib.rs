@@ -309,6 +309,31 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// Authenticate `caller` and require them to be the asset's tokenizer or
+    /// the contract admin.
+    ///
+    /// `caller` comes from the transaction, so `require_auth` is what makes
+    /// the comparison against the stored principals meaningful. Module
+    /// functions stay unauthenticated and keep their signatures; enforcement
+    /// lives here at the public boundary.
+    fn require_asset_admin_or_tokenizer(
+        env: &Env,
+        asset_id: u64,
+        caller: &Address,
+    ) -> Result<TokenizedAsset, Error> {
+        caller.require_auth();
+        let asset: TokenizedAsset = env
+            .storage()
+            .persistent()
+            .get(&TokenDataKey::TokenizedAsset(asset_id))
+            .ok_or(Error::AssetNotTokenized)?;
+        let admin = Self::get_admin(env.clone())?;
+        if *caller != asset.tokenizer && *caller != admin {
+            return Err(Error::Unauthorized);
+        }
+        Ok(asset)
+    }
+
     fn validate_asset(env: &Env, asset: &asset::Asset) -> Result<(), Error> {
         // Validate asset name length (3-100 characters)
         if asset.name.len() < 3 || asset.name.len() > 100 {
