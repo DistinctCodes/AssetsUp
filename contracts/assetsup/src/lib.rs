@@ -1326,9 +1326,19 @@ impl AssetUpContract {
         tokenization::get_tokenized_asset(&env, asset_id)
     }
 
-    /// Update asset valuation
-    pub fn update_valuation(env: Env, asset_id: u64, new_valuation: i128) -> Result<(), Error> {
+    /// Update asset valuation.
+    ///
+    /// Auth: `caller` must authenticate and be the asset's tokenizer or the
+    /// contract admin. Oracle-authored valuations are intentionally not enabled
+    /// here; see AUTHORIZATION.md for the rationale.
+    pub fn update_valuation(
+        env: Env,
+        asset_id: u64,
+        new_valuation: i128,
+        caller: Address,
+    ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         tokenization::update_valuation(&env, asset_id, new_valuation)
     }
