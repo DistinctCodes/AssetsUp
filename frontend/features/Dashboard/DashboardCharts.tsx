@@ -18,10 +18,12 @@ import { AssetStatus } from '@/lib/query/types/asset';
 
 // ─── Color palettes ───────────────────────────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
-  [AssetStatus.ACTIVE]:      '#22c55e',
-  [AssetStatus.ASSIGNED]:    '#3b82f6',
-  [AssetStatus.MAINTENANCE]: '#f59e0b',
-  [AssetStatus.RETIRED]:     '#9ca3af',
+  // The API reports canonical statuses; ACTIVE/MAINTENANCE are wire-only
+  // aliases and must not be used as report keys.
+  [AssetStatus.AVAILABLE]:      '#22c55e',
+  [AssetStatus.ASSIGNED]:       '#3b82f6',
+  [AssetStatus.IN_MAINTENANCE]: '#f59e0b',
+  [AssetStatus.RETIRED]:        '#9ca3af',
 };
 
 const CATEGORY_COLORS = [
