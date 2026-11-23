@@ -1,12 +1,25 @@
 import type { NextConfig } from "next";
 
+// Remote image hosts are an explicit allowlist read at build time. The default
+// is an empty list (no remote hosts), so a deployment must opt in to each CDN
+// it trusts instead of inheriting a wildcard that accepts any HTTPS host.
+const imageHosts = Array.from(
+  new Set(
+    (process.env.NEXT_PUBLIC_IMAGE_HOSTS ?? "")
+      .split(",")
+      .map((host) => host.trim().toLowerCase())
+      .filter((host) => host.length > 0),
+  ),
+);
+
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "**" },
-    ],
+    remotePatterns: imageHosts.map((hostname) => ({
+      protocol: "https" as const,
+      hostname,
+    })),
   },
   async headers() {
     return [
