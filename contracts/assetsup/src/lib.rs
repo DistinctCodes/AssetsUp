@@ -1480,13 +1480,17 @@ impl AssetUpContract {
         ))
     }
 
-    /// Set the jurisdiction allow-list for an asset's transfers
+    /// Set the jurisdiction allow-list for an asset's transfers.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
     pub fn set_geographic_restriction(
         env: Env,
         asset_id: u64,
         allowed_jurisdictions: Vec<String>,
+        caller: Address,
     ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         transfer_restrictions::set_geographic_restriction(&env, asset_id, allowed_jurisdictions)
     }
