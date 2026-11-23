@@ -166,8 +166,7 @@ fn distribute_rejects_an_authenticated_non_admin_caller() {
             args: (TOKEN_ID, 100i128, holder.clone()).into_val(&env),
             sub_invokes: &[],
         },
-    }
-    .into()]);
+    }]);
 
     assert_eq!(
         client.try_distribute_dividends(&TOKEN_ID, &100i128, &holder),
@@ -222,8 +221,7 @@ fn update_valuation_requires_an_authenticated_tokenizer_or_admin() {
             args: (TOKEN_ID, 5_000i128, holder.clone()).into_val(&env),
             sub_invokes: &[],
         },
-    }
-    .into()]);
+    }]);
     assert_eq!(
         client.try_update_valuation(&TOKEN_ID, &5_000i128, &holder),
         Err(Ok(Error::Unauthorized))
