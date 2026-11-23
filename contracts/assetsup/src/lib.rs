@@ -1440,16 +1440,32 @@ impl AssetUpContract {
         )
     }
 
-    /// Add address to whitelist
-    pub fn add_to_whitelist(env: Env, asset_id: u64, address: Address) -> Result<(), Error> {
+    /// Add address to whitelist.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
+    pub fn add_to_whitelist(
+        env: Env,
+        asset_id: u64,
+        address: Address,
+        caller: Address,
+    ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         transfer_restrictions::add_to_whitelist(&env, asset_id, address)
     }
 
-    /// Remove address from whitelist
-    pub fn remove_from_whitelist(env: Env, asset_id: u64, address: Address) -> Result<(), Error> {
+    /// Remove address from whitelist.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
+    pub fn remove_from_whitelist(
+        env: Env,
+        asset_id: u64,
+        address: Address,
+        caller: Address,
+    ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         transfer_restrictions::remove_from_whitelist(&env, asset_id, address)
     }

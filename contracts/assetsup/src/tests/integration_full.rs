@@ -131,8 +131,8 @@ fn test_transfer_restrictions_workflow() {
     // Set transfer restrictions
     client.set_transfer_restriction(&asset_id, &true);
 
-    // Add investor1 to whitelist
-    client.add_to_whitelist(&asset_id, &investor1);
+    // Add investor1 to whitelist (tokenizer/admin only)
+    client.add_to_whitelist(&asset_id, &investor1, &owner);
 
     // Transfer to whitelisted address should succeed
     client.transfer_tokens(&asset_id, &owner, &investor1, &100000i128);
