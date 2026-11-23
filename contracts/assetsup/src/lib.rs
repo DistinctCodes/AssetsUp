@@ -1425,13 +1425,19 @@ impl AssetUpContract {
     // Transfer Restrictions
     // =====================
 
-    /// Set transfer restrictions
+    /// Set the accredited-investor requirement for a token's transfers.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
+    /// The geographic allow-list is left untouched; use
+    /// `set_geographic_restriction` to change it.
     pub fn set_transfer_restriction(
         env: Env,
         asset_id: u64,
         require_accredited: bool,
+        caller: Address,
     ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         transfer_restrictions::set_transfer_restriction(
             &env,
