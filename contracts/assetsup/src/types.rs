@@ -105,10 +105,6 @@ pub enum TokenDataKey {
     TokenMetadata(u64),
     /// Stores the recorded ISO country code (jurisdiction) for an address
     AddressJurisdiction(Address),
-    /// Stores `Vec<Address>` of admin-managed KYC/compliance attesters. Only an
-    /// admin or one of these addresses may record a holder's jurisdiction;
-    /// holders must not be able to self-attest.
-    JurisdictionAttesters,
     /// Maps a token symbol to the asset_id that claimed it, so the same
     /// underlying asset cannot be tokenized twice under a reused symbol.
     SymbolRegistry(String),
@@ -121,6 +117,11 @@ pub enum TokenDataKey {
     RegistryTokenized(BytesN<32>),
     /// Admin-configured maximum token lock duration, in seconds (`u64`).
     MaxLockDuration,
+    /// Stores `Vec<Address>` of admin-managed KYC/compliance attesters. Only an
+    /// admin or one of these addresses may record a holder's jurisdiction;
+    /// holders must not be able to self-attest. Appended last so the XDR
+    /// discriminants of all existing keys stay unchanged across upgrades.
+    JurisdictionAttesters,
 }
 
 /// Represents a tokenized asset on-chain
