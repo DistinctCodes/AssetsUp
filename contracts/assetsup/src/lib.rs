@@ -1301,9 +1301,23 @@ impl AssetUpContract {
         tokenization::get_max_lock_duration(&env)
     }
 
-    /// Unlock tokens
-    pub fn unlock_tokens(env: Env, asset_id: u64, holder: Address) -> Result<(), Error> {
+    /// Unlock tokens.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin —
+    /// the same parties that set the lock in the first place. Clearing a lock is
+    /// deliberately not permissionless, even after `until_timestamp`: the lock
+    /// enforces a hold agreed when it was set, and anyone being able to remove
+    /// the on-chain record would undermine that. (Once the timestamp has passed
+    /// the lock is already inert via `is_tokens_locked`, so no unlock call is
+    /// needed to restore transfers.)
+    pub fn unlock_tokens(
+        env: Env,
+        asset_id: u64,
+        holder: Address,
+        caller: Address,
+    ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         tokenization::unlock_tokens(&env, asset_id, holder)
     }

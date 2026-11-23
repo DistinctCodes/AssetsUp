@@ -182,7 +182,7 @@ fn tokenization_is_blocked_while_paused() {
     assert!(client
         .try_lock_tokens(&1u64, &holder, &100u64, &holder)
         .is_err());
-    assert!(client.try_unlock_tokens(&1u64, &holder).is_err());
+    assert!(client.try_unlock_tokens(&1u64, &holder, &holder).is_err());
 }
 
 #[test]

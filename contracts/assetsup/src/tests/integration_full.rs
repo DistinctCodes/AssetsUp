@@ -199,8 +199,8 @@ fn test_token_locking_workflow() {
     // Verify tokens are locked
     assert!(client.is_tokens_locked(&asset_id, &investor));
 
-    // Unlock tokens
-    client.unlock_tokens(&asset_id, &investor);
+    // Unlock tokens (tokenizer/admin only)
+    client.unlock_tokens(&asset_id, &investor, &owner);
 
     // Verify tokens are unlocked
     assert!(!client.is_tokens_locked(&asset_id, &investor));
