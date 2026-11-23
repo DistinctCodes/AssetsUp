@@ -67,7 +67,7 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           components: clippy
       - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -92,7 +92,7 @@ jobs:
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
       - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -118,7 +118,7 @@ jobs:
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
       - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -149,7 +149,7 @@ jobs:
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -182,7 +182,7 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           targets: wasm32-unknown-unknown
       - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -228,7 +228,7 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           targets: wasm32-unknown-unknown
       - name: Cache cargo registry and tools
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cargo/bin
@@ -278,7 +278,7 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           targets: wasm32-unknown-unknown
       - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cargo/registry
