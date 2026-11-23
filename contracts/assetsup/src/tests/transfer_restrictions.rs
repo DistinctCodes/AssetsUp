@@ -345,3 +345,73 @@ fn test_jurisdiction_is_readable() {
 
     assert_eq!(recorded, Some(String::from_str(&env, "JP")));
 }
+
+// =====================
+// #1790: the two restriction setters must not clobber each other
+// =====================
+
+#[test]
+fn test_accredited_then_geographic_preserves_both_fields() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let asset_id = 905u64;
+
+    let restriction = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+
+        transfer_restrictions::set_transfer_restriction(
+            &env,
+            asset_id,
+            TransferRestriction {
+                require_accredited: true,
+                geographic_allowed: soroban_sdk::Vec::new(&env),
+            },
+        )
+        .unwrap();
+
+        let allowed = soroban_sdk::vec![
+            &env,
+            String::from_str(&env, "US"),
+            String::from_str(&env, "CA")
+        ];
+        transfer_restrictions::set_geographic_restriction(&env, asset_id, allowed).unwrap();
+
+        transfer_restrictions::get_transfer_restriction(&env, asset_id).unwrap()
+    });
+
+    assert!(restriction.require_accredited);
+    assert_eq!(restriction.geographic_allowed.len(), 2);
+}
+
+#[test]
+fn test_geographic_then_accredited_preserves_both_fields() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let asset_id = 906u64;
+
+    let restriction = env.as_contract(&contract_id, || {
+        setup_tokenized_asset(&env, asset_id, &tokenizer);
+
+        let allowed = soroban_sdk::vec![&env, String::from_str(&env, "DE")];
+        transfer_restrictions::set_geographic_restriction(&env, asset_id, allowed).unwrap();
+
+        // The wrapper passes an empty allow-list; the module must ignore it and
+        // keep the jurisdictions configured in the previous call.
+        transfer_restrictions::set_transfer_restriction(
+            &env,
+            asset_id,
+            TransferRestriction {
+                require_accredited: false,
+                geographic_allowed: soroban_sdk::Vec::new(&env),
+            },
+        )
+        .unwrap();
+
+        transfer_restrictions::get_transfer_restriction(&env, asset_id).unwrap()
+    });
+
+    assert!(!restriction.require_accredited);
+    assert_eq!(restriction.geographic_allowed.len(), 1);
+}
