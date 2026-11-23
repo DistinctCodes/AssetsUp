@@ -406,6 +406,9 @@ pub fn transfer_tokens(
     if is_new_holder {
         holders.push_back(to.clone());
         store.set(&holders_list_key, &holders);
+
+        tokenized_asset.token_holders_count = tokenized_asset.token_holders_count.saturating_add(1);
+        store.set(&key, &tokenized_asset);
     }
 
     // Append audit log
