@@ -40,9 +40,17 @@ fn test_full_asset_tokenization_workflow() {
     assert_eq!(client.get_token_balance(&asset_id, &investor1), 400000);
     assert_eq!(client.get_token_balance(&asset_id, &investor2), 300000);
 
-    // Step 4: Enable revenue sharing and distribute dividends
+    // Step 4: Enable revenue sharing, configure and fund a dividend token,
+    // then distribute dividends. The distribution pulls the amount from the
+    // tokenizer into the contract so the credits are fully backed.
     client.enable_revenue_sharing(&asset_id);
-    client.distribute_dividends(&asset_id, &10000i128);
+    let dividend_token = env
+        .register_stellar_asset_contract_v2(admin.clone())
+        .address();
+    client.set_dividend_token(&asset_id, &dividend_token, &owner);
+    let sac = soroban_sdk::token::StellarAssetClient::new(&env, &dividend_token);
+    sac.mint(&owner, &10000i128);
+    client.distribute_dividends(&asset_id, &10000i128, &owner);
 
     // Verify dividend distribution
     assert_eq!(client.get_unclaimed_dividends(&asset_id, &owner), 3000);
