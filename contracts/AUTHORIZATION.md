@@ -42,6 +42,19 @@ privileged address.
 `transfer_asset_ownership` was the most serious: a direct path to taking any
 registered asset by naming its owner.
 
+#### Restriction and lock entrypoints
+
+These entrypoints checked the emergency pause but never authenticated anyone;
+the module functions they delegate to contain no `require_auth` of their own.
+Each now takes `caller: Address` last, authenticates it and requires that the
+caller be the tokenized asset's tokenizer or the contract admin. Authentication
+alone is not enough: a well-signed caller holding neither role receives
+`Error::Unauthorized`.
+
+| Entrypoint | Was | Now |
+|---|---|---|
+| `set_geographic_restriction` | pause check only | ✅ `caller`, tokenizer or admin |
+
 ### Lifecycle and administration
 
 | Entrypoint | Principal | |
@@ -80,6 +93,7 @@ admin.
 | `propose_detokenization` | `proposer` | ✅ |
 | `unlock_tokens`, `update_valuation`, `distribute_dividends`, `enable_revenue_sharing`, `disable_revenue_sharing`, `execute_detokenization` | — | ⚠️ **no auth** |
 | `set_transfer_restriction`, `add_to_whitelist`, `remove_from_whitelist` | — | ⚠️ **no auth** |
+| `set_geographic_restriction` | `caller`, must be tokenizer or admin | ✅ |
 | `get_token_balance`, `get_token_holders`, `is_tokens_locked`, `get_ownership_percentage`, `get_tokenized_asset`, `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`, `proposal_passed`, `is_whitelisted`, `get_whitelist`, `get_detokenization_proposal`, `is_detokenization_active` | — | 📖 |
 
 The `require_auth` for the ✅ rows lives in the `lib.rs` entrypoint wrapper, not
