@@ -309,6 +309,32 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// Authenticate `caller` and return the tokenized asset when the caller is
+    /// its tokenizer or the contract admin.
+    ///
+    /// This is the authorization boundary for the restriction and lock
+    /// entrypoints: it is called from the `lib.rs` wrapper *before* delegating to
+    /// the module function, which deliberately contains no `require_auth` of its
+    /// own. `caller.require_auth()` comes first so an unauthenticated caller can
+    /// never satisfy the role comparison simply by naming a privileged address.
+    fn require_asset_admin_or_tokenizer(
+        env: &Env,
+        asset_id: u64,
+        caller: &Address,
+    ) -> Result<TokenizedAsset, Error> {
+        caller.require_auth();
+        let asset: TokenizedAsset = env
+            .storage()
+            .persistent()
+            .get(&TokenDataKey::TokenizedAsset(asset_id))
+            .ok_or(Error::AssetNotTokenized)?;
+        let admin = Self::get_admin(env.clone())?;
+        if *caller != asset.tokenizer && *caller != admin {
+            return Err(Error::Unauthorized);
+        }
+        Ok(asset)
+    }
+
     fn validate_asset(env: &Env, asset: &asset::Asset) -> Result<(), Error> {
         // Validate asset name length (3-100 characters)
         if asset.name.len() < 3 || asset.name.len() > 100 {
