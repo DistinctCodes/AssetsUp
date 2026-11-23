@@ -1344,11 +1344,43 @@ impl AssetUpContract {
     // Dividend Functions
     // =====================
 
-    /// Distribute dividends proportionally to all holders
-    pub fn distribute_dividends(env: Env, asset_id: u64, total_amount: i128) -> Result<(), Error> {
+    /// Distribute dividends proportionally to all holders.
+    ///
+    /// Auth: `caller` must authenticate and be the asset's tokenizer or the
+    /// contract admin. `total_amount` is pulled from `caller` in the same
+    /// invocation using the configured payment token, so every holder credit
+    /// is backed by funds the contract actually holds.
+    pub fn distribute_dividends(
+        env: Env,
+        asset_id: u64,
+        total_amount: i128,
+        caller: Address,
+    ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
+        dividends::collect_dividend_funds(&env, asset_id, &caller, total_amount)?;
 
         dividends::distribute_dividends(&env, asset_id, total_amount)
+    }
+
+    /// Configure the payment token used to pay an asset's dividends.
+    ///
+    /// Auth: `caller` must authenticate and be the asset's tokenizer or the
+    /// contract admin.
+    pub fn set_dividend_token(
+        env: Env,
+        asset_id: u64,
+        token: Address,
+        caller: Address,
+    ) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
+        dividends::set_dividend_token(&env, asset_id, token)
+    }
+
+    /// The configured dividend payment token for `asset_id`, if any. Read-only.
+    pub fn get_dividend_token(env: Env, asset_id: u64) -> Result<Address, Error> {
+        dividends::get_dividend_token(&env, asset_id)
     }
 
     /// Claim unclaimed dividends
