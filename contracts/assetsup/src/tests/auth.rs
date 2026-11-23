@@ -13,9 +13,11 @@
 //! address. `transfer_asset_ownership` was a direct asset-theft path.
 
 use soroban_sdk::testutils::Address as _;
+use soroban_sdk::testutils::Ledger as _;
 use soroban_sdk::{Address, BytesN, Env, IntoVal, String, Vec};
 
-use super::helpers::{create_env, create_test_asset};
+use super::helpers::{create_env, create_test_asset, register_asset_for};
+use crate::error::Error;
 use crate::{AssetUpContract, AssetUpContractClient};
 
 /// Registers the contract and initializes it, then clears the mocked auths so
@@ -361,4 +363,215 @@ fn a_third_party_signature_does_not_authorize_a_transfer() {
         "the attacker's own signature must not authorize the owner's transfer"
     );
     assert_eq!(client.get_asset(&id).owner, owner);
+}
+
+// ---------------------------------------------------------------------------
+// Restriction and lock entrypoints (#1789, #1788, #1787, #1782)
+//
+// These entrypoints used to call require_not_paused but never authenticated
+// anyone; the module functions they delegate to contain no require_auth. Each
+// now takes `caller` last and routes it through the shared
+// `require_asset_admin_or_tokenizer` helper. The tests below cover both halves:
+// an unmocked call (no signature at all) and a mock_all_auths call by a
+// well-signed intruder (authentication is not the same as authorization).
+// ---------------------------------------------------------------------------
+
+/// Register and tokenize a fresh asset, then clear all mocked auths so every
+/// subsequent call must carry a real signature.
+///
+/// Returns `(client, admin, tokenizer, holder)`.
+fn setup_restricted_unmocked(
+    env: &Env,
+) -> (AssetUpContractClient<'_>, Address, Address, Address) {
+    let (client, admin) = setup_unmocked(env);
+    let tokenizer = Address::generate(env);
+    let holder = Address::generate(env);
+
+    env.mock_all_auths();
+    let registry_id = register_asset_for(env, &client, &admin, &tokenizer, 21);
+    client.tokenize_asset(
+        &21u64,
+        &registry_id,
+        &String::from_str(env, "AUTH"),
+        &1_000i128,
+        &0u32,
+        &0i128,
+        &tokenizer,
+        &String::from_str(env, "Auth Token"),
+        &String::from_str(env, "Authorization test token"),
+        &crate::types::AssetType::Physical,
+    );
+    env.set_auths(&[]);
+
+    (client, admin, tokenizer, holder)
+}
+
+// -- #1789 set_geographic_restriction ---------------------------------------
+
+#[test]
+fn set_geographic_restriction_rejects_an_unauthenticated_caller() {
+    let env = create_env();
+    let (client, _admin, _tokenizer, _holder) = setup_restricted_unmocked(&env);
+    let jurisdictions = Vec::from_array(&env, [String::from_str(&env, "US")]);
+    let intruder = Address::generate(&env);
+
+    // Naming a caller without their signature must not be enough.
+    assert!(client
+        .try_set_geographic_restriction(&21u64, &jurisdictions, &intruder)
+        .is_err());
+}
+
+#[test]
+fn set_geographic_restriction_rejects_an_authenticated_non_admin() {
+    let env = create_env();
+    let (client, _admin, _tokenizer, _holder) = setup_restricted_unmocked(&env);
+    let jurisdictions = Vec::from_array(&env, [String::from_str(&env, "US")]);
+    let intruder = Address::generate(&env);
+
+    env.mock_all_auths();
+    assert!(matches!(
+        client.try_set_geographic_restriction(&21u64, &jurisdictions, &intruder),
+        Err(Ok(Error::Unauthorized))
+    ));
+}
+
+#[test]
+fn set_geographic_restriction_succeeds_for_the_tokenizer() {
+    let env = create_env();
+    let (client, _admin, tokenizer, _holder) = setup_restricted_unmocked(&env);
+    let jurisdictions = Vec::from_array(&env, [String::from_str(&env, "US")]);
+
+    env.mock_all_auths();
+    assert!(client
+        .try_set_geographic_restriction(&21u64, &jurisdictions, &tokenizer)
+        .is_ok());
+}
+
+// -- #1788 add_to_whitelist / remove_from_whitelist --------------------------
+
+#[test]
+fn whitelist_writes_reject_an_unauthenticated_caller() {
+    let env = create_env();
+    let (client, _admin, _tokenizer, holder) = setup_restricted_unmocked(&env);
+
+    assert!(client
+        .try_add_to_whitelist(&21u64, &holder, &holder)
+        .is_err());
+    assert!(client
+        .try_remove_from_whitelist(&21u64, &holder, &holder)
+        .is_err());
+}
+
+#[test]
+fn whitelist_writes_reject_an_authenticated_non_admin() {
+    let env = create_env();
+    let (client, _admin, _tokenizer, holder) = setup_restricted_unmocked(&env);
+    let intruder = Address::generate(&env);
+
+    env.mock_all_auths();
+    assert!(matches!(
+        client.try_add_to_whitelist(&21u64, &holder, &intruder),
+        Err(Ok(Error::Unauthorized))
+    ));
+    assert!(matches!(
+        client.try_remove_from_whitelist(&21u64, &holder, &intruder),
+        Err(Ok(Error::Unauthorized))
+    ));
+}
+
+#[test]
+fn whitelist_writes_succeed_for_the_tokenizer() {
+    let env = create_env();
+    let (client, _admin, tokenizer, holder) = setup_restricted_unmocked(&env);
+
+    env.mock_all_auths();
+    client.add_to_whitelist(&21u64, &holder, &tokenizer);
+    assert!(client.is_whitelisted(&21u64, &holder));
+
+    client.remove_from_whitelist(&21u64, &holder, &tokenizer);
+    assert!(!client.is_whitelisted(&21u64, &holder));
+}
+
+// -- #1787 set_transfer_restriction -----------------------------------------
+
+#[test]
+fn set_transfer_restriction_rejects_an_unauthenticated_caller() {
+    let env = create_env();
+    let (client, _admin, _tokenizer, _holder) = setup_restricted_unmocked(&env);
+    let intruder = Address::generate(&env);
+
+    assert!(client
+        .try_set_transfer_restriction(&21u64, &true, &intruder)
+        .is_err());
+}
+
+#[test]
+fn set_transfer_restriction_rejects_an_authenticated_non_admin() {
+    let env = create_env();
+    let (client, _admin, _tokenizer, _holder) = setup_restricted_unmocked(&env);
+    let intruder = Address::generate(&env);
+
+    env.mock_all_auths();
+    assert!(matches!(
+        client.try_set_transfer_restriction(&21u64, &true, &intruder),
+        Err(Ok(Error::Unauthorized))
+    ));
+}
+
+#[test]
+fn set_transfer_restriction_succeeds_for_the_tokenizer() {
+    let env = create_env();
+    let (client, _admin, tokenizer, _holder) = setup_restricted_unmocked(&env);
+
+    env.mock_all_auths();
+    assert!(client
+        .try_set_transfer_restriction(&21u64, &true, &tokenizer)
+        .is_ok());
+}
+
+// -- #1782 unlock_tokens ----------------------------------------------------
+
+#[test]
+fn unlock_tokens_rejects_an_unauthenticated_caller() {
+    let env = create_env();
+    let (client, _admin, tokenizer, holder) = setup_restricted_unmocked(&env);
+    let intruder = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.lock_tokens(&21u64, &holder, &1_000u64, &tokenizer);
+    env.set_auths(&[]);
+
+    assert!(client
+        .try_unlock_tokens(&21u64, &holder, &intruder)
+        .is_err());
+    assert!(client.is_tokens_locked(&21u64, &holder));
+}
+
+#[test]
+fn unlock_tokens_rejects_an_authenticated_non_admin() {
+    let env = create_env();
+    let (client, _admin, tokenizer, holder) = setup_restricted_unmocked(&env);
+    let intruder = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.lock_tokens(&21u64, &holder, &1_000u64, &tokenizer);
+
+    assert!(matches!(
+        client.try_unlock_tokens(&21u64, &holder, &intruder),
+        Err(Ok(Error::Unauthorized))
+    ));
+    assert!(client.is_tokens_locked(&21u64, &holder));
+}
+
+#[test]
+fn unlock_tokens_succeeds_for_the_tokenizer() {
+    let env = create_env();
+    let (client, _admin, tokenizer, holder) = setup_restricted_unmocked(&env);
+
+    env.mock_all_auths();
+    client.lock_tokens(&21u64, &holder, &1_000u64, &tokenizer);
+    assert!(client.is_tokens_locked(&21u64, &holder));
+
+    client.unlock_tokens(&21u64, &holder, &tokenizer);
+    assert!(!client.is_tokens_locked(&21u64, &holder));
 }
