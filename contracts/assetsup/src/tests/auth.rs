@@ -529,3 +529,53 @@ fn the_tokenizer_and_admin_can_set_transfer_restrictions() {
     });
     assert!(!stored.require_accredited);
 }
+
+// ---------------------------------------------------------------------------
+// #1786: revenue sharing authorization
+// ---------------------------------------------------------------------------
+
+#[test]
+fn revenue_sharing_toggles_require_the_callers_authorization() {
+    let env = create_env();
+    let (client, _admin, tokenizer) = tokenized_client(&env);
+
+    env.set_auths(&[]);
+    assert!(client.try_enable_revenue_sharing(&1u64, &tokenizer).is_err());
+    assert!(client.try_disable_revenue_sharing(&1u64, &tokenizer).is_err());
+}
+
+#[test]
+fn revenue_sharing_toggles_reject_a_third_party() {
+    let env = create_env();
+    let (client, _admin, _tokenizer) = tokenized_client(&env);
+    let intruder = Address::generate(&env);
+
+    env.mock_all_auths();
+    let err = match client.try_enable_revenue_sharing(&1u64, &intruder) {
+        Err(Ok(e)) => e,
+        other => panic!("expected Unauthorized, got {other:?}"),
+    };
+    assert_eq!(err, Error::Unauthorized);
+
+    let err = match client.try_disable_revenue_sharing(&1u64, &intruder) {
+        Err(Ok(e)) => e,
+        other => panic!("expected Unauthorized, got {other:?}"),
+    };
+    assert_eq!(err, Error::Unauthorized);
+}
+
+#[test]
+fn the_tokenizer_and_admin_can_toggle_revenue_sharing() {
+    let env = create_env();
+    let (client, admin, tokenizer) = tokenized_client(&env);
+
+    env.mock_all_auths();
+    client.enable_revenue_sharing(&1u64, &tokenizer);
+    assert!(client.get_tokenized_asset(&1u64).revenue_sharing_enabled);
+
+    client.disable_revenue_sharing(&1u64, &tokenizer);
+    assert!(!client.get_tokenized_asset(&1u64).revenue_sharing_enabled);
+
+    client.enable_revenue_sharing(&1u64, &admin);
+    assert!(client.get_tokenized_asset(&1u64).revenue_sharing_enabled);
+}
