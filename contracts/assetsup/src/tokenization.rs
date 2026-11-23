@@ -324,7 +324,7 @@ pub fn transfer_tokens(
 
     // Verify asset is tokenized
     let key = TokenDataKey::TokenizedAsset(asset_id);
-    let tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
+    let mut tokenized_asset: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
 
     // Check if from address has locked tokens
     let lock_key = TokenDataKey::TokenLockedUntil(asset_id, from.clone());
@@ -379,12 +379,29 @@ pub fn transfer_tokens(
     store.set(&from_holder_key, &from_ownership);
     store.set(&to_holder_key, &to_ownership);
 
-    // Add to holder list if new
     let holders_list_key = TokenDataKey::TokenHoldersList(asset_id);
     let mut holders: Vec<Address> = store
         .get(&holders_list_key)
         .ok_or(Error::AssetNotTokenized)?;
 
+    // A sender who has moved their entire balance is no longer a holder:
+    // leaving them in the list skews holder counts and dividend distributions
+    // indefinitely (#1792). Keep their `TokenHolder` ownership record, though —
+    // dividends already accrued must stay claimable after the last token leaves.
+    // A self-transfer is excluded: the recipient's credited balance is the one
+    // that matters, so the address must remain listed.
+    if from_ownership.balance == 0 && from != to {
+        if let Some(index) = holders.iter().position(|h| h == from) {
+            holders.remove(index as u32);
+            store.set(&holders_list_key, &holders);
+
+            tokenized_asset.token_holders_count =
+                tokenized_asset.token_holders_count.saturating_sub(1);
+            store.set(&key, &tokenized_asset);
+        }
+    }
+
+    // Add to holder list if new
     let is_new_holder = !holders.iter().any(|h| h == to);
     if is_new_holder {
         holders.push_back(to.clone());
