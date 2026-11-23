@@ -1371,15 +1371,21 @@ impl AssetUpContract {
     }
 
     /// Enable revenue sharing for an asset
-    pub fn enable_revenue_sharing(env: Env, asset_id: u64) -> Result<(), Error> {
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
+    pub fn enable_revenue_sharing(env: Env, asset_id: u64, caller: Address) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         dividends::enable_revenue_sharing(&env, asset_id)
     }
 
     /// Disable revenue sharing for an asset
-    pub fn disable_revenue_sharing(env: Env, asset_id: u64) -> Result<(), Error> {
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
+    pub fn disable_revenue_sharing(env: Env, asset_id: u64, caller: Address) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         dividends::disable_revenue_sharing(&env, asset_id)
     }
