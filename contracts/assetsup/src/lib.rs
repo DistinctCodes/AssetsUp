@@ -309,6 +309,35 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// Authenticate `caller`, then require it to be the token's tokenizer or the
+    /// contract admin.
+    ///
+    /// The role comparison alone would be meaningless: `caller` is supplied by
+    /// whoever builds the invocation, so an attacker could name the tokenizer
+    /// and pass it. Authenticating here (rather than in the module functions)
+    /// keeps the module layer directly testable while making the boundary
+    /// explicit for every privileged wrapper.
+    fn require_asset_admin_or_tokenizer(
+        env: &Env,
+        asset_id: u64,
+        caller: &Address,
+    ) -> Result<TokenizedAsset, Error> {
+        caller.require_auth();
+
+        let asset: TokenizedAsset = env
+            .storage()
+            .persistent()
+            .get(&TokenDataKey::TokenizedAsset(asset_id))
+            .ok_or(Error::AssetNotTokenized)?;
+        let admin = Self::get_admin(env.clone())?;
+
+        if *caller != asset.tokenizer && *caller != admin {
+            return Err(Error::Unauthorized);
+        }
+
+        Ok(asset)
+    }
+
     fn validate_asset(env: &Env, asset: &asset::Asset) -> Result<(), Error> {
         // Validate asset name length (3-100 characters)
         if asset.name.len() < 3 || asset.name.len() > 100 {
