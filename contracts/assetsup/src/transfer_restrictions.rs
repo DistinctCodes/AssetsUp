@@ -2,20 +2,31 @@ use crate::error::Error;
 use crate::types::{TokenDataKey, TransferRestriction};
 use soroban_sdk::{Address, Env, String, Vec};
 
-/// Set transfer restrictions for an asset
+/// Update only the accredited-investor requirement for an asset.
+///
+/// The geographic allow-list is a separate setting (see
+/// [`set_geographic_restriction`]). Writing a fresh `TransferRestriction` here
+/// used to overwrite an allow-list configured earlier with an empty one,
+/// silently opening the asset to every jurisdiction. The caller-supplied
+/// `geographic_allowed` is therefore ignored, mirroring how
+/// `set_geographic_restriction` preserves `require_accredited`.
 pub fn set_transfer_restriction(
     env: &Env,
     asset_id: u64,
     restriction: TransferRestriction,
 ) -> Result<(), Error> {
     let store = env.storage().persistent();
-
-    // Store the restriction
     let key = TokenDataKey::TransferRestriction(asset_id);
-    store.set(&key, &restriction);
+
+    let mut existing: TransferRestriction = store.get(&key).flatten().unwrap_or(TransferRestriction {
+        require_accredited: restriction.require_accredited,
+        geographic_allowed: Vec::new(env),
+    });
+    existing.require_accredited = restriction.require_accredited;
+    store.set(&key, &existing);
 
     // Emit event: (asset_id, require_accredited)
-    crate::events::restriction_set(env, asset_id, restriction.require_accredited);
+    crate::events::restriction_set(env, asset_id, existing.require_accredited);
 
     Ok(())
 }
