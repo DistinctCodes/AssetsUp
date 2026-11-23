@@ -83,6 +83,14 @@ describe("next.config security headers", () => {
     expect(csp).toContain("'unsafe-eval'");
   });
 
+  it("allows same-origin camera access while denying other sensitive features", async () => {
+    const headers = await headersFor({ NODE_ENV: "production" });
+    expect(headers).toContainEqual({
+      key: "Permissions-Policy",
+      value: "camera=(self), microphone=(), geolocation=()",
+    });
+  });
+
   it("keeps every other header unchanged", async () => {
     const headers = await headersFor({ NODE_ENV: "production" });
     expect(headers).toEqual(
