@@ -54,6 +54,13 @@ alone is not enough: a well-signed caller holding neither role receives
 | Entrypoint | Was | Now |
 |---|---|---|
 | `set_geographic_restriction` | pause check only | ✅ `caller`, tokenizer or admin |
+| `add_to_whitelist` | pause check only | ✅ `caller`, tokenizer or admin |
+| `remove_from_whitelist` | pause check only | ✅ `caller`, tokenizer or admin |
+
+A designated compliance-officer role was considered for the whitelist flows but
+not added: the tokenizer and the admin already cover the authorized principals,
+and introducing a new stored role would widen the ABI and the storage layout
+without being required by the issue.
 
 ### Lifecycle and administration
 
@@ -92,7 +99,8 @@ admin.
 | `cast_vote` | `voter` | ✅ |
 | `propose_detokenization` | `proposer` | ✅ |
 | `unlock_tokens`, `update_valuation`, `distribute_dividends`, `enable_revenue_sharing`, `disable_revenue_sharing`, `execute_detokenization` | — | ⚠️ **no auth** |
-| `set_transfer_restriction`, `add_to_whitelist`, `remove_from_whitelist` | — | ⚠️ **no auth** |
+| `set_transfer_restriction` | — | ⚠️ **no auth** |
+| `add_to_whitelist`, `remove_from_whitelist` | `caller`, must be tokenizer or admin | ✅ |
 | `set_geographic_restriction` | `caller`, must be tokenizer or admin | ✅ |
 | `get_token_balance`, `get_token_holders`, `is_tokens_locked`, `get_ownership_percentage`, `get_tokenized_asset`, `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`, `proposal_passed`, `is_whitelisted`, `get_whitelist`, `get_detokenization_proposal`, `is_detokenization_active` | — | 📖 |
 
