@@ -15,7 +15,11 @@
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{Address, BytesN, Env, IntoVal, String, Vec};
 
-use super::helpers::{create_env, create_test_asset};
+use super::helpers::{
+    create_env, create_mock_addresses, create_test_asset, initialize_contract, register_asset_for,
+};
+use crate::error::Error;
+use crate::types::AssetType;
 use crate::{AssetUpContract, AssetUpContractClient};
 
 /// Registers the contract and initializes it, then clears the mocked auths so
@@ -361,4 +365,123 @@ fn a_third_party_signature_does_not_authorize_a_transfer() {
         "the attacker's own signature must not authorize the owner's transfer"
     );
     assert_eq!(client.get_asset(&id).owner, owner);
+}
+
+// ---------------------------------------------------------------------------
+// #1791: jurisdiction attestation
+// ---------------------------------------------------------------------------
+
+/// An initialized contract with one tokenized asset owned by `tokenizer`.
+fn tokenized_client(env: &Env) -> (AssetUpContractClient<'_>, Address, Address) {
+    let (admin, tokenizer, _, _) = create_mock_addresses(env);
+    let client = initialize_contract(env, &admin);
+    let registry_id = register_asset_for(env, &client, &admin, &tokenizer, 1);
+
+    env.mock_all_auths();
+    client.tokenize_asset(
+        &1u64,
+        &registry_id,
+        &String::from_str(env, "AUTHTKN"),
+        &1000i128,
+        &7u32,
+        &1i128,
+        &tokenizer,
+        &String::from_str(env, "Auth Token"),
+        &String::from_str(env, "Token used by authorization tests"),
+        &AssetType::Physical,
+    );
+
+    (client, admin, tokenizer)
+}
+
+#[test]
+fn jurisdiction_attestation_requires_the_callers_authorization() {
+    let env = create_env();
+    let (client, _admin, _tokenizer) = tokenized_client(&env);
+    let holder = Address::generate(&env);
+
+    env.set_auths(&[]);
+    assert!(client
+        .try_set_address_jurisdiction(&holder, &String::from_str(&env, "US"), &holder)
+        .is_err());
+    assert!(client.get_address_jurisdiction(&holder).is_none());
+}
+
+#[test]
+fn a_holder_cannot_self_attest_their_jurisdiction() {
+    let env = create_env();
+    let (client, _admin, _tokenizer) = tokenized_client(&env);
+    let holder = Address::generate(&env);
+
+    // The holder signs their own request, but signing is not a role: only an
+    // admin or a designated attester may record a jurisdiction.
+    env.mock_all_auths();
+    let err = match client.try_set_address_jurisdiction(
+        &holder,
+        &String::from_str(&env, "US"),
+        &holder,
+    ) {
+        Err(Ok(e)) => e,
+        other => panic!("expected Unauthorized, got {other:?}"),
+    };
+    assert_eq!(err, Error::Unauthorized);
+    assert!(client.get_address_jurisdiction(&holder).is_none());
+}
+
+#[test]
+fn managing_the_attester_set_requires_the_admins_authorization() {
+    let env = create_env();
+    let (client, _admin, _tokenizer) = tokenized_client(&env);
+    let candidate = Address::generate(&env);
+
+    env.set_auths(&[]);
+    assert!(client.try_add_jurisdiction_attester(&candidate).is_err());
+    assert!(!client.is_jurisdiction_attester(&candidate));
+
+    env.mock_all_auths();
+    client.add_jurisdiction_attester(&candidate);
+    assert!(client.is_jurisdiction_attester(&candidate));
+
+    let list = client.get_jurisdiction_attesters();
+    assert_eq!(list.len(), 1);
+
+    client.remove_jurisdiction_attester(&candidate);
+    assert!(!client.is_jurisdiction_attester(&candidate));
+    assert_eq!(client.get_jurisdiction_attesters().len(), 0);
+}
+
+#[test]
+fn an_attester_can_record_jurisdiction_and_loses_the_role_when_removed() {
+    let env = create_env();
+    let (client, admin, _tokenizer) = tokenized_client(&env);
+    let attester = Address::generate(&env);
+    let holder = Address::generate(&env);
+    let second = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.add_jurisdiction_attester(&attester);
+
+    client.set_address_jurisdiction(&holder, &String::from_str(&env, "DE"), &attester);
+    assert_eq!(
+        client.get_address_jurisdiction(&holder),
+        Some(String::from_str(&env, "DE"))
+    );
+
+    // The admin may attest directly as well.
+    client.set_address_jurisdiction(&second, &String::from_str(&env, "FR"), &admin);
+    assert_eq!(
+        client.get_address_jurisdiction(&second),
+        Some(String::from_str(&env, "FR"))
+    );
+
+    client.remove_jurisdiction_attester(&attester);
+    let err = match client.try_set_address_jurisdiction(
+        &second,
+        &String::from_str(&env, "US"),
+        &attester,
+    ) {
+        Err(Ok(e)) => e,
+        other => panic!("expected Unauthorized, got {other:?}"),
+    };
+    assert_eq!(err, Error::Unauthorized);
 }
