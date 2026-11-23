@@ -57,6 +57,13 @@ alone is not enough: a well-signed caller holding neither role receives
 | `add_to_whitelist` | pause check only | ✅ `caller`, tokenizer or admin |
 | `remove_from_whitelist` | pause check only | ✅ `caller`, tokenizer or admin |
 | `set_transfer_restriction` | pause check only | ✅ `caller`, tokenizer or admin |
+| `unlock_tokens` | pause check only | ✅ `caller`, tokenizer or admin |
+
+`unlock_tokens` stays gated on the tokenizer/admin that set the lock rather than
+becoming permissionless after `until_timestamp`. An expired lock is already
+inert for transfers (`is_tokens_locked` returns false), so allowing anyone to
+clear the stored record would only let an outsider rewrite state that belongs to
+the lock setter, with no liveness benefit.
 
 The existing transfer-restriction value logic (including the `geographic_allowed`
 field) is unchanged; only authorization was added.
@@ -102,7 +109,8 @@ admin.
 | `claim_dividends` | `holder` | ✅ |
 | `cast_vote` | `voter` | ✅ |
 | `propose_detokenization` | `proposer` | ✅ |
-| `unlock_tokens`, `update_valuation`, `distribute_dividends`, `enable_revenue_sharing`, `disable_revenue_sharing`, `execute_detokenization` | — | ⚠️ **no auth** |
+| `unlock_tokens` | `caller`, must be tokenizer or admin | ✅ |
+| `update_valuation`, `distribute_dividends`, `enable_revenue_sharing`, `disable_revenue_sharing`, `execute_detokenization` | — | ⚠️ **no auth** |
 | `set_transfer_restriction` | `caller`, must be tokenizer or admin | ✅ |
 | `add_to_whitelist`, `remove_from_whitelist` | `caller`, must be tokenizer or admin | ✅ |
 | `set_geographic_restriction` | `caller`, must be tokenizer or admin | ✅ |
@@ -115,7 +123,7 @@ one of those functions directly would bypass authorization. They are
 `pub(crate)` and only reachable through the wrappers today, but that is a
 property of the module layout rather than an enforced boundary.
 
-The ⚠️ rows are **not fixed here.** They are real gaps, but each needs a
+The remaining ⚠️ rows are **not fixed here.** They are real gaps, but each needs a
 decision about *which* principal should be required — the token issuer, the
 asset owner, or the admin — and that is a design question rather than an
 oversight. They are listed so the next change starts from a list rather than a
@@ -254,4 +262,4 @@ point, having already collected the required approvals.
   per-entrypoint, not bound to specific amounts or recipients, so a signature
   authorizing a transfer does not pin *which* transfer. Binding auth to
   arguments on the value-carrying paths is worth a follow-up.
-- The ⚠️ rows under `assetsup` tokenization remain open.
+- The remaining ⚠️ rows under `assetsup` tokenization remain open.
