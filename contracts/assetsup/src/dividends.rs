@@ -1,7 +1,44 @@
 use crate::error::Error;
 use crate::math;
 use crate::types::{OwnershipRecord, TokenDataKey, TokenizedAsset};
+use soroban_sdk::token::Client as TokenClient;
 use soroban_sdk::{Address, Env, Vec};
+
+/// Configure the payment token used to pay dividends for `asset_id`.
+///
+/// The asset must be tokenized. This is only called through the `lib.rs`
+/// entrypoint, which authenticates the tokenizer or admin first.
+pub fn set_dividend_token(env: &Env, asset_id: u64, token: Address) -> Result<(), Error> {
+    let store = env.storage().persistent();
+    let key = TokenDataKey::TokenizedAsset(asset_id);
+    let _: TokenizedAsset = store.get(&key).ok_or(Error::AssetNotTokenized)?;
+    store.set(&TokenDataKey::DividendToken(asset_id), &token);
+    Ok(())
+}
+
+/// The configured dividend payment token, or `InvalidInput` when none has been
+/// set. No holder may be credited before this is configured: doing so would
+/// create dividend liabilities with no funds backing them.
+pub fn get_dividend_token(env: &Env, asset_id: u64) -> Result<Address, Error> {
+    env.storage()
+        .persistent()
+        .get(&TokenDataKey::DividendToken(asset_id))
+        .ok_or(Error::InvalidInput)
+}
+
+/// Pull `amount` of the configured dividend token from `payer` into this
+/// contract. A failed transfer reverts the whole invocation, so holders are
+/// never credited with unbacked dividends.
+pub fn collect_dividend_funds(
+    env: &Env,
+    asset_id: u64,
+    payer: &Address,
+    amount: i128,
+) -> Result<(), Error> {
+    let token = get_dividend_token(env, asset_id)?;
+    TokenClient::new(env, &token).transfer(payer, &env.current_contract_address(), &amount);
+    Ok(())
+}
 
 /// Distribute dividends proportionally to all token holders
 pub fn distribute_dividends(env: &Env, asset_id: u64, total_amount: i128) -> Result<(), Error> {
@@ -68,6 +105,20 @@ pub fn claim_dividends(env: &Env, asset_id: u64, holder: Address) -> Result<i128
 
     if unclaimed <= 0 {
         return Err(Error::NoDividendsToClaim);
+    }
+
+    // Pay the claim in the configured dividend token BEFORE clearing the
+    // ledger. A failed transfer reverts the invocation, so `unclaimed` stays
+    // untouched and the holder can retry once the contract is funded. Assets
+    // with no token configured keep the legacy bookkeeping-only behaviour so
+    // existing holders are not stranded; the public entrypoint configures the
+    // token before any real distribution.
+    if let Ok(token) = get_dividend_token(env, asset_id) {
+        TokenClient::new(env, &token).transfer(
+            &env.current_contract_address(),
+            &holder,
+            &unclaimed,
+        );
     }
 
     // Clear unclaimed dividends

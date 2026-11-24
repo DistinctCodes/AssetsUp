@@ -73,6 +73,24 @@ not added: the tokenizer and the admin already cover the authorized principals,
 and introducing a new stored role would widen the ABI and the storage layout
 without being required by the issue.
 
+This change also closes three of the ⚠️ rows below:
+
+| Entrypoint | Was | Now |
+|---|---|---|
+| `update_valuation` | no auth | ✅ `caller`, must be tokenizer or admin |
+| `distribute_dividends` | no auth | ✅ `caller`, must be tokenizer or admin; pulls funds |
+| `set_dividend_token` | did not exist | ✅ `caller`, must be tokenizer or admin |
+
+`update_valuation` deliberately allows the tokenizer or admin rather than a
+registered oracle: `assetsup` has no oracle registry, and adding one is a
+separate design decision. `distribute_dividends` additionally pulls
+`total_amount` of the configured dividend token from the authenticated caller
+into the contract before crediting holders, so payouts are backed by real
+funds. `claim_dividends` transfers that token from the contract to the holder
+before clearing the ledger. All three share the
+`require_asset_admin_or_tokenizer` helper in `lib.rs`; module functions remain
+unauthenticated and keep their signatures.
+
 ### Lifecycle and administration
 
 | Entrypoint | Principal | |
@@ -107,10 +125,13 @@ admin.
 | `transfer_tokens` | `from` | ✅ |
 | `lock_tokens` | tokenizer **and** holder (unless the same address) | ✅ |
 | `claim_dividends` | `holder` | ✅ |
+| `update_valuation` | `caller`, must be tokenizer or admin | ✅ (added here) |
+| `distribute_dividends` | `caller`, must be tokenizer or admin | ✅ (added here) |
+| `set_dividend_token` | `caller`, must be tokenizer or admin | ✅ (added here) |
 | `cast_vote` | `voter` | ✅ |
 | `propose_detokenization` | `proposer` | ✅ |
 | `unlock_tokens` | `caller`, must be tokenizer or admin | ✅ |
-| `update_valuation`, `distribute_dividends`, `enable_revenue_sharing`, `disable_revenue_sharing`, `execute_detokenization` | — | ⚠️ **no auth** |
+| `enable_revenue_sharing`, `disable_revenue_sharing`, `execute_detokenization` | — | ⚠️ **no auth** |
 | `set_transfer_restriction` | `caller`, must be tokenizer or admin | ✅ |
 | `add_to_whitelist`, `remove_from_whitelist` | `caller`, must be tokenizer or admin | ✅ |
 | `set_geographic_restriction` | `caller`, must be tokenizer or admin | ✅ |

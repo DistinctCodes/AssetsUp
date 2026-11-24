@@ -117,6 +117,9 @@ pub enum TokenDataKey {
     RegistryTokenized(BytesN<32>),
     /// Admin-configured maximum token lock duration, in seconds (`u64`).
     MaxLockDuration,
+    /// Payment token (`Address`) used to pay dividends for a tokenized asset.
+    /// Stored separately so `TokenizedAsset` constructors stay unchanged.
+    DividendToken(u64),
 }
 
 /// Represents a tokenized asset on-chain

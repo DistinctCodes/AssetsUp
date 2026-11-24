@@ -190,7 +190,9 @@ fn dividends_and_voting_are_blocked_while_paused() {
     let env = create_env();
     let (client, _admin) = setup_paused(&env);
 
-    assert!(client.try_distribute_dividends(&1u64, &100i128).is_err());
+    assert!(client
+        .try_distribute_dividends(&1u64, &100i128, &Address::generate(env))
+        .is_err());
     assert!(client.try_enable_revenue_sharing(&1u64).is_err());
     assert!(client.try_disable_revenue_sharing(&1u64).is_err());
     assert!(client

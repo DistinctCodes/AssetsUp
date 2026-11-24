@@ -14,6 +14,7 @@ mod paging;
 
 // Tokenization and ownership tests
 mod detokenization;
+mod dividend_payouts;
 mod dividends;
 mod tokenization;
 mod transfer_restrictions;
