@@ -125,7 +125,13 @@ export class AssetsService {
       qb.andWhere('asset.departmentId = :d', { d: query.departmentId });
     if (query?.locationId)
       qb.andWhere('asset.locationId = :l', { l: query.locationId });
-    if (query?.status) qb.andWhere('asset.status = :st', { st: query.status });
+    if (query?.status) {
+      // The DTO validates the wire value, but direct callers (and old shared
+      // links) can still send an alias such as ACTIVE/MAINTENANCE. Resolve it
+      // to the canonical stored status exactly like updateStatus does.
+      const status = this.lifecycle.normalizeStatus(query.status);
+      qb.andWhere('asset.status = :st', { st: status });
+    }
     if (query?.assignedToId)
       qb.andWhere('asset.assignedToUserId = :au', { au: query.assignedToId });
 
