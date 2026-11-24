@@ -137,7 +137,7 @@ service are documented in [`src/audit.rs`](src/audit.rs).
 | `transfer_tokens` | `from` |
 | `lock_tokens` | tokenizer **and** holder (unless they are the same address) |
 | `set_max_lock_duration` | admin |
-| `unlock_tokens` | — |
+| `unlock_tokens` | tokenizer or admin |
 | `update_valuation` | — |
 | `bump_asset_ttl` | — (permissionless keeper) |
 
@@ -187,8 +187,10 @@ tokenized, preventing immediate tokenize→detokenize round-trips.
 `set_transfer_restriction`, `add_to_whitelist`, `remove_from_whitelist`,
 `is_whitelisted`, `get_whitelist`, plus jurisdiction rules:
 `set_geographic_restriction`, `set_address_jurisdiction`,
-`get_address_jurisdiction`. None of the restriction setters currently call
-`require_auth` except `set_address_jurisdiction`, which is self-authenticated.
+`get_address_jurisdiction`. The mutating restriction setters require a `caller`
+that authenticates and is the asset's tokenizer or the contract admin;
+`set_address_jurisdiction` is self-authenticated. See
+[`AUTHORIZATION.md`](../AUTHORIZATION.md).
 
 When an asset has a non-empty `geographic_allowed` allow-list, `validate_transfer`
 requires the recipient to have a recorded jurisdiction that appears in it, or

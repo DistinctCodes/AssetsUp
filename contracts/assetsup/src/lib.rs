@@ -309,6 +309,32 @@ impl AssetUpContract {
         Ok(())
     }
 
+    /// Authenticate `caller` and return the tokenized asset when the caller is
+    /// its tokenizer or the contract admin.
+    ///
+    /// This is the authorization boundary for the restriction and lock
+    /// entrypoints: it is called from the `lib.rs` wrapper *before* delegating to
+    /// the module function, which deliberately contains no `require_auth` of its
+    /// own. `caller.require_auth()` comes first so an unauthenticated caller can
+    /// never satisfy the role comparison simply by naming a privileged address.
+    fn require_asset_admin_or_tokenizer(
+        env: &Env,
+        asset_id: u64,
+        caller: &Address,
+    ) -> Result<TokenizedAsset, Error> {
+        caller.require_auth();
+        let asset: TokenizedAsset = env
+            .storage()
+            .persistent()
+            .get(&TokenDataKey::TokenizedAsset(asset_id))
+            .ok_or(Error::AssetNotTokenized)?;
+        let admin = Self::get_admin(env.clone())?;
+        if *caller != asset.tokenizer && *caller != admin {
+            return Err(Error::Unauthorized);
+        }
+        Ok(asset)
+    }
+
     fn validate_asset(env: &Env, asset: &asset::Asset) -> Result<(), Error> {
         // Validate asset name length (3-100 characters)
         if asset.name.len() < 3 || asset.name.len() > 100 {
@@ -1275,9 +1301,23 @@ impl AssetUpContract {
         tokenization::get_max_lock_duration(&env)
     }
 
-    /// Unlock tokens
-    pub fn unlock_tokens(env: Env, asset_id: u64, holder: Address) -> Result<(), Error> {
+    /// Unlock tokens.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin —
+    /// the same parties that set the lock in the first place. Clearing a lock is
+    /// deliberately not permissionless, even after `until_timestamp`: the lock
+    /// enforces a hold agreed when it was set, and anyone being able to remove
+    /// the on-chain record would undermine that. (Once the timestamp has passed
+    /// the lock is already inert via `is_tokens_locked`, so no unlock call is
+    /// needed to restore transfers.)
+    pub fn unlock_tokens(
+        env: Env,
+        asset_id: u64,
+        holder: Address,
+        caller: Address,
+    ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         tokenization::unlock_tokens(&env, asset_id, holder)
     }
@@ -1396,13 +1436,17 @@ impl AssetUpContract {
     // Transfer Restrictions
     // =====================
 
-    /// Set transfer restrictions
+    /// Set transfer restrictions.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
     pub fn set_transfer_restriction(
         env: Env,
         asset_id: u64,
         require_accredited: bool,
+        caller: Address,
     ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         transfer_restrictions::set_transfer_restriction(
             &env,
@@ -1414,16 +1458,32 @@ impl AssetUpContract {
         )
     }
 
-    /// Add address to whitelist
-    pub fn add_to_whitelist(env: Env, asset_id: u64, address: Address) -> Result<(), Error> {
+    /// Add address to whitelist.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
+    pub fn add_to_whitelist(
+        env: Env,
+        asset_id: u64,
+        address: Address,
+        caller: Address,
+    ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         transfer_restrictions::add_to_whitelist(&env, asset_id, address)
     }
 
-    /// Remove address from whitelist
-    pub fn remove_from_whitelist(env: Env, asset_id: u64, address: Address) -> Result<(), Error> {
+    /// Remove address from whitelist.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
+    pub fn remove_from_whitelist(
+        env: Env,
+        asset_id: u64,
+        address: Address,
+        caller: Address,
+    ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         transfer_restrictions::remove_from_whitelist(&env, asset_id, address)
     }
@@ -1454,13 +1514,17 @@ impl AssetUpContract {
         ))
     }
 
-    /// Set the jurisdiction allow-list for an asset's transfers
+    /// Set the jurisdiction allow-list for an asset's transfers.
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
     pub fn set_geographic_restriction(
         env: Env,
         asset_id: u64,
         allowed_jurisdictions: Vec<String>,
+        caller: Address,
     ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         transfer_restrictions::set_geographic_restriction(&env, asset_id, allowed_jurisdictions)
     }

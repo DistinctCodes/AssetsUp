@@ -182,7 +182,7 @@ fn tokenization_is_blocked_while_paused() {
     assert!(client
         .try_lock_tokens(&1u64, &holder, &100u64, &holder)
         .is_err());
-    assert!(client.try_unlock_tokens(&1u64, &holder).is_err());
+    assert!(client.try_unlock_tokens(&1u64, &holder, &holder).is_err());
 }
 
 #[test]
@@ -204,8 +204,8 @@ fn transfer_restrictions_are_blocked_while_paused() {
     let (client, _admin) = setup_paused(&env);
     let who = Address::generate(&env);
 
-    assert!(client.try_add_to_whitelist(&1u64, &who).is_err());
-    assert!(client.try_remove_from_whitelist(&1u64, &who).is_err());
+    assert!(client.try_add_to_whitelist(&1u64, &who, &who).is_err());
+    assert!(client.try_remove_from_whitelist(&1u64, &who, &who).is_err());
 }
 
 #[test]

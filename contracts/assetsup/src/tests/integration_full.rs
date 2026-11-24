@@ -128,11 +128,11 @@ fn test_transfer_restrictions_workflow() {
         &AssetType::Physical,
     );
 
-    // Set transfer restrictions
-    client.set_transfer_restriction(&asset_id, &true);
+    // Set transfer restrictions (tokenizer/admin only)
+    client.set_transfer_restriction(&asset_id, &true, &owner);
 
-    // Add investor1 to whitelist
-    client.add_to_whitelist(&asset_id, &investor1);
+    // Add investor1 to whitelist (tokenizer/admin only)
+    client.add_to_whitelist(&asset_id, &investor1, &owner);
 
     // Transfer to whitelisted address should succeed
     client.transfer_tokens(&asset_id, &owner, &investor1, &100000i128);
@@ -199,8 +199,8 @@ fn test_token_locking_workflow() {
     // Verify tokens are locked
     assert!(client.is_tokens_locked(&asset_id, &investor));
 
-    // Unlock tokens
-    client.unlock_tokens(&asset_id, &investor);
+    // Unlock tokens (tokenizer/admin only)
+    client.unlock_tokens(&asset_id, &investor, &owner);
 
     // Verify tokens are unlocked
     assert!(!client.is_tokens_locked(&asset_id, &investor));
