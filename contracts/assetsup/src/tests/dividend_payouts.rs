@@ -47,7 +47,7 @@ fn setup(
         &String::from_str(env, "A token with dividends"),
         &AssetType::Physical,
     );
-    client.enable_revenue_sharing(&TOKEN_ID);
+    client.enable_revenue_sharing(&TOKEN_ID, &tokenizer);
 
     let token = env
         .register_stellar_asset_contract_v2(admin.clone())

@@ -2,20 +2,31 @@ use crate::error::Error;
 use crate::types::{TokenDataKey, TransferRestriction};
 use soroban_sdk::{Address, Env, String, Vec};
 
-/// Set transfer restrictions for an asset
+/// Update only the accredited-investor requirement for an asset.
+///
+/// The geographic allow-list is a separate setting (see
+/// [`set_geographic_restriction`]). Writing a fresh `TransferRestriction` here
+/// used to overwrite an allow-list configured earlier with an empty one,
+/// silently opening the asset to every jurisdiction. The caller-supplied
+/// `geographic_allowed` is therefore ignored, mirroring how
+/// `set_geographic_restriction` preserves `require_accredited`.
 pub fn set_transfer_restriction(
     env: &Env,
     asset_id: u64,
     restriction: TransferRestriction,
 ) -> Result<(), Error> {
     let store = env.storage().persistent();
-
-    // Store the restriction
     let key = TokenDataKey::TransferRestriction(asset_id);
-    store.set(&key, &restriction);
+
+    let mut existing: TransferRestriction = store.get(&key).flatten().unwrap_or(TransferRestriction {
+        require_accredited: restriction.require_accredited,
+        geographic_allowed: Vec::new(env),
+    });
+    existing.require_accredited = restriction.require_accredited;
+    store.set(&key, &existing);
 
     // Emit event: (asset_id, require_accredited)
-    crate::events::restriction_set(env, asset_id, restriction.require_accredited);
+    crate::events::restriction_set(env, asset_id, existing.require_accredited);
 
     Ok(())
 }
@@ -65,6 +76,52 @@ pub fn get_address_jurisdiction(env: &Env, address: Address) -> Option<String> {
         .persistent()
         .get(&TokenDataKey::AddressJurisdiction(address))
         .flatten()
+}
+
+/// The admin-managed set of KYC/compliance attesters who may record a holder's
+/// jurisdiction. Attestation is deliberately separated from self-authentication:
+/// a holder must not be able to declare their own jurisdiction.
+fn attesters(env: &Env) -> Vec<Address> {
+    env.storage()
+        .persistent()
+        .get(&TokenDataKey::JurisdictionAttesters)
+        .flatten()
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+/// Add an address to the jurisdiction attester set. Idempotent.
+pub fn add_jurisdiction_attester(env: &Env, attester: Address) -> Result<(), Error> {
+    let mut list = attesters(env);
+    if list.iter().any(|a| a == attester) {
+        return Ok(());
+    }
+    list.push_back(attester);
+    env.storage()
+        .persistent()
+        .set(&TokenDataKey::JurisdictionAttesters, &list);
+    Ok(())
+}
+
+/// Remove an address from the jurisdiction attester set. Idempotent.
+pub fn remove_jurisdiction_attester(env: &Env, attester: Address) -> Result<(), Error> {
+    let mut list = attesters(env);
+    if let Some(index) = list.iter().position(|a| a == attester) {
+        list.remove(index as u32);
+        env.storage()
+            .persistent()
+            .set(&TokenDataKey::JurisdictionAttesters, &list);
+    }
+    Ok(())
+}
+
+/// Whether `attester` is currently permitted to record jurisdictions.
+pub fn is_jurisdiction_attester(env: &Env, attester: Address) -> bool {
+    attesters(env).iter().any(|a| a == attester)
+}
+
+/// The addresses currently permitted to record jurisdictions.
+pub fn get_jurisdiction_attesters(env: &Env) -> Vec<Address> {
+    attesters(env)
 }
 
 /// Add an address to the whitelist

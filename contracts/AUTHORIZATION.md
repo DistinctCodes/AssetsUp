@@ -91,6 +91,23 @@ before clearing the ledger. All three share the
 `require_asset_admin_or_tokenizer` helper in `lib.rs`; module functions remain
 unauthenticated and keep their signatures.
 
+The same class of gap is closed here for the token-level setters, and
+jurisdiction attestation is no longer self-service:
+
+| Entrypoint | Was | Now |
+|---|---|---|
+| `enable_revenue_sharing`, `disable_revenue_sharing` | no `require_auth` at all | ✅ `caller`, must be the token's tokenizer or the admin |
+| `set_transfer_restriction` | no `require_auth` at all | ✅ `caller`, must be the token's tokenizer or the admin |
+| `set_address_jurisdiction` | `address.require_auth()` — the holder attested for themselves | ✅ `caller`, must be the admin or an admin-managed KYC/compliance attester |
+
+Holders can no longer declare the jurisdiction that lets them pass an asset's
+geographic allow-list. The attester set is managed by the admin through
+`add_jurisdiction_attester` / `remove_jurisdiction_attester` (both
+admin-authenticated); `is_jurisdiction_attester` and `get_jurisdiction_attesters`
+are read-only. `set_transfer_restriction` now changes only `require_accredited`,
+preserving the geographic allow-list written by `set_geographic_restriction`
+(#1790).
+
 ### Lifecycle and administration
 
 | Entrypoint | Principal | |
@@ -131,11 +148,14 @@ admin.
 | `cast_vote` | `voter` | ✅ |
 | `propose_detokenization` | `proposer` | ✅ |
 | `unlock_tokens` | `caller`, must be tokenizer or admin | ✅ |
-| `enable_revenue_sharing`, `disable_revenue_sharing`, `execute_detokenization` | — | ⚠️ **no auth** |
-| `set_transfer_restriction` | `caller`, must be tokenizer or admin | ✅ |
+| `execute_detokenization` | — | ⚠️ **no auth** |
+| `enable_revenue_sharing`, `disable_revenue_sharing`, `set_transfer_restriction` | `caller`, must be the token's tokenizer or the admin | ✅ |
 | `add_to_whitelist`, `remove_from_whitelist` | `caller`, must be tokenizer or admin | ✅ |
 | `set_geographic_restriction` | `caller`, must be tokenizer or admin | ✅ |
-| `get_token_balance`, `get_token_holders`, `is_tokens_locked`, `get_ownership_percentage`, `get_tokenized_asset`, `get_unclaimed_dividends`, `get_vote_tally`, `has_voted`, `proposal_passed`, `is_whitelisted`, `get_whitelist`, `get_detokenization_proposal`, `is_detokenization_active` | — | 📖 |
+| `set_address_jurisdiction` | `caller`, must be the admin or a KYC/compliance attester | ✅ |
+| `add_jurisdiction_attester`, `remove_jurisdiction_attester` | current admin | ✅ |
+| `is_jurisdiction_attester`, `get_jurisdiction_attesters` | — | 📖 |
+| `get_token_balance`, `get_token_holders`, `is_tokens_locked`, `get_ownership_percentage`, `get_tokenized_asset`, `get_unclaimed_dividends`, `get_address_jurisdiction`, `get_vote_tally`, `has_voted`, `proposal_passed`, `is_whitelisted`, `get_whitelist`, `get_detokenization_proposal`, `is_detokenization_active` | — | 📖 |
 
 The `require_auth` for the ✅ rows lives in the `lib.rs` entrypoint wrapper, not
 in the module function it delegates to. `tokenization.rs`, `dividends.rs`,
@@ -148,8 +168,9 @@ The remaining ⚠️ rows are **not fixed here.** They are real gaps, but each n
 decision about *which* principal should be required — the token issuer, the
 asset owner, or the admin — and that is a design question rather than an
 oversight. They are listed so the next change starts from a list rather than a
-search. None is an ownership-transfer path, which is why the four registry
-entrypoints took priority.
+search. The rows gated in this change (revenue-sharing toggles, the
+accredited-investor restriction setter, and jurisdiction attestation) now carry
+the explicit signers shown above.
 
 ---
 

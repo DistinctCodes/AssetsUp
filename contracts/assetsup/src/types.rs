@@ -120,6 +120,11 @@ pub enum TokenDataKey {
     /// Payment token (`Address`) used to pay dividends for a tokenized asset.
     /// Stored separately so `TokenizedAsset` constructors stay unchanged.
     DividendToken(u64),
+    /// Stores `Vec<Address>` of admin-managed KYC/compliance attesters. Only an
+    /// admin or one of these addresses may record a holder's jurisdiction;
+    /// holders must not be able to self-attest. Appended last so the XDR
+    /// discriminants of all existing keys stay unchanged across upgrades.
+    JurisdictionAttesters,
 }
 
 /// Represents a tokenized asset on-chain

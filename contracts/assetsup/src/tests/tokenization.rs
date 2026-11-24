@@ -546,3 +546,83 @@ fn test_lock_tokens_unauthorized() {
     assert!(lock_result.is_err());
     assert!(still_unlocked);
 }
+
+// =====================
+// #1792: holder list pruning
+// =====================
+
+#[test]
+fn test_full_transfer_prunes_the_sender_from_holders() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset_id = make_asset_id(1200);
+
+    let (before_len, after_len, recipient_listed, sender_listed, count, sender_balance) =
+        env.as_contract(&contract_id, || {
+            setup_tokenized(&env, asset_id, &tokenizer);
+            let before = tokenization::get_token_holders(&env, asset_id).unwrap();
+
+            tokenization::transfer_tokens(
+                &env,
+                asset_id,
+                tokenizer.clone(),
+                recipient.clone(),
+                1000,
+            )
+            .unwrap();
+
+            let after = tokenization::get_token_holders(&env, asset_id).unwrap();
+            let asset = tokenization::get_tokenized_asset(&env, asset_id).unwrap();
+            (
+                before.len(),
+                after.len(),
+                after.iter().any(|h| h == recipient),
+                after.iter().any(|h| h == tokenizer),
+                asset.token_holders_count,
+                tokenization::get_token_balance(&env, asset_id, tokenizer.clone()).unwrap(),
+            )
+        });
+
+    assert_eq!(before_len, 1);
+    assert_eq!(after_len, 1);
+    assert!(recipient_listed, "the recipient must become a holder");
+    assert!(!sender_listed, "a zero-balance sender must be pruned");
+    assert_eq!(count, 1, "token_holders_count must track the list");
+    assert_eq!(sender_balance, 0);
+}
+
+#[test]
+fn test_pruned_holder_can_still_claim_accrued_dividends() {
+    let env = Env::default();
+    let contract_id = env.register(AssetUpContract, ());
+    let tokenizer = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset_id = make_asset_id(1300);
+
+    let (sender_listed, claimed) = env.as_contract(&contract_id, || {
+        setup_tokenized(&env, asset_id, &tokenizer);
+        crate::dividends::enable_revenue_sharing(&env, asset_id).unwrap();
+        crate::dividends::distribute_dividends(&env, asset_id, 1000).unwrap();
+
+        tokenization::transfer_tokens(
+            &env,
+            asset_id,
+            tokenizer.clone(),
+            recipient.clone(),
+            1000,
+        )
+        .unwrap();
+
+        let holders = tokenization::get_token_holders(&env, asset_id).unwrap();
+        let still_listed = holders.iter().any(|h| h == tokenizer);
+        // The ownership record was retained, so accrued dividends are claimable
+        // even though the address is no longer in the holders list.
+        let amount = crate::dividends::claim_dividends(&env, asset_id, tokenizer.clone()).unwrap();
+        (still_listed, amount)
+    });
+
+    assert!(!sender_listed);
+    assert_eq!(claimed, 1000);
+}

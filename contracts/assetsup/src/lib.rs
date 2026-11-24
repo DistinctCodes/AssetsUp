@@ -1424,15 +1424,21 @@ impl AssetUpContract {
     }
 
     /// Enable revenue sharing for an asset
-    pub fn enable_revenue_sharing(env: Env, asset_id: u64) -> Result<(), Error> {
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
+    pub fn enable_revenue_sharing(env: Env, asset_id: u64, caller: Address) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         dividends::enable_revenue_sharing(&env, asset_id)
     }
 
     /// Disable revenue sharing for an asset
-    pub fn disable_revenue_sharing(env: Env, asset_id: u64) -> Result<(), Error> {
+    ///
+    /// Auth: `caller` must authorize and be the asset's tokenizer or the admin.
+    pub fn disable_revenue_sharing(env: Env, asset_id: u64, caller: Address) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
+        Self::require_asset_admin_or_tokenizer(&env, asset_id, &caller)?;
 
         dividends::disable_revenue_sharing(&env, asset_id)
     }
@@ -1571,21 +1577,65 @@ impl AssetUpContract {
         transfer_restrictions::set_geographic_restriction(&env, asset_id, allowed_jurisdictions)
     }
 
-    /// Record the jurisdiction (ISO country code) of an address; self-authenticated
+    /// Record the jurisdiction (ISO country code) of an address.
+    ///
+    /// Auth: `caller` must authorize and be the contract admin or a designated
+    /// KYC/compliance attester. The subject (`address`) deliberately does **not**
+    /// authorize this call: a holder cannot self-attest a jurisdiction in order
+    /// to satisfy an asset's geographic allow-list.
     pub fn set_address_jurisdiction(
         env: Env,
         address: Address,
         jurisdiction: String,
+        caller: Address,
     ) -> Result<(), Error> {
         Self::require_not_paused(&env)?;
 
-        address.require_auth();
+        caller.require_auth();
+        let admin = Self::get_admin(env.clone())?;
+        if caller != admin && !transfer_restrictions::is_jurisdiction_attester(&env, caller.clone())
+        {
+            return Err(Error::Unauthorized);
+        }
+
         transfer_restrictions::set_address_jurisdiction(&env, address, jurisdiction)
     }
 
     /// Get the recorded jurisdiction of an address
     pub fn get_address_jurisdiction(env: Env, address: Address) -> Option<String> {
         transfer_restrictions::get_address_jurisdiction(&env, address)
+    }
+
+    /// Add `attester` to the admin-managed KYC/compliance attester set.
+    ///
+    /// Auth: the contract admin.
+    pub fn add_jurisdiction_attester(env: Env, attester: Address) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+        transfer_restrictions::add_jurisdiction_attester(&env, attester)
+    }
+
+    /// Remove `attester` from the jurisdiction attester set.
+    ///
+    /// Auth: the contract admin.
+    pub fn remove_jurisdiction_attester(env: Env, attester: Address) -> Result<(), Error> {
+        Self::require_not_paused(&env)?;
+
+        let admin = Self::get_admin(env.clone())?;
+        admin.require_auth();
+        transfer_restrictions::remove_jurisdiction_attester(&env, attester)
+    }
+
+    /// Whether `attester` may record jurisdictions. Read-only.
+    pub fn is_jurisdiction_attester(env: Env, attester: Address) -> bool {
+        transfer_restrictions::is_jurisdiction_attester(&env, attester)
+    }
+
+    /// The addresses that may record jurisdictions. Read-only.
+    pub fn get_jurisdiction_attesters(env: Env) -> Vec<Address> {
+        transfer_restrictions::get_jurisdiction_attesters(&env)
     }
 
     // =====================

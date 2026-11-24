@@ -43,7 +43,7 @@ fn test_full_asset_tokenization_workflow() {
     // Step 4: Enable revenue sharing, configure and fund a dividend token,
     // then distribute dividends. The distribution pulls the amount from the
     // tokenizer into the contract so the credits are fully backed.
-    client.enable_revenue_sharing(&asset_id);
+    client.enable_revenue_sharing(&asset_id, &owner);
     let dividend_token = env
         .register_stellar_asset_contract_v2(admin.clone())
         .address();
